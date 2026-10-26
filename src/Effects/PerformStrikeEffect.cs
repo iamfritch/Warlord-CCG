@@ -20,7 +20,9 @@ public sealed record PerformStrikeEffect(int StrikeBonus = 0, bool IsRanged = fa
 			yield break;
 		}
 		CardInstance? opponentCard = context.FindCard(context.SourceInstanceId);
-		if (!IsRanged && GameEngine.HasTurnBuff(context.State, targetId, "DUPE_ACTIVE"))
+		PassiveBonuses earlyPassiveBonuses = (opponentCard.HasValue ? GameEngine.GetContinuousPassiveBonuses(context.State, opponentCard.Value, new CombatContext { IsAttacking = true, OpponentCard = defender, IsMelee = !IsRanged, IsRanged = IsRanged }, context.CardDb) : new PassiveBonuses());
+		bool hasTrueStrike = TrueStrike || earlyPassiveBonuses.TrueStrike;
+		if (!hasTrueStrike && !IsRanged && GameEngine.HasTurnBuff(context.State, targetId, "DUPE_ACTIVE"))
 		{
 			int baseDefSkill = (context.CardDb?.GetDefinition(defender.Value.DefinitionId)?.Skill).GetValueOrDefault();
 			int defSkill = (defender.Value.CurrentSkill > 0 ? defender.Value.CurrentSkill : baseDefSkill) + GameEngine.GetTurnBuffValue(context.State, defender.Value.InstanceId, "SKILL");
@@ -42,7 +44,7 @@ public sealed record PerformStrikeEffect(int StrikeBonus = 0, bool IsRanged = fa
 				int dist = BoardGeometry.GetCrossBoardDistance(atkRank.Value, defRank.Value);
 				if (IsRanged)
 				{
-					if (dist > MaxRange)
+					if (!BoardGeometry.IsRangedValid(atkRank.Value, defRank.Value, MaxRange))
 					{
 						yield break;
 					}
@@ -137,10 +139,10 @@ public sealed record PerformStrikeEffect(int StrikeBonus = 0, bool IsRanged = fa
 			int val = context.RollDice(1, 20);
 			num12 = Math.Max(num11, val);
 		}
-		bool flag2 = ((context.CardDb != null) | flag) && num12 == 1;
+		bool flag2 = num12 == 1;
 		bool flag3 = num12 == 20;
 		int num13 = num12 + num5;
-		bool flag4 = !flag2 && ((flag | flag3) || num13 >= num8);
+		bool flag4 = !flag2 && (flag3 || num13 >= num8);
 		int damageDealt = ((flag4 && !ZeroDamage) ? (1 + num9) : 0);
 		string attackerName = ((!opponentCard.HasValue || context.CardDb == null) ? $"Card #{context.SourceInstanceId}" : (context.CardDb.GetDefinition(opponentCard.Value.DefinitionId)?.Name ?? $"Card #{context.SourceInstanceId}"));
 		string defenderName = definition3?.Name ?? $"Card #{targetId}";

@@ -478,7 +478,7 @@ public class BucketEModalAndBranchingTests
 			InstanceId = 2,
 			DefinitionId = "victim",
 			OwnerPlayerIndex = 1,
-			Rank = 1,
+			Rank = 2,
 			Zone = CardZone.Board,
 			ReadyState = ReadyState.Spent
 		};

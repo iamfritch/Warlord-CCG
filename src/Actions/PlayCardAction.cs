@@ -382,7 +382,8 @@ public sealed record PlayCardAction : PlayerAction, IPlayerAction
 		ArgumentNullException.ThrowIfNull(itemDef, "itemDef");
 		ArgumentNullException.ThrowIfNull(targetDef, "targetDef");
 		List<string> list = new List<string>();
-		int num = targetDef.Level + targetCard.BonusLevel + (targetCard.SkillRatings.TryGetValue("BonusLevel", out var value) ? value : 0);
+		int currentRank = targetCard.Rank ?? (state != null && targetCard.OwnerPlayerIndex >= 0 && targetCard.OwnerPlayerIndex < state.Players.Count ? BoardGeometry.FindCardRank(state.Players[targetCard.OwnerPlayerIndex], targetCard.InstanceId) : null) ?? 0;
+		int num = targetDef.Level + targetCard.BonusLevel + (targetCard.SkillRatings.TryGetValue("BonusLevel", out var value) ? value : 0) + currentRank;
 		if (num < itemDef.Level)
 		{
 			list.Add($"Target character '{targetDef.Name}' (Level {num}) does not meet required Level {itemDef.Level} for Item '{itemDef.Name}'.");
@@ -424,6 +425,37 @@ public sealed record PlayCardAction : PlayerAction, IPlayerAction
 				{
 					if (itemEquipmentSlots2.Contains(item))
 					{
+						if (item.Equals("Weapon", StringComparison.OrdinalIgnoreCase))
+						{
+							bool hasDualWield = targetDef.Traits.Any((string t) => t.Equals("Dual Wield", StringComparison.OrdinalIgnoreCase))
+								|| targetDef.RulesText.Contains("Dual Wield", StringComparison.OrdinalIgnoreCase)
+								|| itemDef.Traits.Any((string t) => t.Equals("Dual Wield", StringComparison.OrdinalIgnoreCase))
+								|| itemDef.RulesText.Contains("Dual Wield", StringComparison.OrdinalIgnoreCase)
+								|| definition2.Traits.Any((string t) => t.Equals("Dual Wield", StringComparison.OrdinalIgnoreCase))
+								|| definition2.RulesText.Contains("Dual Wield", StringComparison.OrdinalIgnoreCase)
+								|| itemDef.Name.Equals("Revenger", StringComparison.OrdinalIgnoreCase)
+								|| definition2.Name.Equals("Revenger", StringComparison.OrdinalIgnoreCase);
+							if (hasDualWield)
+							{
+								int weaponCount = 0;
+								foreach (int existingId in targetCard.AttachedItemIds)
+								{
+									CardInstance? existingCard = CardLocator.FindCard(state, existingId);
+									if (existingCard.HasValue)
+									{
+										CardDefinition existingDef = cardDb.GetDefinition(existingCard.Value.DefinitionId);
+										if (existingDef != null && GetItemEquipmentSlots(existingDef).Contains("Weapon"))
+										{
+											weaponCount++;
+										}
+									}
+								}
+								if (weaponCount < 2)
+								{
+									continue;
+								}
+							}
+						}
 						if (item.Equals("Armor", StringComparison.OrdinalIgnoreCase))
 						{
 							list.Add($"Target character '{targetDef.Name}' already has armor equipped ('{definition2.Name}').");

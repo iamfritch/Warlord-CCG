@@ -85,10 +85,10 @@ public sealed record ResolveAttackEffect : IEffect
 		PassiveBonuses continuousPassiveBonuses = GameEngine.GetContinuousPassiveBonuses(context.State, cardInstance.Value, combatCtx, context.CardDb);
 		num += continuousPassiveBonuses.Ac;
 		int num3 = context.RollDice(1, 20);
-		bool flag = (EnableCriticals || TrueStrike) && num3 == 1;
+		bool flag = EnableCriticals && num3 == 1;
 		bool flag2 = EnableCriticals && num3 == 20;
 		int num4 = num3 + StrikeBonus;
-		bool flag3 = !flag && ((TrueStrike | flag2) || num4 >= num);
+		bool flag3 = !flag && (flag2 || num4 >= num);
 		int num5 = 0;
 		if (flag3)
 		{

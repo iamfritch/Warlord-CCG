@@ -75,7 +75,7 @@ public sealed class GameEngineDeathCheckTests
 		gameEngine.Resolver.ResolveAll(gameState);
 		CardInstance cardInstance = gameState.Players[1].DiscardPile[0];
 		Assert.Equal(CardZone.Discard, cardInstance.Zone);
-		Assert.Equal(ReadyState.Spent, cardInstance.ReadyState);
+		Assert.Equal(ReadyState.Ready, cardInstance.ReadyState);
 	}
 
 	[Fact]

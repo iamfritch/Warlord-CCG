@@ -66,6 +66,9 @@ public sealed class BoardGeometryTests
 			Zone = CardZone.Board,
 			OwnerPlayerIndex = 1
 		};
+		CardInstance rank2Defender = gameState.Players[1].Ranks[1][0];
+		gameState.Players[1].Ranks.Remove(1);
+		gameState.Players[1].Ranks[2] = new List<CardInstance> { rank2Defender };
 		SortedDictionary<int, List<CardInstance>> ranks = gameState.Players[1].Ranks;
 		int num = 1;
 		List<CardInstance> list = new List<CardInstance>(num);
@@ -73,7 +76,7 @@ public sealed class BoardGeometryTests
 		CollectionsMarshal.AsSpan(list)[0] = cardInstance;
 		ranks[3] = list;
 		CardInstance attacker = gameState.Players[0].Ranks[1][0];
-		List<CardInstance> validRangedTargets = BoardGeometry.GetValidRangedTargets(attacker, 1, gameState);
+		List<CardInstance> validRangedTargets = BoardGeometry.GetValidRangedTargets(attacker, 2, gameState);
 		Assert.Single(validRangedTargets);
 		Assert.Equal(2, validRangedTargets[0].InstanceId);
 		List<CardInstance> validRangedTargets2 = BoardGeometry.GetValidRangedTargets(attacker, 3, gameState);

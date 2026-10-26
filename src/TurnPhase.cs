@@ -8,7 +8,9 @@ public enum TurnPhase
 	Setup,
 	Ready,
 	Draw,
-	Main,
+	Order,
+	Main = Order,
 	Combat,
-	End
+	EndOfTurn,
+	End = EndOfTurn
 }

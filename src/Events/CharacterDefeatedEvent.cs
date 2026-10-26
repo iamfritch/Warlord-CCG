@@ -30,8 +30,15 @@ public sealed record CharacterDefeatedEvent : GameEvent
 						CardInstance item = cardInstance with
 						{
 							Zone = CardZone.Banished,
-							ReadyState = ReadyState.Spent,
-							Rank = null
+							ReadyState = ReadyState.Ready,
+							Rank = null,
+							Wounds = 0,
+							CurrentArmorClass = 0,
+							CurrentSkill = 0,
+							BonusLevel = 0,
+							AttachedItemIds = cardInstance.AttachedItemIds,
+							StatusTags = new List<string>(),
+							AbilitiesUsedThisTurn = new List<int>()
 						};
 						playerState.BanishPile.Add(item);
 					}
@@ -40,8 +47,15 @@ public sealed record CharacterDefeatedEvent : GameEvent
 						CardInstance item2 = cardInstance with
 						{
 							Zone = CardZone.Discard,
-							ReadyState = ReadyState.Spent,
-							Rank = null
+							ReadyState = ReadyState.Ready,
+							Rank = null,
+							Wounds = 0,
+							CurrentArmorClass = 0,
+							CurrentSkill = 0,
+							BonusLevel = 0,
+							AttachedItemIds = cardInstance.AttachedItemIds,
+							StatusTags = new List<string>(),
+							AbilitiesUsedThisTurn = new List<int>()
 						};
 						playerState.DiscardPile.Add(item2);
 					}

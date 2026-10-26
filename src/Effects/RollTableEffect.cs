@@ -17,7 +17,10 @@ public sealed record RollTableEffect(IReadOnlyList<RollTableBranch> Branches) : 
 			{
 				continue;
 			}
-			GlobalOnRollTableResolved?.Invoke(context.SourceInstanceId, num, branch.MinRoll, branch.MaxRoll);
+			if (!context.State.IsSimulation)
+			{
+				GlobalOnRollTableResolved?.Invoke(context.SourceInstanceId, num, branch.MinRoll, branch.MaxRoll);
+			}
 			foreach (IEffect effect in branch.Effects)
 			{
 				foreach (GameEvent item in effect.Evaluate(context))

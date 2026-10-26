@@ -14,11 +14,9 @@ public sealed class GameEnginePhaseTests
 		gameEngine.AdvancePhase();
 		Assert.Equal(TurnPhase.Draw, gameState.CurrentPhase);
 		gameEngine.AdvancePhase();
-		Assert.Equal(TurnPhase.Main, gameState.CurrentPhase);
+		Assert.Equal(TurnPhase.Order, gameState.CurrentPhase);
 		gameEngine.AdvancePhase();
-		Assert.Equal(TurnPhase.Combat, gameState.CurrentPhase);
-		gameEngine.AdvancePhase();
-		Assert.Equal(TurnPhase.End, gameState.CurrentPhase);
+		Assert.Equal(TurnPhase.EndOfTurn, gameState.CurrentPhase);
 	}
 
 	[Fact]

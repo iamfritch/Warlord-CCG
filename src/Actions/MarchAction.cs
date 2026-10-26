@@ -11,6 +11,8 @@ public sealed record MarchAction : PlayerAction
 
 	public required int DestinationRank { get; init; }
 
+	public int? TargetSlotIndex { get; init; }
+
 	[CompilerGenerated]
 	[SetsRequiredMembers]
 	private MarchAction(MarchAction original)
@@ -19,5 +21,6 @@ public sealed record MarchAction : PlayerAction
 		CardInstanceId = original.CardInstanceId;
 		SourceRank = original.SourceRank;
 		DestinationRank = original.DestinationRank;
+		TargetSlotIndex = original.TargetSlotIndex;
 	}
 }

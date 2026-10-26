@@ -27,7 +27,9 @@ public sealed record FortitudeSaveEffect(int DC, IReadOnlyList<IEffect> FailureE
 		int checks = ((!PerEquippedItem) ? 1 : cardInstance.Value.AttachedItemIds.Count);
 		for (int i = 0; i < checks; i++)
 		{
-			if (context.RollDice(1, 20) + targetSkill >= effectiveDC)
+			int roll = context.RollDice(1, 20);
+			bool success = roll == 20 || (roll != 1 && roll + targetSkill >= effectiveDC);
+			if (success)
 			{
 				continue;
 			}

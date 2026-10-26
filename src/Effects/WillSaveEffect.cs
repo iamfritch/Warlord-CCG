@@ -24,7 +24,9 @@ public sealed record WillSaveEffect(int DC, IReadOnlyList<IEffect> FailureEffect
 			}
 		}
 		int effectiveSkill = GameEngine.GetEffectiveSkill(context.State, cardInstance.Value, context.CardDb);
-		if (context.RollDice(1, 20) + effectiveSkill >= num)
+		int roll = context.RollDice(1, 20);
+		bool success = roll == 20 || (roll != 1 && roll + effectiveSkill >= num);
+		if (success)
 		{
 			yield break;
 		}

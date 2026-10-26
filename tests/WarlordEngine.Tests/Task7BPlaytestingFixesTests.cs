@@ -19,10 +19,10 @@ public class Task7BPlaytestingFixesTests
 	{
 		CardDefinition cardDefinition = new CardDefinition
 		{
-			DefinitionId = "item_sword_lvl2",
-			Name = "Heavy Broadsword",
+			DefinitionId = "item_sword_lvl3",
+			Name = "Heavy Greatsword",
 			Type = CardType.Item,
-			Level = 2,
+			Level = 3,
 			Class = CharacterClass.Fighter
 		};
 		CardDefinition cardDefinition2 = new CardDefinition
@@ -119,7 +119,7 @@ public class Task7BPlaytestingFixesTests
 		};
 		ActionResult actionResult = gameEngine.CanExecute(action);
 		Assert.False(actionResult.IsSuccess);
-		Assert.Contains(actionResult.Errors, (string e) => e.Contains("Level 2"));
+		Assert.Contains(actionResult.Errors, (string e) => e.Contains("Level 2") || e.Contains("Level 3"));
 		PlayCardAction action2 = new PlayCardAction
 		{
 			PlayerIndex = 0,

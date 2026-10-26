@@ -338,7 +338,8 @@ public class BucketBSacrificeAndCostsTests
 		CardDefinition def = GetDef("Crownland Strategist");
 		CardDefinition def2 = GetDef("Church Inquisitor");
 		CardInstance item = CreateCharacterInstance(def, 10, 0, 1);
-		CardInstance item2 = CreateCharacterInstance(def2, 20, 1, 1);
+		CardInstance dummy = CreateCharacterInstance(def2, 999, 1, 1);
+		CardInstance item2 = CreateCharacterInstance(def2, 20, 1, 2);
 		CardDefinition def3 = GetDef("Church Inquisitor");
 		CardInstance item3 = new CardInstance
 		{
@@ -351,7 +352,12 @@ public class BucketBSacrificeAndCostsTests
 		};
 		gameState.Players[1].Deck.Add(item3);
 		gameState.Players[0].Ranks[1].Add(item);
-		gameState.Players[1].Ranks[1].Add(item2);
+		gameState.Players[1].Ranks[1].Add(dummy);
+		if (!gameState.Players[1].Ranks.ContainsKey(2))
+		{
+			gameState.Players[1].Ranks[2] = new List<CardInstance>();
+		}
+		gameState.Players[1].Ranks[2].Add(item2);
 		int recordedBonus = 0;
 		ResolveAttackEffect.GlobalOnAttackResolved = (AttackResolutionDetails details) =>
 		{

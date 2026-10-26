@@ -72,7 +72,11 @@ public sealed class GameEngine
 				yield break;
 			}
 			PlayerState playerState = state.Players[defenderCard.Value.OwnerPlayerIndex];
-			if (defenderCard.Value.Rank.HasValue && playerState.Ranks.TryGetValue(defenderCard.Value.Rank.Value, out List<CardInstance> value))
+			CardDefinition def = engine._cardDb.GetDefinition(attackerCard.Value.DefinitionId);
+			bool attackerHasTrueStrike = HasTurnBuff(state, attackerCard.Value.InstanceId, "TRUE_STRIKE") ||
+				GetContinuousPassiveBonuses(state, attackerCard.Value, new CombatContext { IsAttacking = true, OpponentCard = defenderCard }, engine._cardDb).TrueStrike ||
+				(def != null && (def.Traits.Any((string t) => t.Equals("True Strike", StringComparison.OrdinalIgnoreCase)) || def.RulesText.Contains("True Strike", StringComparison.OrdinalIgnoreCase)));
+			if (!attackerHasTrueStrike && defenderCard.Value.Rank.HasValue && playerState.Ranks.TryGetValue(defenderCard.Value.Rank.Value, out List<CardInstance> value))
 			{
 				foreach (CardInstance item4 in value)
 				{
@@ -87,7 +91,7 @@ public sealed class GameEngine
 					}
 				}
 			}
-			if (HasTurnBuff(state, defenderCard.Value.InstanceId, "DUPE_ACTIVE"))
+			if (!attackerHasTrueStrike && HasTurnBuff(state, defenderCard.Value.InstanceId, "DUPE_ACTIVE"))
 			{
 				int baseDefSkill = (engine._cardDb.GetDefinition(defenderCard.Value.DefinitionId)?.Skill).GetValueOrDefault();
 				int defSkill = (defenderCard.Value.CurrentSkill > 0 ? defenderCard.Value.CurrentSkill : baseDefSkill) + GetTurnBuffValue(state, defenderCard.Value.InstanceId, "SKILL");
@@ -101,7 +105,6 @@ public sealed class GameEngine
 				yield break;
 			}
 			List<StrikeDescriptor> strikes = new List<StrikeDescriptor>();
-			CardDefinition def = engine._cardDb.GetDefinition(attackerCard.Value.DefinitionId);
 			CardDefinition cardDefinition = def;
 			if ((object)cardDefinition != null && cardDefinition.Attack?.Strikes.Count > 0)
 			{
@@ -491,7 +494,7 @@ public sealed class GameEngine
 					int crossDist = BoardGeometry.GetCrossBoardDistance(num, num4);
 					if (strike.IsRanged)
 					{
-						if (crossDist > 2)
+						if (!BoardGeometry.IsRangedValid(num, num4, 2))
 						{
 							continue;
 						}
@@ -545,13 +548,18 @@ public sealed class GameEngine
 				}
 				foreach (int item in attachedItemIds)
 				{
+					CardInstance? cardInstance2 = CardLocator.FindCard(state, item);
+					int itemOwnerIdx = cardInstance2?.OwnerPlayerIndex ?? characterDefeatedEvent.OwnerPlayerIndex;
+					PlayerState itemOwnerState = (itemOwnerIdx >= 0 && itemOwnerIdx < state.Players.Count)
+						? state.Players[itemOwnerIdx]
+						: playerState;
 					bool flag = false;
-					for (int j = 0; j < playerState.DiscardPile.Count; j++)
+					for (int j = 0; j < itemOwnerState.DiscardPile.Count; j++)
 					{
-						if (playerState.DiscardPile[j].InstanceId == item)
+						if (itemOwnerState.DiscardPile[j].InstanceId == item)
 						{
 							flag = true;
-							playerState.DiscardPile[j] = playerState.DiscardPile[j]with
+							itemOwnerState.DiscardPile[j] = itemOwnerState.DiscardPile[j] with
 							{
 								Zone = CardZone.Discard,
 								AttachedToInstanceId = null
@@ -561,10 +569,9 @@ public sealed class GameEngine
 					}
 					if (!flag)
 					{
-						CardInstance? cardInstance2 = CardLocator.FindCard(state, item);
 						if (cardInstance2.HasValue)
 						{
-							playerState.DiscardPile.Add(cardInstance2.Value with
+							itemOwnerState.DiscardPile.Add(cardInstance2.Value with
 							{
 								Zone = CardZone.Discard,
 								AttachedToInstanceId = null
@@ -972,7 +979,7 @@ public sealed class GameEngine
 		{
 			if (!flag2 && !(action is DeployStartingArmyAction))
 			{
-				if (_state.CurrentPhase == TurnPhase.Main)
+				if (_state.CurrentPhase == TurnPhase.Order)
 				{
 					_state.TurnState.RecordAction();
 				}
@@ -1281,7 +1288,7 @@ public sealed class GameEngine
 			}
 		}
 		TurnPhase currentPhase = state.CurrentPhase;
-		if ((uint)(currentPhase - 3) <= 1u)
+		if (currentPhase == TurnPhase.Order || currentPhase == TurnPhase.Combat)
 		{
 			int key;
 			List<CardInstance> value;
@@ -1312,7 +1319,7 @@ public sealed class GameEngine
 							int crossDist = BoardGeometry.GetCrossBoardDistance(num3, num5);
 							if (flag)
 							{
-								if (crossDist > 2)
+								if (!BoardGeometry.IsRangedValid(num3, num5, 2))
 								{
 									continue;
 								}
@@ -1347,6 +1354,28 @@ public sealed class GameEngine
 					if (item16.ReadyState != ReadyState.Ready)
 					{
 						continue;
+					}
+					if (value.Count > 1)
+					{
+						int currentSlot = value.FindIndex((CardInstance c) => c.InstanceId == item16.InstanceId);
+						for (int slot = 0; slot < value.Count; slot++)
+						{
+							if (slot != currentSlot)
+							{
+								MarchAction marchWithin = new MarchAction
+								{
+									PlayerIndex = playerId,
+									CardInstanceId = item16.InstanceId,
+									SourceRank = num6,
+									DestinationRank = num6,
+									TargetSlotIndex = slot
+								};
+								if (CanExecute(marchWithin, state).IsSuccess)
+								{
+									list.Add(marchWithin);
+								}
+							}
+						}
 					}
 					if (num6 > 1)
 					{
@@ -2343,15 +2372,13 @@ public sealed class GameEngine
 			turnPhase = TurnPhase.Draw;
 			break;
 		case TurnPhase.Draw:
-			turnPhase = TurnPhase.Main;
+			turnPhase = TurnPhase.Order;
 			break;
-		case TurnPhase.Main:
-			turnPhase = TurnPhase.Combat;
-			break;
+		case TurnPhase.Order:
 		case TurnPhase.Combat:
-			turnPhase = TurnPhase.End;
+			turnPhase = TurnPhase.EndOfTurn;
 			break;
-		case TurnPhase.End:
+		case TurnPhase.EndOfTurn:
 			PerformTurnEndSurvivalChecks();
 			_state.ActivePlayerIndex = (_state.ActivePlayerIndex + 1) % _state.Players.Count;
 			_state.TurnNumber++;
@@ -2360,7 +2387,7 @@ public sealed class GameEngine
 		default:
 			throw new InvalidOperationException($"Unknown phase: {currentPhase}");
 		}
-		if (turnPhase == TurnPhase.Main)
+		if (turnPhase == TurnPhase.Order)
 		{
 			RollInitiative();
 		}
@@ -2525,9 +2552,9 @@ public sealed class GameEngine
 		{
 			list.Add($"It is not Player {deploy.PlayerIndex}'s turn. Active player is Player {state.ActivePlayerIndex}.");
 		}
-		if (state.CurrentPhase != TurnPhase.Main)
+		if (state.CurrentPhase != TurnPhase.Order)
 		{
-			list.Add($"Cannot deploy during {state.CurrentPhase} phase. " + "Deployment is only allowed during the Main phase.");
+			list.Add($"Cannot deploy during {state.CurrentPhase} phase. Deployment is only allowed during the Order phase (Main phase).");
 		}
 		if (deploy.PlayerIndex < 0 || deploy.PlayerIndex >= state.Players.Count)
 		{
@@ -2582,9 +2609,9 @@ public sealed class GameEngine
 		{
 			list.Add($"It is not Player {march.PlayerIndex}'s turn.");
 		}
-		if (state.CurrentPhase != TurnPhase.Main && state.CurrentPhase != TurnPhase.Combat)
+		if (state.CurrentPhase != TurnPhase.Order && state.CurrentPhase != TurnPhase.Combat)
 		{
-			list.Add("Marching is only allowed during the Main phase.");
+			list.Add("Marching is only allowed during the Order phase.");
 		}
 		if (march.PlayerIndex < 0 || march.PlayerIndex >= state.Players.Count)
 		{
@@ -2592,13 +2619,38 @@ public sealed class GameEngine
 			return ActionResult.Failure(list);
 		}
 		PlayerState playerState = state.Players[march.PlayerIndex];
-		if (march.SourceRank == march.DestinationRank)
-		{
-			list.Add("Source and destination ranks cannot be the same.");
-		}
 		if (march.DestinationRank < 1)
 		{
 			list.Add($"Destination rank {march.DestinationRank} is invalid.");
+		}
+		if (march.SourceRank == march.DestinationRank)
+		{
+			if (playerState.Ranks.TryGetValue(march.SourceRank, out List<CardInstance> sameRankCards))
+			{
+				if (sameRankCards.Count <= 1)
+				{
+					list.Add("Cannot maneuver within rank when there is only 1 character in the rank.");
+				}
+				else
+				{
+					int currentIdx = sameRankCards.FindIndex((CardInstance c) => c.InstanceId == march.CardInstanceId);
+					if (march.TargetSlotIndex.HasValue)
+					{
+						if (march.TargetSlotIndex.Value < 0 || march.TargetSlotIndex.Value >= sameRankCards.Count)
+						{
+							list.Add($"Target slot index {march.TargetSlotIndex.Value} is out of range for rank with {sameRankCards.Count} characters.");
+						}
+						else if (march.TargetSlotIndex.Value == currentIdx)
+						{
+							list.Add("Target slot index must change character's position in the rank.");
+						}
+					}
+				}
+			}
+		}
+		else if (Math.Abs(march.SourceRank - march.DestinationRank) > 1)
+		{
+			list.Add("Characters can only march one rank at a time.");
 		}
 		if (!playerState.Ranks.ContainsKey(march.SourceRank))
 		{
@@ -2624,11 +2676,7 @@ public sealed class GameEngine
 				list.Add($"Card {march.CardInstanceId} not found at Rank {march.SourceRank}.");
 			}
 		}
-		if (Math.Abs(march.SourceRank - march.DestinationRank) > 1)
-		{
-			list.Add("Characters can only march one rank at a time.");
-		}
-		if (list.Count == 0)
+		if (list.Count == 0 && march.SourceRank != march.DestinationRank)
 		{
 			Dictionary<int, int> dictionary = new Dictionary<int, int>();
 			foreach (var (key, list3) in playerState.Ranks)
@@ -2702,9 +2750,9 @@ public sealed class GameEngine
 		{
 			list.Add($"It is not Player {attack.PlayerIndex}'s turn.");
 		}
-		if (state.CurrentPhase != TurnPhase.Combat)
+		if (state.CurrentPhase != TurnPhase.Order && state.CurrentPhase != TurnPhase.Combat)
 		{
-			list.Add("Attacks are only allowed during the Combat phase.");
+			list.Add("Attacks are only allowed during the Order phase.");
 		}
 		if (attack.PlayerIndex < 0 || attack.PlayerIndex >= state.Players.Count)
 		{
@@ -2849,9 +2897,9 @@ public sealed class GameEngine
 		{
 			list.Add($"It is not Player {attack.PlayerIndex}'s turn.");
 		}
-		if (state.CurrentPhase != TurnPhase.Combat && state.CurrentPhase != TurnPhase.Main)
+		if (state.CurrentPhase != TurnPhase.Combat && state.CurrentPhase != TurnPhase.Order)
 		{
-			list.Add("Attacks are only allowed during the Main or Combat phase.");
+			list.Add("Attacks are only allowed during the Order phase.");
 		}
 		if (attack.PlayerIndex < 0 || attack.PlayerIndex >= state.Players.Count)
 		{
@@ -2943,9 +2991,9 @@ public sealed class GameEngine
 			int rankDistance = BoardGeometry.GetCrossBoardDistance(num.Value, num2.Value);
 			if (num4)
 			{
-				if (rankDistance > 2)
+				if (!BoardGeometry.IsRangedValid(num.Value, num2.Value, 2))
 				{
-					list.Add($"Ranged attacks reach up to 2 ranks away (distance is {rankDistance}). Attacker is at Rank {num.Value}, Target is at Rank {num2.Value}.");
+					list.Add($"Ranged attacks reach 2 ranks away (distance is {rankDistance}). Attacker is at Rank {num.Value}, Target is at Rank {num2.Value}.");
 				}
 			}
 			else
@@ -3054,6 +3102,22 @@ public sealed class GameEngine
 		{
 			list.Add($"Starting army must include exactly 3 Level 1 characters in Rank 1 (found {num2}).");
 		}
+		HashSet<string> seenUniqueNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+		foreach (var item2 in list2)
+		{
+			CardDefinition item = item2.Item2;
+			if (item.Traits.Any((string t) => t.Equals("Reserved", StringComparison.OrdinalIgnoreCase)) || item.RulesText.Contains("Reserved", StringComparison.OrdinalIgnoreCase))
+			{
+				list.Add($"Starting character '{item.Name}' has the Reserved keyword and cannot be deployed in starting army.");
+			}
+			if (item.Traits.Any((string t) => t.Equals("Unique", StringComparison.OrdinalIgnoreCase)))
+			{
+				if (!seenUniqueNames.Add(item.Name))
+				{
+					list.Add($"Starting army cannot contain duplicate Unique character '{item.Name}'.");
+				}
+			}
+		}
 		if (cardDefinition != null)
 		{
 			string effectiveFaction = cardDefinition.GetEffectiveFaction();
@@ -3063,7 +3127,7 @@ public sealed class GameEngine
 				if (!item.IsWarlord)
 				{
 					string effectiveFaction2 = item.GetEffectiveFaction();
-					if (!effectiveFaction2.Equals("Mercenary", StringComparison.OrdinalIgnoreCase) && !item.Traits.Contains("Mercenary", StringComparer.OrdinalIgnoreCase) && !effectiveFaction2.Equals(effectiveFaction, StringComparison.OrdinalIgnoreCase))
+					if (!effectiveFaction2.Equals(effectiveFaction, StringComparison.OrdinalIgnoreCase))
 					{
 						list.Add($"Starting character '{item.Name}' faction '{effectiveFaction2}' does not match Warlord faction '{effectiveFaction}'.");
 					}
@@ -3234,9 +3298,9 @@ public sealed class GameEngine
 				list.Add(failureReason ?? "React timing condition is not satisfied.");
 			}
 		}
-		else if ((abilityDefinition.Trigger == AbilityTrigger.Order || abilityDefinition.Trigger == AbilityTrigger.SpendOrder) && state.CurrentPhase != TurnPhase.Main && state.CurrentPhase != TurnPhase.Combat)
+		else if ((abilityDefinition.Trigger == AbilityTrigger.Order || abilityDefinition.Trigger == AbilityTrigger.SpendOrder) && state.CurrentPhase != TurnPhase.Order && state.CurrentPhase != TurnPhase.Combat)
 		{
-			list.Add("Orders can only be used during Main or Combat phases.");
+			list.Add("Orders can only be used during the Order phase.");
 		}
 		if ((abilityDefinition.Trigger == AbilityTrigger.SpendOrder || abilityDefinition.Trigger == AbilityTrigger.SpendReact) && cardInstance.Value.ReadyState != ReadyState.Ready)
 		{
@@ -3370,9 +3434,9 @@ public sealed class GameEngine
 			{
 				list.Add($"It is not Player {playCard.PlayerIndex}'s turn. Active player is Player {state.ActivePlayerIndex}.");
 			}
-			if (state.CurrentPhase != TurnPhase.Main)
+			if (state.CurrentPhase != TurnPhase.Order)
 			{
-				list.Add($"Cannot play cards during {state.CurrentPhase} phase. Playing cards is only allowed during the Main phase.");
+				list.Add($"Cannot play cards during {state.CurrentPhase} phase. Playing cards is only allowed during the Order phase (Main phase).");
 			}
 		}
 		PlayerState playerState = state.Players[playCard.PlayerIndex];
@@ -3579,12 +3643,12 @@ public sealed class GameEngine
 					Class = (definition.Class ?? definition4.Class)
 				};
 			}
-			bool flag3 = definition.Name.Equals("Revenger", StringComparison.OrdinalIgnoreCase);
-			bool flag4 = cardInstance6.Value.AttachedItemIds.Any((int id) =>
+			bool flag3 = HasDualWield(definition);
+			bool flag4 = HasDualWield(definition4) || cardInstance6.Value.AttachedItemIds.Any((int id) =>
 			{
 				CardInstance? cardInstance7 = CardLocator.FindCard(state, id);
 				CardDefinition cardDefinition2 = (cardInstance7.HasValue ? _cardDb.GetDefinition(cardInstance7.Value.DefinitionId) : null);
-				return cardDefinition2 != null && cardDefinition2.Name.Equals("Revenger", StringComparison.OrdinalIgnoreCase);
+				return HasDualWield(cardDefinition2);
 			});
 			if (flag3 | flag4)
 			{
@@ -4122,7 +4186,8 @@ public sealed class GameEngine
 						PlayerIndex = marchAction.PlayerIndex,
 						CardInstanceId = marchAction.CardInstanceId,
 						SourceRank = marchAction.SourceRank,
-						DestinationRank = marchAction.DestinationRank
+						DestinationRank = marchAction.DestinationRank,
+						TargetSlotIndex = marchAction.TargetSlotIndex
 					});
 				}
 			}
@@ -4454,7 +4519,7 @@ public sealed class GameEngine
 		}
 		CloseReactWindow();
 		SyncPendingEvents();
-		if (_state.CurrentPhase == TurnPhase.Main)
+		if (_state.CurrentPhase == TurnPhase.Order)
 		{
 			_state.TurnState.RecordAction();
 		}
@@ -4778,6 +4843,17 @@ public sealed class GameEngine
 		return false;
 	}
 
+	public static bool HasDualWield(CardDefinition? def)
+	{
+		if (def == null)
+		{
+			return false;
+		}
+		return def.Name.Equals("Revenger", StringComparison.OrdinalIgnoreCase)
+			|| def.Traits.Any((string t) => t.Equals("Dual Wield", StringComparison.OrdinalIgnoreCase))
+			|| def.RulesText.Contains("Dual Wield", StringComparison.OrdinalIgnoreCase);
+	}
+
 	public static bool IsCharacterWounded(CardInstance card, CardDefinition? def, GameState state, CardDatabase? cardDb)
 	{
 		if (card.Wounds > 0)
@@ -5091,11 +5167,11 @@ public sealed class GameEngine
 			{
 				continue;
 			}
-			if (IsWeapon(definition12) || definition12.Name.Equals("Revenger", StringComparison.OrdinalIgnoreCase))
+			if (IsWeapon(definition12) || HasDualWield(definition12))
 			{
 				num13++;
 			}
-			if (definition12.Name.Equals("Revenger", StringComparison.OrdinalIgnoreCase))
+			if (HasDualWield(definition12))
 			{
 				flag5 = true;
 			}
@@ -5129,7 +5205,7 @@ public sealed class GameEngine
 				num5 += result;
 			}
 		}
-		if (flag5 && (object)combatCtx != null && combatCtx.IsMelee && num13 >= 2)
+		if ((flag5 || HasDualWield(definition)) && (object)combatCtx != null && combatCtx.IsMelee && num13 >= 2)
 		{
 			num6++;
 		}

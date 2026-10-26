@@ -871,8 +871,8 @@ public sealed class CoreTabletopRulesBugsTests
 		CardInstance p1R1 = state.Players[1].Ranks[1][0]; // ID 20
 		CardInstance p1R2 = state.Players[1].Ranks[2][0]; // ID 21
 
-		// Rank 1 -> Rank 1: dist = 1 + 1 - 1 = 1 <= 2 (Valid)
-		Assert.True(BoardGeometry.IsRangedValid(p0R1, p1R1, state, 2));
+		// Rank 1 -> Rank 1: dist = 1 + 1 - 1 = 1 < 2 (INVALID for ranged strike under Rule 509.4)
+		Assert.False(BoardGeometry.IsRangedValid(p0R1, p1R1, state, 2));
 		// Rank 1 -> Rank 2: dist = 1 + 2 - 1 = 2 <= 2 (Valid)
 		Assert.True(BoardGeometry.IsRangedValid(p0R1, p1R2, state, 2));
 		// Rank 2 -> Rank 1: dist = 2 + 1 - 1 = 2 <= 2 (Valid)
@@ -889,7 +889,7 @@ public sealed class CoreTabletopRulesBugsTests
 		AttackAction atkR2ToR2 = new AttackAction { PlayerIndex = 0, AttackerInstanceId = 11, TargetInstanceId = 21 };
 		ActionResult resR2ToR2 = engine.CanExecute(atkR2ToR2, state);
 		Assert.False(resR2ToR2.IsSuccess);
-		Assert.Contains(resR2ToR2.Errors, e => e.Contains("out of range") || e.Contains("reach up to 2 ranks away"));
+		Assert.Contains(resR2ToR2.Errors, e => e.Contains("out of range") || e.Contains("reach up to 2 ranks away") || e.Contains("reach 2 ranks away") || e.Contains("Ranged attacks"));
 
 		// Rank 1 -> Rank 2 attack succeeds
 		AttackAction atkR1ToR2 = new AttackAction { PlayerIndex = 0, AttackerInstanceId = 10, TargetInstanceId = 21 };

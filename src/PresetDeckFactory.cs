@@ -264,7 +264,8 @@ public static class PresetDeckFactory
 		string warlordFaction = warlord.GetEffectiveFaction();
 		List<CardDefinition> source = (from d in cardDb.Definitions.Values
 			where !d.IsWarlord && d.Type == CardType.Character
-			where d.GetEffectiveFaction().Equals(warlordFaction, StringComparison.OrdinalIgnoreCase) || d.Traits.Contains("Mercenary", StringComparer.OrdinalIgnoreCase) || d.GetEffectiveFaction().Equals("Mercenary", StringComparison.OrdinalIgnoreCase)
+			where !d.Traits.Any((string t) => t.Equals("Reserved", StringComparison.OrdinalIgnoreCase)) && !d.RulesText.Contains("Reserved", StringComparison.OrdinalIgnoreCase)
+			where d.GetEffectiveFaction().Equals(warlordFaction, StringComparison.OrdinalIgnoreCase)
 			select d).ToList();
 		List<CardDefinition> list = source.Where((CardDefinition d) => d.Level == 2).ToList();
 		List<CardDefinition> list2 = source.Where((CardDefinition d) => d.Level == 1).ToList();

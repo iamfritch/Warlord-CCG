@@ -629,7 +629,7 @@ public class BucketCPassivesAndAurasTests
 	}
 
 	[Fact]
-	public void SteadyGrip_TrueStrike_HitsEvenWhenTotalBelowAc_ExceptOnNatural1()
+	public void SteadyGrip_TrueStrike_RequiresRollMeetingAc_Rule602_14()
 	{
 		PlayerState playerState = CreatePlayer(0, "P1");
 		PlayerState playerState2 = CreatePlayer(1, "P2");
@@ -673,8 +673,7 @@ public class BucketCPassivesAndAurasTests
 			RollDice = (int count, int sides) => 5
 		};
 		List<GameEvent> list = resolveAttackEffect2.Evaluate(context2).ToList();
-		Assert.Single(list);
-		Assert.IsType<DealDamageEvent>(list[0]);
+		Assert.Empty(list);
 		ResolveAttackEffect resolveAttackEffect3 = new ResolveAttackEffect
 		{
 			StrikeBonus = 2,
@@ -687,10 +686,11 @@ public class BucketCPassivesAndAurasTests
 			TargetInstanceId = item2.InstanceId,
 			State = state,
 			CardDb = _cardDb,
-			RollDice = (int count, int sides) => 1
+			RollDice = (int count, int sides) => 20
 		};
 		List<GameEvent> collection2 = resolveAttackEffect3.Evaluate(context3).ToList();
-		Assert.Empty(collection2);
+		Assert.Single(collection2);
+		Assert.IsType<DealDamageEvent>(collection2[0]);
 	}
 
 	[Fact]

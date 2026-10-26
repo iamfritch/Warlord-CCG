@@ -13,9 +13,25 @@ public static class BoardGeometry
 		return Math.Abs(rankA - rankB);
 	}
 
-	public static int GetCrossBoardDistance(int attackerRank, int defenderRank)
+	public static int GetCrossFormationDistance(int attackerRank, int defenderRank)
 	{
 		return attackerRank + defenderRank - 1;
+	}
+
+	public static int GetCrossBoardDistance(int attackerRank, int defenderRank)
+	{
+		return GetCrossFormationDistance(attackerRank, defenderRank);
+	}
+
+	public static bool IsRangedValid(int attackerRank, int defenderRank, int maxRange = 2)
+	{
+		int dist = GetCrossFormationDistance(attackerRank, defenderRank);
+		return dist >= 2 && dist <= maxRange;
+	}
+
+	public static bool IsSameFormationRangedValid(int attackerRank, int allyRank)
+	{
+		return Math.Abs(attackerRank - allyRank) == 2;
 	}
 
 	public static bool IsMeleeValid(CardInstance attacker, CardInstance defender, GameState state)
@@ -49,7 +65,7 @@ public static class BoardGeometry
 		{
 			return false;
 		}
-		return GetCrossBoardDistance(num.Value, num2.Value) <= maxRange;
+		return IsRangedValid(num.Value, num2.Value, maxRange);
 	}
 
 	public static List<CardInstance> GetValidRangedTargets(CardInstance attacker, int weaponRange, GameState state)
@@ -68,7 +84,7 @@ public static class BoardGeometry
 			}
 			foreach (var (defenderRank, collection) in player.Ranks)
 			{
-				if (GetCrossBoardDistance(num.Value, defenderRank) <= weaponRange)
+				if (IsRangedValid(num.Value, defenderRank, weaponRange))
 				{
 					list.AddRange(collection);
 				}
