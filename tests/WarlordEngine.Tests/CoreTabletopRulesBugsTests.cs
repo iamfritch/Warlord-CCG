@@ -55,11 +55,11 @@ public sealed class CoreTabletopRulesBugsTests
 					BaseHitPoints = 1,
 					Attack = new AttackValue
 					{
-						Strikes = new _003C_003Ez__ReadOnlySingleElementList<StrikeDescriptor>(new StrikeDescriptor
+						Strikes = new List<StrikeDescriptor> { new StrikeDescriptor
 						{
 							Modifier = 3,
 							IsRanged = false
-						}),
+						} },
 						RawText = "+3"
 					}
 				},
@@ -74,11 +74,11 @@ public sealed class CoreTabletopRulesBugsTests
 					BaseHitPoints = 5,
 					Attack = new AttackValue
 					{
-						Strikes = new _003C_003Ez__ReadOnlySingleElementList<StrikeDescriptor>(new StrikeDescriptor
+						Strikes = new List<StrikeDescriptor> { new StrikeDescriptor
 						{
 							Modifier = 2,
 							IsRanged = false
-						}),
+						} },
 						RawText = "+2"
 					}
 				}
@@ -377,13 +377,13 @@ public sealed class CoreTabletopRulesBugsTests
 				Level = 5,
 				ArmorClass = 16,
 				BaseHitPoints = 3,
-				Abilities = new _003C_003Ez__ReadOnlySingleElementList<AbilityDefinition>(new AbilityDefinition
+				Abilities = new List<AbilityDefinition> { new AbilityDefinition
 				{
 					Trigger = AbilityTrigger.Order,
 					IsLimited = true,
 					Description = "Limited Order: Boost friendly characters",
-					Effects = new _003C_003Ez__ReadOnlySingleElementList<IEffect>(new ModifyStatEffect("ATK", 2))
-				})
+					Effects = new List<IEffect> { new ModifyStatEffect("ATK", 2) } }
+				}
 			} }
 		};
 		GameState gameState = new GameState
@@ -466,11 +466,11 @@ public sealed class CoreTabletopRulesBugsTests
 					BaseHitPoints = 5,
 					Attack = new AttackValue
 					{
-						Strikes = new _003C_003Ez__ReadOnlySingleElementList<StrikeDescriptor>(new StrikeDescriptor
+						Strikes = new List<StrikeDescriptor> { new StrikeDescriptor
 						{
 							Modifier = 2,
 							IsRanged = false
-						})
+						} }
 					}
 				},
 				["defender"] = new CardDefinition
@@ -573,11 +573,11 @@ public sealed class CoreTabletopRulesBugsTests
 					BaseHitPoints = 5,
 					Attack = new AttackValue
 					{
-						Strikes = new _003C_003Ez__ReadOnlySingleElementList<StrikeDescriptor>(new StrikeDescriptor
+						Strikes = new List<StrikeDescriptor> { new StrikeDescriptor
 						{
 							Modifier = 5,
 							IsRanged = false
-						})
+						} }
 					}
 				},
 				["enemy_target"] = new CardDefinition
@@ -673,11 +673,11 @@ public sealed class CoreTabletopRulesBugsTests
 					Name = "Power Strike",
 					Type = CardType.Action,
 					Level = 1,
-					Abilities = new _003C_003Ez__ReadOnlySingleElementList<AbilityDefinition>(new AbilityDefinition
+					Abilities = new List<AbilityDefinition> { new AbilityDefinition
 					{
 						Trigger = AbilityTrigger.Order,
-						Effects = new _003C_003Ez__ReadOnlySingleElementList<IEffect>(new DealDamageEffect(2, "physical"))
-					})
+						Effects = new List<IEffect> { new DealDamageEffect(2, "physical") } }
+					}
 				},
 				["sword"] = new CardDefinition
 				{
@@ -1113,5 +1113,103 @@ public sealed class CoreTabletopRulesBugsTests
 		CardInstance alraynPostCombat = state.Players[1].Ranks[1].First(c => c.InstanceId == 10);
 		Assert.Equal(alraynDef.BaseHitPoints ?? 3, alraynPostCombat.CurrentHitPoints);
 		Assert.Equal(0, alraynPostCombat.Wounds);
+	}
+
+	[Fact]
+	public void TabletopRule3b_Dupe_CannotBePlayed_WhenDefenderIsSoloInRank()
+	{
+		string cardsPath = Path.Combine(AppContext.BaseDirectory, "DataParser", "cards.json");
+		if (!File.Exists(cardsPath))
+		{
+			cardsPath = Path.Combine(Directory.GetCurrentDirectory(), "DataParser", "cards.json");
+		}
+		if (!File.Exists(cardsPath))
+		{
+			cardsPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "DataParser", "cards.json"));
+		}
+		CardDatabase cardDb = DatabaseLoader.LoadFromFile(cardsPath);
+
+		CardDefinition alraynDef = cardDb.GetDefinition("alrayn_gaunt");
+		Assert.NotNull(alraynDef);
+		CardDefinition dupeDef = cardDb.GetDefinition("dupe");
+		Assert.NotNull(dupeDef);
+
+		CardDefinition enemyDef = new CardDefinition
+		{
+			DefinitionId = "enemy_fighter",
+			Name = "Enemy Fighter",
+			Type = CardType.Character,
+			Class = CharacterClass.Fighter,
+			Level = 1,
+			ArmorClass = 12,
+			BaseHitPoints = 5,
+			Attack = new AttackValue
+			{
+				Strikes = new List<StrikeDescriptor> { new StrikeDescriptor { Modifier = 5, IsRanged = false } }
+			}
+		};
+
+		Dictionary<string, CardDefinition> dict = new Dictionary<string, CardDefinition>(cardDb.Definitions, StringComparer.OrdinalIgnoreCase);
+		dict["enemy_fighter"] = enemyDef;
+		cardDb = new CardDatabase { Definitions = dict };
+
+		GameState state = new GameState
+		{
+			TurnNumber = 1,
+			ActivePlayerIndex = 0,
+			CurrentPhase = TurnPhase.Main,
+			AutoPassWhenNoReactsAvailable = false,
+			Players =
+			[
+				new PlayerState
+				{
+					PlayerIndex = 0,
+					Ranks = new SortedDictionary<int, List<CardInstance>>
+					{
+						[1] = [new CardInstance { InstanceId = 1, DefinitionId = "enemy_fighter", CurrentArmorClass = 12, CurrentHitPoints = 5, CurrentSkill = 2, ReadyState = ReadyState.Ready, Zone = CardZone.Board, OwnerPlayerIndex = 0, Rank = 1 }]
+					}
+				},
+				new PlayerState
+				{
+					PlayerIndex = 1,
+					Ranks = new SortedDictionary<int, List<CardInstance>>
+					{
+						// Solo in Rank 1
+						[1] =
+						[
+							new CardInstance { InstanceId = 10, DefinitionId = "alrayn_gaunt", CurrentArmorClass = alraynDef.ArmorClass ?? 16, CurrentHitPoints = alraynDef.BaseHitPoints ?? 3, CurrentSkill = alraynDef.Skill ?? 9, ReadyState = ReadyState.Ready, Zone = CardZone.Board, OwnerPlayerIndex = 1, Rank = 1 }
+						]
+					},
+					Hand =
+					[
+						new CardInstance { InstanceId = 50, DefinitionId = "dupe", Zone = CardZone.Hand, OwnerPlayerIndex = 1 }
+					]
+				}
+			]
+		};
+
+		GameEngine engine = new GameEngine(state, cardDb, (int count, int sides) => 15);
+
+		// Player 0 attacks Alrayn Gaunt (ID 10)
+		AttackAction attackAlrayn = new AttackAction { PlayerIndex = 0, AttackerInstanceId = 1, TargetInstanceId = 10 };
+		ActionResult attackResult = engine.Execute(attackAlrayn);
+		Assert.True(attackResult.IsSuccess);
+
+		// Check legal actions for Player 1: Dupe must NOT appear because Alrayn is solo in Rank 1!
+		var legalActions = engine.GetLegalActions(state, 1);
+		var dupeAction = legalActions.OfType<PlayCardAction>().FirstOrDefault(a => a.CardInstanceId == 50);
+		Assert.Null(dupeAction);
+
+		// Directly attempting to play Dupe must fail validation
+		PlayCardAction directDupe = new PlayCardAction
+		{
+			PlayerIndex = 1,
+			CardInstanceId = 50,
+			PerformerInstanceId = 10,
+			TargetCharacterId = 10
+		};
+		ActionResult canExecuteResult = engine.CanExecute(directDupe, state);
+		Assert.False(canExecuteResult.IsSuccess);
+		Assert.Contains(canExecuteResult.Errors, e => e.Contains("Character must be in a rank with at least one other character to move to a different position in this rank."));
 	}
 }

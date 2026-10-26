@@ -89,9 +89,11 @@ public sealed class GameEngine
 			}
 			if (HasTurnBuff(state, defenderCard.Value.InstanceId, "DUPE_ACTIVE"))
 			{
-				int defSkill = defenderCard.Value.CurrentSkill > 0 ? defenderCard.Value.CurrentSkill : (engine._cardDb.GetDefinition(defenderCard.Value.DefinitionId)?.Skill).GetValueOrDefault();
+				int baseDefSkill = (engine._cardDb.GetDefinition(defenderCard.Value.DefinitionId)?.Skill).GetValueOrDefault();
+				int defSkill = (defenderCard.Value.CurrentSkill > 0 ? defenderCard.Value.CurrentSkill : baseDefSkill) + GetTurnBuffValue(state, defenderCard.Value.InstanceId, "SKILL");
 				int num = 8 + defSkill;
-				int atkSkill = attackerCard.Value.CurrentSkill > 0 ? attackerCard.Value.CurrentSkill : (engine._cardDb.GetDefinition(attackerCard.Value.DefinitionId)?.Skill).GetValueOrDefault();
+				int baseAtkSkill = (engine._cardDb.GetDefinition(attackerCard.Value.DefinitionId)?.Skill).GetValueOrDefault();
+				int atkSkill = (attackerCard.Value.CurrentSkill > 0 ? attackerCard.Value.CurrentSkill : baseAtkSkill) + GetTurnBuffValue(state, attackerCard.Value.InstanceId, "SKILL");
 				if (engine._diceRoller(1, 20) + atkSkill < num)
 				{
 					AddTurnBuff(state, attackerCard.Value.InstanceId, "NO_MELEE_STRIKES", 1);
@@ -1644,6 +1646,14 @@ public sealed class GameEngine
 				failureReason = "This character is not the target of the strike.";
 				return false;
 			}
+			if (Regex.IsMatch(ability.Description ?? "", "\\bmove\\s+to\\s+a\\s+different\\s+position\\s+in\\s+this\\s+rank\\b", RegexOptions.IgnoreCase))
+			{
+				if (!state.Players[sourceCard.OwnerPlayerIndex].Ranks.TryGetValue(num, out var rankCards) || rankCards.Count <= 1)
+				{
+					failureReason = "Character must be in a rank with at least one other character to move to a different position in this rank.";
+					return false;
+				}
+			}
 			if (ability.TargetScope == TargetScope.OtherInSameRank)
 			{
 				CardInstance? cardInstance9 = FindBoardCard(state, declareAttackEvent4.DefenderInstanceId);
@@ -2108,6 +2118,13 @@ public sealed class GameEngine
 					CardInstance? atkCard = FindBoardCard(state, declareAttackEvent2.AttackerInstanceId);
 					CardDefinition? atkDef = atkCard.HasValue ? _cardDb.GetDefinition(atkCard.Value.DefinitionId) : null;
 					if (atkDef != null && atkDef.Attack?.Strikes.Count > 0 && atkDef.Attack.Strikes.All((StrikeDescriptor s) => s.IsRanged))
+					{
+						yield break;
+					}
+				}
+				if (Regex.IsMatch(ability.Description ?? "", "\\bmove\\s+to\\s+a\\s+different\\s+position\\s+in\\s+this\\s+rank\\b", RegexOptions.IgnoreCase))
+				{
+					if (!performer.HasValue || !performer.Value.Rank.HasValue || !state.Players[performer.Value.OwnerPlayerIndex].Ranks.TryGetValue(performer.Value.Rank.Value, out var rankList) || rankList.Count <= 1)
 					{
 						yield break;
 					}
@@ -3431,17 +3448,28 @@ public sealed class GameEngine
 						{
 							list.Add("Card can only be played when a character is targeted with a strike.");
 						}
-						else if (abilityDefinition.TargetScope == TargetScope.Self && playCard.PerformerInstanceId.HasValue && declareAttack.DefenderInstanceId != playCard.PerformerInstanceId.Value)
+						else
+						{
+							if (abilityDefinition.TargetScope == TargetScope.Self && playCard.PerformerInstanceId.HasValue && declareAttack.DefenderInstanceId != playCard.PerformerInstanceId.Value)
 						{
 							list.Add("Only the character targeted by the strike can perform this react.");
 						}
-						else if (Regex.IsMatch(abilityDefinition.Description ?? "", "\\bmelee\\s+strike\\b", RegexOptions.IgnoreCase))
+							if (Regex.IsMatch(abilityDefinition.Description ?? "", "\\bmelee\\s+strike\\b", RegexOptions.IgnoreCase))
 						{
 							CardInstance? atkCard = FindBoardCard(state, declareAttack.AttackerInstanceId);
 							CardDefinition? atkDef = atkCard.HasValue ? _cardDb.GetDefinition(atkCard.Value.DefinitionId) : null;
 							if (atkDef != null && atkDef.Attack?.Strikes.Count > 0 && atkDef.Attack.Strikes.All((StrikeDescriptor s) => s.IsRanged))
 							{
 								list.Add("Dupe can only react to a melee strike, not a ranged strike.");
+							}
+						}
+						if (Regex.IsMatch(abilityDefinition.Description ?? "", "\\bmove\\s+to\\s+a\\s+different\\s+position\\s+in\\s+this\\s+rank\\b", RegexOptions.IgnoreCase) && playCard.PerformerInstanceId.HasValue)
+							{
+								CardInstance? perf = FindBoardCard(state, playCard.PerformerInstanceId.Value);
+								if (perf.HasValue && perf.Value.Rank.HasValue && state.Players[perf.Value.OwnerPlayerIndex].Ranks.TryGetValue(perf.Value.Rank.Value, out var rankCards) && rankCards.Count <= 1)
+								{
+									list.Add("Character must be in a rank with at least one other character to move to a different position in this rank.");
+								}
 							}
 						}
 						break;
@@ -4287,7 +4315,7 @@ public sealed class GameEngine
 				}
 				else if (definition5.Name.Equals("Dupe", StringComparison.OrdinalIgnoreCase))
 				{
-					AddTurnBuff(_state, num7, "DUPE_ACTIVE", 1);
+
 					(int, int, int)? tuple5 = FindCharacterPosition(_state, num7);
 					if (tuple5.HasValue)
 					{
@@ -4299,6 +4327,7 @@ public sealed class GameEngine
 							CardInstance item4 = list4[oldIdx];
 							list4.RemoveAt(oldIdx);
 							list4.Insert(newIdx, item4);
+							AddTurnBuff(_state, num7, "DUPE_ACTIVE", 1);
 						}
 					}
 				}

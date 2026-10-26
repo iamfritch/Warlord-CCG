@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("WarlordCli")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+aa86e31e8b8c078034883dd9c3f796b5f4d80b5b")]
 [assembly: System.Reflection.AssemblyProductAttribute("WarlordCli")]
 [assembly: System.Reflection.AssemblyTitleAttribute("WarlordCli")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

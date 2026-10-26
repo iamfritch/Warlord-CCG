@@ -22,9 +22,11 @@ public sealed record PerformStrikeEffect(int StrikeBonus = 0, bool IsRanged = fa
 		CardInstance? opponentCard = context.FindCard(context.SourceInstanceId);
 		if (!IsRanged && GameEngine.HasTurnBuff(context.State, targetId, "DUPE_ACTIVE"))
 		{
-			int defSkill = (context.CardDb?.GetDefinition(defender.Value.DefinitionId)?.Skill).GetValueOrDefault();
+			int baseDefSkill = (context.CardDb?.GetDefinition(defender.Value.DefinitionId)?.Skill).GetValueOrDefault();
+			int defSkill = (defender.Value.CurrentSkill > 0 ? defender.Value.CurrentSkill : baseDefSkill) + GameEngine.GetTurnBuffValue(context.State, defender.Value.InstanceId, "SKILL");
 			int dc = 8 + defSkill;
-			int atkSkill = ((opponentCard.HasValue && context.CardDb != null) ? (context.CardDb.GetDefinition(opponentCard.Value.DefinitionId)?.Skill).GetValueOrDefault() : 0);
+			int baseAtkSkill = ((opponentCard.HasValue && context.CardDb != null) ? (context.CardDb.GetDefinition(opponentCard.Value.DefinitionId)?.Skill).GetValueOrDefault() : 0);
+			int atkSkill = (opponentCard.HasValue ? (opponentCard.Value.CurrentSkill > 0 ? opponentCard.Value.CurrentSkill : baseAtkSkill) + GameEngine.GetTurnBuffValue(context.State, opponentCard.Value.InstanceId, "SKILL") : 0);
 			if (context.RollDice(1, 20) + atkSkill < dc && opponentCard.HasValue)
 			{
 				GameEngine.AddTurnBuff(context.State, opponentCard.Value.InstanceId, "NO_MELEE_STRIKES", 1);
