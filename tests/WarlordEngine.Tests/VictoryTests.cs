@@ -26,11 +26,11 @@ public sealed class VictoryTests
 				IsWarlord = true,
 				Attack = new AttackValue
 				{
-					Strikes = new _003C_003Ez__ReadOnlySingleElementList<StrikeDescriptor>(new StrikeDescriptor
+					Strikes = new List<StrikeDescriptor> { new StrikeDescriptor
 					{
 						Modifier = 5,
 						IsRanged = false
-					}),
+					} },
 					RawText = "+5"
 				}
 			} }

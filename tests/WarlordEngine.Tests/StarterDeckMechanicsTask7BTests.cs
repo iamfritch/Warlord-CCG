@@ -30,11 +30,11 @@ public class StarterDeckMechanicsTask7BTests
 					Attack = new AttackValue
 					{
 						RawText = "+0",
-						Strikes = new _003C_003Ez__ReadOnlySingleElementList<StrikeDescriptor>(new StrikeDescriptor
+						Strikes = new List<StrikeDescriptor> { new StrikeDescriptor
 						{
 							Modifier = 0,
 							IsRanged = false
-						})
+						} }
 					}
 				},
 				["keen_eared_sentry"] = new CardDefinition
@@ -46,16 +46,16 @@ public class StarterDeckMechanicsTask7BTests
 					Level = 1,
 					ArmorClass = 11,
 					BaseHitPoints = 1,
-					Traits = new _003C_003Ez__ReadOnlyArray<string>(new string[4] { "Human", "Scout", "Stealth +9", "Free Kingdoms" }),
+					Traits = new List<string> { "Human", "Scout", "Stealth +9", "Free Kingdoms" },
 					SkillRatings = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase) { ["Stealth"] = 9 },
 					Attack = new AttackValue
 					{
 						RawText = "+2",
-						Strikes = new _003C_003Ez__ReadOnlySingleElementList<StrikeDescriptor>(new StrikeDescriptor
+						Strikes = new List<StrikeDescriptor> { new StrikeDescriptor
 						{
 							Modifier = 2,
 							IsRanged = false
-						})
+						} }
 					}
 				},
 				["generic_fighter"] = new CardDefinition
@@ -70,11 +70,11 @@ public class StarterDeckMechanicsTask7BTests
 					Attack = new AttackValue
 					{
 						RawText = "+1",
-						Strikes = new _003C_003Ez__ReadOnlySingleElementList<StrikeDescriptor>(new StrikeDescriptor
+						Strikes = new List<StrikeDescriptor> { new StrikeDescriptor
 						{
 							Modifier = 1,
 							IsRanged = false
-						})
+						} }
 					}
 				},
 				["enemy_target"] = new CardDefinition
@@ -89,11 +89,11 @@ public class StarterDeckMechanicsTask7BTests
 					Attack = new AttackValue
 					{
 						RawText = "+0",
-						Strikes = new _003C_003Ez__ReadOnlySingleElementList<StrikeDescriptor>(new StrikeDescriptor
+						Strikes = new List<StrikeDescriptor> { new StrikeDescriptor
 						{
 							Modifier = 0,
 							IsRanged = false
-						})
+						} }
 					}
 				},
 				["sneak_attack"] = new CardDefinition
@@ -123,7 +123,7 @@ public class StarterDeckMechanicsTask7BTests
 					Type = CardType.Item,
 					Class = CharacterClass.Fighter,
 					RulesText = "+2 AC",
-					Traits = new _003C_003Ez__ReadOnlyArray<string>(new string[2] { "Armor", "Mail" })
+					Traits = new List<string> { "Armor", "Mail" }
 				},
 				["bardiche"] = new CardDefinition
 				{
@@ -132,7 +132,7 @@ public class StarterDeckMechanicsTask7BTests
 					Type = CardType.Item,
 					Class = CharacterClass.Fighter,
 					RulesText = "+2 ATK",
-					Traits = new _003C_003Ez__ReadOnlyArray<string>(new string[2] { "Weapon", "Polearm" })
+					Traits = new List<string> { "Weapon", "Polearm" }
 				},
 				["riding_horse"] = new CardDefinition
 				{

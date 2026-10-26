@@ -52,11 +52,11 @@ public sealed class AiAgentTests
 					Faction = "Free Kingdoms",
 					Attack = new AttackValue
 					{
-						Strikes = new _003C_003Ez__ReadOnlySingleElementList<StrikeDescriptor>(new StrikeDescriptor
+						Strikes = new List<StrikeDescriptor> { new StrikeDescriptor
 						{
 							Modifier = 5,
 							IsRanged = false
-						}),
+						} },
 						RawText = "+5"
 					}
 				},
@@ -72,11 +72,11 @@ public sealed class AiAgentTests
 					Faction = "Free Kingdoms",
 					Attack = new AttackValue
 					{
-						Strikes = new _003C_003Ez__ReadOnlySingleElementList<StrikeDescriptor>(new StrikeDescriptor
+						Strikes = new List<StrikeDescriptor> { new StrikeDescriptor
 						{
 							Modifier = 3,
 							IsRanged = false
-						}),
+						} },
 						RawText = "+3"
 					}
 				},
@@ -92,11 +92,11 @@ public sealed class AiAgentTests
 					Faction = "Free Kingdoms",
 					Attack = new AttackValue
 					{
-						Strikes = new _003C_003Ez__ReadOnlySingleElementList<StrikeDescriptor>(new StrikeDescriptor
+						Strikes = new List<StrikeDescriptor> { new StrikeDescriptor
 						{
 							Modifier = 2,
 							IsRanged = false
-						}),
+						} },
 						RawText = "+2"
 					}
 				}
@@ -562,11 +562,11 @@ public sealed class AiAgentTests
 		CardDatabase cardDb = DatabaseLoader.LoadFromFile(realCardsJsonPath);
 		IReadOnlyList<Deck> readOnlyList = PresetDeckFactory.GeneratePresetDecks(cardDb);
 		Assert.True(readOnlyList.Count >= 2, "Expected at least 2 preset decks for match.");
-		GameEngine gameEngine = GameEngine.CreateFromDecks(new _003C_003Ez__ReadOnlyArray<Deck>(new Deck[2]
+		GameEngine gameEngine = GameEngine.CreateFromDecks(new List<Deck>
 		{
 			readOnlyList[0],
 			readOnlyList[1]
-		}), cardDb);
+		}, cardDb);
 		for (int i = 0; i < 2; i++)
 		{
 			gameEngine.State.ActivePlayerIndex = i;
@@ -577,7 +577,7 @@ public sealed class AiAgentTests
 			DeployStartingArmyAction action = new DeployStartingArmyAction
 			{
 				PlayerIndex = i,
-				Deployments = new _003C_003Ez__ReadOnlyArray<StartingCharacterDeployment>(new StartingCharacterDeployment[6]
+				Deployments = new List<StartingCharacterDeployment>
 				{
 					new StartingCharacterDeployment(cardInstance.InstanceId, 3),
 					new StartingCharacterDeployment(list[0].InstanceId, 2),
@@ -585,7 +585,7 @@ public sealed class AiAgentTests
 					new StartingCharacterDeployment(list2[0].InstanceId, 1),
 					new StartingCharacterDeployment(list2[1].InstanceId, 1),
 					new StartingCharacterDeployment(list2[2].InstanceId, 1)
-				})
+				}
 			};
 			ActionResult actionResult = gameEngine.CanExecute(action);
 			Assert.True(actionResult.IsSuccess, string.Join("; ", actionResult.Errors));
@@ -776,11 +776,11 @@ public sealed class AiAgentTests
 		CardDatabase cardDb = DatabaseLoader.LoadFromFile(realCardsJsonPath);
 		IReadOnlyList<Deck> readOnlyList = PresetDeckFactory.GeneratePresetDecks(cardDb);
 		Assert.True(readOnlyList.Count >= 2, "Expected at least 2 preset decks for match.");
-		GameEngine gameEngine = GameEngine.CreateFromDecks(new _003C_003Ez__ReadOnlyArray<Deck>(new Deck[2]
+		GameEngine gameEngine = GameEngine.CreateFromDecks(new List<Deck>
 		{
 			readOnlyList[0],
 			readOnlyList[1]
-		}), cardDb);
+		}, cardDb);
 		for (int i = 0; i < 2; i++)
 		{
 			gameEngine.State.ActivePlayerIndex = i;
@@ -791,7 +791,7 @@ public sealed class AiAgentTests
 			DeployStartingArmyAction action = new DeployStartingArmyAction
 			{
 				PlayerIndex = i,
-				Deployments = new _003C_003Ez__ReadOnlyArray<StartingCharacterDeployment>(new StartingCharacterDeployment[6]
+				Deployments = new List<StartingCharacterDeployment>
 				{
 					new StartingCharacterDeployment(cardInstance.InstanceId, 3),
 					new StartingCharacterDeployment(list[0].InstanceId, 2),
@@ -799,7 +799,7 @@ public sealed class AiAgentTests
 					new StartingCharacterDeployment(list2[0].InstanceId, 1),
 					new StartingCharacterDeployment(list2[1].InstanceId, 1),
 					new StartingCharacterDeployment(list2[2].InstanceId, 1)
-				})
+				}
 			};
 			ActionResult actionResult = gameEngine.CanExecute(action);
 			Assert.True(actionResult.IsSuccess, string.Join("; ", actionResult.Errors));

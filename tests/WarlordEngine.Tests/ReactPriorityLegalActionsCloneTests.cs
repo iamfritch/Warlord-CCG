@@ -31,11 +31,11 @@ public class ReactPriorityLegalActionsCloneTests
 				BaseHitPoints = 4,
 				Attack = new AttackValue
 				{
-					Strikes = new _003C_003Ez__ReadOnlySingleElementList<StrikeDescriptor>(new StrikeDescriptor
+					Strikes = new List<StrikeDescriptor> { new StrikeDescriptor
 					{
 						Modifier = 6,
 						IsRanged = false
-					})
+					} }
 				}
 			},
 			new CardDefinition
@@ -51,11 +51,11 @@ public class ReactPriorityLegalActionsCloneTests
 				BaseHitPoints = 4,
 				Attack = new AttackValue
 				{
-					Strikes = new _003C_003Ez__ReadOnlySingleElementList<StrikeDescriptor>(new StrikeDescriptor
+					Strikes = new List<StrikeDescriptor> { new StrikeDescriptor
 					{
 						Modifier = 5,
 						IsRanged = false
-					})
+					} }
 				}
 			},
 			new CardDefinition
@@ -70,11 +70,11 @@ public class ReactPriorityLegalActionsCloneTests
 				BaseHitPoints = 2,
 				Attack = new AttackValue
 				{
-					Strikes = new _003C_003Ez__ReadOnlySingleElementList<StrikeDescriptor>(new StrikeDescriptor
+					Strikes = new List<StrikeDescriptor> { new StrikeDescriptor
 					{
 						Modifier = 3,
 						IsRanged = false
-					})
+					} }
 				}
 			},
 			new CardDefinition
@@ -89,18 +89,18 @@ public class ReactPriorityLegalActionsCloneTests
 				BaseHitPoints = 2,
 				Attack = new AttackValue
 				{
-					Strikes = new _003C_003Ez__ReadOnlySingleElementList<StrikeDescriptor>(new StrikeDescriptor
+					Strikes = new List<StrikeDescriptor> { new StrikeDescriptor
 					{
 						Modifier = 4,
 						IsRanged = true
-					})
+					} }
 				},
-				Abilities = new _003C_003Ez__ReadOnlySingleElementList<AbilityDefinition>(new AbilityDefinition
+				Abilities = new List<AbilityDefinition> { new AbilityDefinition
 				{
 					Trigger = AbilityTrigger.SpendOrder,
 					Description = "Spend Order: Draw 1 card.",
-					Effects = new _003C_003Ez__ReadOnlySingleElementList<IEffect>(new DrawCardEffect(1))
-				})
+					Effects = new List<IEffect> { new DrawCardEffect(1) }
+				} }
 			},
 			new CardDefinition
 			{
@@ -114,18 +114,18 @@ public class ReactPriorityLegalActionsCloneTests
 				BaseHitPoints = 3,
 				Attack = new AttackValue
 				{
-					Strikes = new _003C_003Ez__ReadOnlySingleElementList<StrikeDescriptor>(new StrikeDescriptor
+					Strikes = new List<StrikeDescriptor> { new StrikeDescriptor
 					{
 						Modifier = 2,
 						IsRanged = false
-					})
+					} }
 				},
-				Abilities = new _003C_003Ez__ReadOnlySingleElementList<AbilityDefinition>(new AbilityDefinition
+				Abilities = new List<AbilityDefinition> { new AbilityDefinition
 				{
 					Trigger = AbilityTrigger.SpendReact,
 					Description = "Spend React: Deal 1 damage to target character.",
-					Effects = new _003C_003Ez__ReadOnlySingleElementList<IEffect>(new DealDamageEffect(1, "physical"))
-				})
+					Effects = new List<IEffect> { new DealDamageEffect(1, "physical") }
+				} }
 			},
 			new CardDefinition
 			{
@@ -142,12 +142,12 @@ public class ReactPriorityLegalActionsCloneTests
 				Type = CardType.Action,
 				Faction = "Deverenian",
 				Level = 1,
-				Abilities = new _003C_003Ez__ReadOnlySingleElementList<AbilityDefinition>(new AbilityDefinition
+				Abilities = new List<AbilityDefinition> { new AbilityDefinition
 				{
 					Trigger = AbilityTrigger.Order,
 					Description = "Order: Deal 1 damage to target character.",
-					Effects = new _003C_003Ez__ReadOnlySingleElementList<IEffect>(new DealDamageEffect(1, "magic"))
-				})
+					Effects = new List<IEffect> { new DealDamageEffect(1, "magic") }
+				} }
 			},
 			new CardDefinition
 			{
@@ -156,12 +156,12 @@ public class ReactPriorityLegalActionsCloneTests
 				Type = CardType.Action,
 				Faction = "Dwarf",
 				Level = 1,
-				Abilities = new _003C_003Ez__ReadOnlySingleElementList<AbilityDefinition>(new AbilityDefinition
+				Abilities = new List<AbilityDefinition> { new AbilityDefinition
 				{
 					Trigger = AbilityTrigger.React,
 					Description = "React: Deal 1 damage to target character.",
-					Effects = new _003C_003Ez__ReadOnlySingleElementList<IEffect>(new DealDamageEffect(1, "physical"))
-				})
+					Effects = new List<IEffect> { new DealDamageEffect(1, "physical") }
+				} }
 			}
 		};
 		return new CardDatabase

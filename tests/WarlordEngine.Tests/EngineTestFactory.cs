@@ -24,11 +24,11 @@ internal static class EngineTestFactory
 					Skill = 5,
 					Attack = new AttackValue
 					{
-						Strikes = new _003C_003Ez__ReadOnlySingleElementList<StrikeDescriptor>(new StrikeDescriptor
+						Strikes = new List<StrikeDescriptor> { new StrikeDescriptor
 						{
 							Modifier = 3,
 							IsRanged = false
-						}),
+						} },
 						RawText = "+3"
 					},
 					BaseHitPoints = 10

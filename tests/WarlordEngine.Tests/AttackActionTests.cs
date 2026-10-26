@@ -25,11 +25,11 @@ public sealed class AttackActionTests
 				BaseHitPoints = 10,
 				Attack = new AttackValue
 				{
-					Strikes = new _003C_003Ez__ReadOnlySingleElementList<StrikeDescriptor>(new StrikeDescriptor
+					Strikes = new List<StrikeDescriptor> { new StrikeDescriptor
 					{
 						Modifier = 3,
 						IsRanged = false
-					}),
+					} },
 					RawText = "+3"
 				}
 			} }
@@ -360,11 +360,11 @@ public sealed class AttackActionTests
 				BaseHitPoints = 10,
 				Attack = new AttackValue
 				{
-					Strikes = new _003C_003Ez__ReadOnlySingleElementList<StrikeDescriptor>(new StrikeDescriptor
+					Strikes = new List<StrikeDescriptor> { new StrikeDescriptor
 					{
 						Modifier = 10,
 						IsRanged = false
-					}),
+					} },
 					RawText = "+10"
 				}
 			} }
@@ -456,11 +456,11 @@ public sealed class AttackActionTests
 					BaseHitPoints = 10,
 					Attack = new AttackValue
 					{
-						Strikes = new _003C_003Ez__ReadOnlySingleElementList<StrikeDescriptor>(new StrikeDescriptor
+						Strikes = new List<StrikeDescriptor> { new StrikeDescriptor
 						{
 							Modifier = 0,
 							IsRanged = false
-						}),
+						} },
 						RawText = "+0"
 					}
 				},

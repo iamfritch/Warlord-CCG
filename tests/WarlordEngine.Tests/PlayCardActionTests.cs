@@ -41,12 +41,12 @@ public sealed class PlayCardActionTests
 					Name = "Fireball",
 					Type = CardType.Action,
 					Level = 1,
-					Abilities = new _003C_003Ez__ReadOnlySingleElementList<AbilityDefinition>(new AbilityDefinition
+					Abilities = new List<AbilityDefinition> { new AbilityDefinition
 					{
 						Trigger = AbilityTrigger.Order,
-						Effects = new _003C_003Ez__ReadOnlySingleElementList<IEffect>(new DealDamageEffect(4, "fire")),
+						Effects = new List<IEffect> { new DealDamageEffect(4, "fire") },
 						Description = "Order: Deal 4 fire damage."
-					})
+					} }
 				}
 			}
 		};

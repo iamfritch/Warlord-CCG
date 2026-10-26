@@ -46,7 +46,7 @@ public sealed class DeckManagementTests
 		{
 			DeckName = "Vanguard Deck",
 			WarlordDefinitionId = "warlord-hero",
-			CardDefinitionIds = new _003C_003Ez__ReadOnlyArray<string>(new string[2] { "level-1-troop", "level-1-troop" })
+			CardDefinitionIds = new List<string> { "level-1-troop", "level-1-troop" }
 		};
 		ActionResult actionResult = deck.Validate(cardDb, 2);
 		Assert.True(actionResult.IsSuccess, string.Join("; ", actionResult.Errors));
@@ -60,7 +60,7 @@ public sealed class DeckManagementTests
 		{
 			DeckName = "Invalid Deck",
 			WarlordDefinitionId = "level-1-troop",
-			CardDefinitionIds = new _003C_003Ez__ReadOnlySingleElementList<string>("level-1-troop")
+			CardDefinitionIds = new List<string> { "level-1-troop" }
 		};
 		ActionResult actionResult = deck.Validate(cardDb, 1);
 		Assert.False(actionResult.IsSuccess);
@@ -75,7 +75,7 @@ public sealed class DeckManagementTests
 		{
 			DeckName = "Tiny Deck",
 			WarlordDefinitionId = "warlord-hero",
-			CardDefinitionIds = new _003C_003Ez__ReadOnlySingleElementList<string>("level-1-troop")
+			CardDefinitionIds = new List<string> { "level-1-troop" }
 		};
 		ActionResult actionResult = deck.Validate(cardDb, 5);
 		Assert.False(actionResult.IsSuccess);
@@ -90,15 +90,15 @@ public sealed class DeckManagementTests
 		{
 			DeckName = "Player 1 Vanguard",
 			WarlordDefinitionId = "warlord-hero",
-			CardDefinitionIds = new _003C_003Ez__ReadOnlySingleElementList<string>("level-1-troop")
+			CardDefinitionIds = new List<string> { "level-1-troop" }
 		};
 		Deck deck2 = new Deck
 		{
 			DeckName = "Player 2 Vanguard",
 			WarlordDefinitionId = "warlord-hero",
-			CardDefinitionIds = new _003C_003Ez__ReadOnlySingleElementList<string>("level-1-troop")
+			CardDefinitionIds = new List<string> { "level-1-troop" }
 		};
-		GameEngine gameEngine = GameEngine.CreateFromDecks(new _003C_003Ez__ReadOnlyArray<Deck>(new Deck[2] { deck, deck2 }), cardDb);
+		GameEngine gameEngine = GameEngine.CreateFromDecks(new List<Deck> { deck, deck2 }, cardDb);
 		Assert.NotNull(gameEngine);
 		Assert.Equal(2, gameEngine.State.Players.Count);
 		Assert.Equal(TurnPhase.Setup, gameEngine.State.CurrentPhase);

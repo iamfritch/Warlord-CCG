@@ -143,7 +143,7 @@ public class Task7BPlaytestingFixesTests
 			Type = CardType.Item,
 			Level = 1,
 			Class = CharacterClass.Fighter,
-			Traits = new _003C_003Ez__ReadOnlyArray<string>(new string[2] { "Armor", "Mail" })
+			Traits = new List<string> { "Armor", "Mail" }
 		};
 		CardDefinition cardDefinition2 = new CardDefinition
 		{
@@ -152,7 +152,7 @@ public class Task7BPlaytestingFixesTests
 			Type = CardType.Item,
 			Level = 1,
 			Class = CharacterClass.Fighter,
-			Traits = new _003C_003Ez__ReadOnlyArray<string>(new string[2] { "Armor", "Plate" })
+			Traits = new List<string> { "Armor", "Plate" }
 		};
 		CardDefinition cardDefinition3 = new CardDefinition
 		{
@@ -296,7 +296,7 @@ public class Task7BPlaytestingFixesTests
 			Type = CardType.Item,
 			Class = CharacterClass.Classless,
 			RulesText = "Destroy Order: Each player draws a card. This turn, this character gains +2 ATK and +1 HP for each card drawn this way.",
-			Traits = new _003C_003Ez__ReadOnlySingleElementList<string>("Potion")
+			Traits = new List<string> { "Potion" }
 		};
 		(int, int, int) itemPassiveStats = GameEngine.GetItemPassiveStats(itemDef);
 		Assert.Equal(0, itemPassiveStats.Item1);
@@ -314,7 +314,7 @@ public class Task7BPlaytestingFixesTests
 			Type = CardType.Item,
 			Class = CharacterClass.Classless,
 			RulesText = "Destroy Order: Each player draws a card.",
-			Traits = new _003C_003Ez__ReadOnlySingleElementList<string>("Potion")
+			Traits = new List<string> { "Potion" }
 		};
 		List<AbilityDefinition> list = RulesParser.Parse(cardDefinition.RulesText, cardDefinition.Name);
 		Assert.NotEmpty(list);
@@ -721,7 +721,7 @@ public class Task7BPlaytestingFixesTests
 			Name = "Shambling Horror",
 			Type = CardType.Character,
 			Level = 2,
-			Traits = new _003C_003Ez__ReadOnlyArray<string>(new string[3] { "Reach", "Undead", "Monster" })
+			Traits = new List<string> { "Reach", "Undead", "Monster" }
 		};
 		CardDefinition cardDefinition2 = new CardDefinition
 		{

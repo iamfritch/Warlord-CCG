@@ -23,12 +23,12 @@ public sealed class AbilityTests
 			Level = 2,
 			BaseHitPoints = 5,
 			ArmorClass = 12,
-			Abilities = new _003C_003Ez__ReadOnlySingleElementList<AbilityDefinition>(new AbilityDefinition
+			Abilities = new List<AbilityDefinition> { new AbilityDefinition
 			{
 				Trigger = AbilityTrigger.SpendOrder,
-				Effects = new _003C_003Ez__ReadOnlySingleElementList<IEffect>(new DealDamageEffect(3, "fire")),
+				Effects = new List<IEffect> { new DealDamageEffect(3, "fire") },
 				Description = "Spend Order: Deal 3 fire damage to target character."
-			})
+			} }
 		};
 		CardDefinition cardDefinition2 = new CardDefinition
 		{

@@ -27,7 +27,7 @@ public class TabletopRulesAndMechanicsTests
 					ArmorClass = 10,
 					BaseHitPoints = 5,
 					Faction = "Mercenary",
-					Traits = new _003C_003Ez__ReadOnlySingleElementList<string>("Mercenary")
+					Traits = new List<string> { "Mercenary" }
 				},
 				["sword"] = new CardDefinition
 				{
@@ -36,7 +36,7 @@ public class TabletopRulesAndMechanicsTests
 					Type = CardType.Item,
 					Class = CharacterClass.Fighter,
 					Level = 1,
-					Traits = new _003C_003Ez__ReadOnlySingleElementList<string>("Weapon")
+					Traits = new List<string> { "Weapon" }
 				},
 				["axe"] = new CardDefinition
 				{
@@ -45,7 +45,7 @@ public class TabletopRulesAndMechanicsTests
 					Type = CardType.Item,
 					Class = CharacterClass.Fighter,
 					Level = 1,
-					Traits = new _003C_003Ez__ReadOnlySingleElementList<string>("Weapon")
+					Traits = new List<string> { "Weapon" }
 				},
 				["shield1"] = new CardDefinition
 				{
@@ -54,7 +54,7 @@ public class TabletopRulesAndMechanicsTests
 					Type = CardType.Item,
 					Class = CharacterClass.Fighter,
 					Level = 1,
-					Traits = new _003C_003Ez__ReadOnlySingleElementList<string>("Shield")
+					Traits = new List<string> { "Shield" }
 				},
 				["shield2"] = new CardDefinition
 				{
@@ -63,7 +63,7 @@ public class TabletopRulesAndMechanicsTests
 					Type = CardType.Item,
 					Class = CharacterClass.Fighter,
 					Level = 1,
-					Traits = new _003C_003Ez__ReadOnlySingleElementList<string>("Shield")
+					Traits = new List<string> { "Shield" }
 				},
 				["helm1"] = new CardDefinition
 				{
@@ -72,7 +72,7 @@ public class TabletopRulesAndMechanicsTests
 					Type = CardType.Item,
 					Class = CharacterClass.Fighter,
 					Level = 1,
-					Traits = new _003C_003Ez__ReadOnlySingleElementList<string>("Helm")
+					Traits = new List<string> { "Helm" }
 				},
 				["helm2"] = new CardDefinition
 				{
@@ -81,7 +81,7 @@ public class TabletopRulesAndMechanicsTests
 					Type = CardType.Item,
 					Class = CharacterClass.Fighter,
 					Level = 1,
-					Traits = new _003C_003Ez__ReadOnlySingleElementList<string>("Helm")
+					Traits = new List<string> { "Helm" }
 				},
 				["steed1"] = new CardDefinition
 				{
@@ -90,7 +90,7 @@ public class TabletopRulesAndMechanicsTests
 					Type = CardType.Item,
 					Class = CharacterClass.Fighter,
 					Level = 1,
-					Traits = new _003C_003Ez__ReadOnlySingleElementList<string>("Steed")
+					Traits = new List<string> { "Steed" }
 				},
 				["steed2"] = new CardDefinition
 				{
@@ -99,7 +99,7 @@ public class TabletopRulesAndMechanicsTests
 					Type = CardType.Item,
 					Class = CharacterClass.Fighter,
 					Level = 1,
-					Traits = new _003C_003Ez__ReadOnlySingleElementList<string>("Steed")
+					Traits = new List<string> { "Steed" }
 				},
 				["lvl2_action"] = new CardDefinition
 				{
@@ -122,14 +122,14 @@ public class TabletopRulesAndMechanicsTests
 					ArmorClass = 14,
 					BaseHitPoints = 3,
 					Faction = "Mercenary",
-					Traits = new _003C_003Ez__ReadOnlySingleElementList<string>("Mercenary"),
+					Traits = new List<string> { "Mercenary" },
 					Attack = new AttackValue
 					{
-						Strikes = new _003C_003Ez__ReadOnlySingleElementList<StrikeDescriptor>(new StrikeDescriptor
+						Strikes = new List<StrikeDescriptor> { new StrikeDescriptor
 						{
 							Modifier = 5,
 							IsRanged = false
-						})
+						} }
 					},
 					RulesText = "React: After Alrayn Gaunt moves: Perform a melee strike.",
 					Abilities = RulesParser.Parse("React: After Alrayn Gaunt moves: Perform a melee strike.", "Alrayn Gaunt")
@@ -571,7 +571,7 @@ public class TabletopRulesAndMechanicsTests
 			Faction = "Mercenary",
 			Attack = new AttackValue
 			{
-				Strikes = new _003C_003Ez__ReadOnlyArray<StrikeDescriptor>(new StrikeDescriptor[2]
+				Strikes = new List<StrikeDescriptor>
 				{
 					new StrikeDescriptor
 					{
@@ -583,7 +583,7 @@ public class TabletopRulesAndMechanicsTests
 						Modifier = 3,
 						IsRanged = false
 					}
-				})
+				}
 			}
 		};
 		CardDefinition value2 = new CardDefinition
@@ -718,7 +718,7 @@ public class TabletopRulesAndMechanicsTests
 			Faction = "Mercenary",
 			Attack = new AttackValue
 			{
-				Strikes = new _003C_003Ez__ReadOnlyArray<StrikeDescriptor>(new StrikeDescriptor[3]
+				Strikes = new List<StrikeDescriptor>
 				{
 					new StrikeDescriptor
 					{
@@ -735,7 +735,7 @@ public class TabletopRulesAndMechanicsTests
 						Modifier = 1,
 						IsRanged = false
 					}
-				})
+				}
 			}
 		};
 		CardDefinition value2 = new CardDefinition
@@ -880,7 +880,7 @@ public class TabletopRulesAndMechanicsTests
 			Faction = "Mercenary",
 			Attack = new AttackValue
 			{
-				Strikes = new _003C_003Ez__ReadOnlyArray<StrikeDescriptor>(new StrikeDescriptor[2]
+				Strikes = new List<StrikeDescriptor>
 				{
 					new StrikeDescriptor
 					{
@@ -892,7 +892,7 @@ public class TabletopRulesAndMechanicsTests
 						Modifier = 3,
 						IsRanged = false
 					}
-				})
+				}
 			}
 		};
 		CardDefinition value2 = new CardDefinition

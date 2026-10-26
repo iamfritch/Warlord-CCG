@@ -451,11 +451,11 @@ public sealed class TurnManagementTests
 				Attack = new AttackValue
 				{
 					RawText = "+3",
-					Strikes = new _003C_003Ez__ReadOnlySingleElementList<StrikeDescriptor>(new StrikeDescriptor
+					Strikes = new List<StrikeDescriptor> { new StrikeDescriptor
 					{
 						Modifier = 3,
 						IsRanged = false
-					})
+					} }
 				}
 			} }
 		};

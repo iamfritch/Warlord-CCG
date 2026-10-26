@@ -175,7 +175,7 @@ public sealed class SetupPhaseTests
 		DeployStartingArmyAction action = new DeployStartingArmyAction
 		{
 			PlayerIndex = 0,
-			Deployments = new _003C_003Ez__ReadOnlyArray<StartingCharacterDeployment>(new StartingCharacterDeployment[6]
+			Deployments = new List<StartingCharacterDeployment>
 			{
 				new StartingCharacterDeployment(1, 3),
 				new StartingCharacterDeployment(2, 2),
@@ -183,7 +183,7 @@ public sealed class SetupPhaseTests
 				new StartingCharacterDeployment(4, 1),
 				new StartingCharacterDeployment(5, 1),
 				new StartingCharacterDeployment(6, 1)
-			})
+			}
 		};
 		ActionResult actionResult = gameEngine.CanExecute(action);
 		Assert.True(actionResult.IsSuccess, string.Join("; ", actionResult.Errors));
@@ -194,7 +194,7 @@ public sealed class SetupPhaseTests
 		DeployStartingArmyAction action2 = new DeployStartingArmyAction
 		{
 			PlayerIndex = 1,
-			Deployments = new _003C_003Ez__ReadOnlyArray<StartingCharacterDeployment>(new StartingCharacterDeployment[6]
+			Deployments = new List<StartingCharacterDeployment>
 			{
 				new StartingCharacterDeployment(10, 3),
 				new StartingCharacterDeployment(11, 2),
@@ -202,7 +202,7 @@ public sealed class SetupPhaseTests
 				new StartingCharacterDeployment(13, 1),
 				new StartingCharacterDeployment(14, 1),
 				new StartingCharacterDeployment(15, 1)
-			})
+			}
 		};
 		ActionResult actionResult2 = gameEngine.CanExecute(action2);
 		Assert.True(actionResult2.IsSuccess, string.Join("; ", actionResult2.Errors));
@@ -284,7 +284,7 @@ public sealed class SetupPhaseTests
 		DeployStartingArmyAction action = new DeployStartingArmyAction
 		{
 			PlayerIndex = 0,
-			Deployments = new _003C_003Ez__ReadOnlyArray<StartingCharacterDeployment>(new StartingCharacterDeployment[6]
+			Deployments = new List<StartingCharacterDeployment>
 			{
 				new StartingCharacterDeployment(1, 1),
 				new StartingCharacterDeployment(2, 2),
@@ -292,7 +292,7 @@ public sealed class SetupPhaseTests
 				new StartingCharacterDeployment(4, 1),
 				new StartingCharacterDeployment(5, 1),
 				new StartingCharacterDeployment(6, 1)
-			})
+			}
 		};
 		ActionResult actionResult = gameEngine.CanExecute(action);
 		Assert.False(actionResult.IsSuccess);
@@ -340,7 +340,7 @@ public sealed class SetupPhaseTests
 		DeployStartingArmyAction action = new DeployStartingArmyAction
 		{
 			PlayerIndex = 0,
-			Deployments = new _003C_003Ez__ReadOnlySingleElementList<StartingCharacterDeployment>(new StartingCharacterDeployment(1, 3))
+			Deployments = new List<StartingCharacterDeployment> { new StartingCharacterDeployment(1, 3) }
 		};
 		ActionResult actionResult = gameEngine.CanExecute(action);
 		Assert.False(actionResult.IsSuccess);

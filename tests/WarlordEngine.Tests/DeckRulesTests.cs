@@ -27,7 +27,7 @@ public sealed class DeckRulesTests
 					BaseHitPoints = 12,
 					IsWarlord = true,
 					Faction = "Free Kingdoms",
-					Traits = new _003C_003Ez__ReadOnlySingleElementList<string>("Free Kingdoms")
+					Traits = new List<string> { "Free Kingdoms" }
 				},
 				["fk-troop"] = new CardDefinition
 				{
@@ -39,7 +39,7 @@ public sealed class DeckRulesTests
 					ArmorClass = 12,
 					BaseHitPoints = 6,
 					Faction = "Free Kingdoms",
-					Traits = new _003C_003Ez__ReadOnlySingleElementList<string>("Free Kingdoms")
+					Traits = new List<string> { "Free Kingdoms" }
 				},
 				["fk-troop-lvl2"] = new CardDefinition
 				{
@@ -51,7 +51,7 @@ public sealed class DeckRulesTests
 					ArmorClass = 14,
 					BaseHitPoints = 8,
 					Faction = "Free Kingdoms",
-					Traits = new _003C_003Ez__ReadOnlySingleElementList<string>("Free Kingdoms")
+					Traits = new List<string> { "Free Kingdoms" }
 				},
 				["dev-troop"] = new CardDefinition
 				{
@@ -63,7 +63,7 @@ public sealed class DeckRulesTests
 					ArmorClass = 13,
 					BaseHitPoints = 7,
 					Faction = "Deverenian",
-					Traits = new _003C_003Ez__ReadOnlySingleElementList<string>("Deverenian")
+					Traits = new List<string> { "Deverenian" }
 				},
 				["merc-troop"] = new CardDefinition
 				{
@@ -75,7 +75,7 @@ public sealed class DeckRulesTests
 					ArmorClass = 12,
 					BaseHitPoints = 5,
 					Faction = "Mercenary",
-					Traits = new _003C_003Ez__ReadOnlySingleElementList<string>("Mercenary")
+					Traits = new List<string> { "Mercenary" }
 				}
 			}
 		};
@@ -207,7 +207,7 @@ public sealed class DeckRulesTests
 		DeployStartingArmyAction action = new DeployStartingArmyAction
 		{
 			PlayerIndex = 0,
-			Deployments = new _003C_003Ez__ReadOnlyArray<StartingCharacterDeployment>(new StartingCharacterDeployment[6]
+			Deployments = new List<StartingCharacterDeployment>
 			{
 				new StartingCharacterDeployment(1, 3),
 				new StartingCharacterDeployment(2, 2),
@@ -215,7 +215,7 @@ public sealed class DeckRulesTests
 				new StartingCharacterDeployment(4, 1),
 				new StartingCharacterDeployment(5, 1),
 				new StartingCharacterDeployment(6, 1)
-			})
+			}
 		};
 		ActionResult actionResult = gameEngine.CanExecute(action);
 		Assert.False(actionResult.IsSuccess);

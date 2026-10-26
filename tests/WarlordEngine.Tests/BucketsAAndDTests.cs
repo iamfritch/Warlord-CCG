@@ -132,7 +132,7 @@ public class BucketsAAndDTests
 			CardDb = cardDb,
 			RollDice = (int count, int sides) => 5
 		};
-		FortitudeSaveEffect fortitudeSaveEffect = new FortitudeSaveEffect(13, new _003C_003Ez__ReadOnlySingleElementList<IEffect>(new DealDamageEffect(1, "physical")), PerEquippedItem: true);
+		FortitudeSaveEffect fortitudeSaveEffect = new FortitudeSaveEffect(13, new List<IEffect> { new DealDamageEffect(1, "physical") }, PerEquippedItem: true);
 		List<GameEvent> list2 = fortitudeSaveEffect.Evaluate(context).ToList();
 		Assert.Equal(2, list2.Count);
 		Assert.All(list2, (GameEvent e) =>
@@ -202,7 +202,7 @@ public class BucketsAAndDTests
 			CardDb = cardDb,
 			RollDice = (int count, int sides) => 15
 		};
-		FortitudeSaveEffect fortitudeSaveEffect = new FortitudeSaveEffect(13, new _003C_003Ez__ReadOnlySingleElementList<IEffect>(new DealDamageEffect(1, "physical")), PerEquippedItem: true);
+		FortitudeSaveEffect fortitudeSaveEffect = new FortitudeSaveEffect(13, new List<IEffect> { new DealDamageEffect(1, "physical") }, PerEquippedItem: true);
 		List<GameEvent> collection = fortitudeSaveEffect.Evaluate(context).ToList();
 		Assert.Empty(collection);
 	}
@@ -354,11 +354,11 @@ public class BucketsAAndDTests
 			ArmorClass = 12,
 			Attack = new AttackValue
 			{
-				Strikes = new _003C_003Ez__ReadOnlySingleElementList<StrikeDescriptor>(new StrikeDescriptor
+				Strikes = new List<StrikeDescriptor> { new StrikeDescriptor
 				{
 					Modifier = 0,
 					IsRanged = false
-				})
+				} }
 			}
 		};
 		CardDefinition cardDefinition2 = new CardDefinition
@@ -532,9 +532,9 @@ public class BucketsAAndDTests
 		GameState state = CreateTwoPlayerState(cardInstance, cardInstance);
 		List<RollTableBranch> branches = new List<RollTableBranch>
 		{
-			new RollTableBranch(1, 9, new _003C_003Ez__ReadOnlySingleElementList<IEffect>(new ModifyStatEffect("ATK", 1))),
-			new RollTableBranch(10, 19, new _003C_003Ez__ReadOnlySingleElementList<IEffect>(new ModifyStatEffect("ATK", 3))),
-			new RollTableBranch(20, 20, new _003C_003Ez__ReadOnlySingleElementList<IEffect>(new ModifyStatEffect("ATK", 10)))
+			new RollTableBranch(1, 9, new List<IEffect> { new ModifyStatEffect("ATK", 1) }),
+			new RollTableBranch(10, 19, new List<IEffect> { new ModifyStatEffect("ATK", 3) }),
+			new RollTableBranch(20, 20, new List<IEffect> { new ModifyStatEffect("ATK", 10) })
 		};
 		RollTableEffect rollTableEffect = new RollTableEffect(branches);
 		EffectContext context = new EffectContext

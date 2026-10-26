@@ -24,7 +24,7 @@ public sealed class CardParsingAndDeckConstraintsTests
 					BaseHitPoints = 12,
 					IsWarlord = true,
 					Faction = "Free Kingdoms",
-					Traits = new _003C_003Ez__ReadOnlyArray<string>(new string[2] { "Warlord", "Free Kingdoms" })
+					Traits = new List<string> { "Warlord", "Free Kingdoms" }
 				},
 				["level4-hero-non-warlord"] = new CardDefinition
 				{
@@ -38,7 +38,7 @@ public sealed class CardParsingAndDeckConstraintsTests
 					BaseHitPoints = 14,
 					IsWarlord = false,
 					Faction = "Free Kingdoms",
-					Traits = new _003C_003Ez__ReadOnlyArray<string>(new string[2] { "Fighter", "Free Kingdoms" })
+					Traits = new List<string> { "Fighter", "Free Kingdoms" }
 				},
 				["wizard-only-spell"] = new CardDefinition
 				{
@@ -51,7 +51,7 @@ public sealed class CardParsingAndDeckConstraintsTests
 					ArmorClass = null,
 					BaseHitPoints = null,
 					Faction = "Free Kingdoms",
-					Traits = new _003C_003Ez__ReadOnlySingleElementList<string>("Spell")
+					Traits = new List<string> { "Spell" }
 				},
 				["evil-only-item"] = new CardDefinition
 				{
@@ -64,7 +64,7 @@ public sealed class CardParsingAndDeckConstraintsTests
 					ArmorClass = null,
 					BaseHitPoints = null,
 					Faction = "Free Kingdoms",
-					Traits = new _003C_003Ez__ReadOnlySingleElementList<string>("Weapon")
+					Traits = new List<string> { "Weapon" }
 				},
 				["fighter-sword"] = new CardDefinition
 				{
@@ -77,7 +77,7 @@ public sealed class CardParsingAndDeckConstraintsTests
 					ArmorClass = null,
 					BaseHitPoints = null,
 					Faction = "Free Kingdoms",
-					Traits = new _003C_003Ez__ReadOnlySingleElementList<string>("Weapon")
+					Traits = new List<string> { "Weapon" }
 				},
 				["fk-troop-lvl2"] = new CardDefinition
 				{
@@ -90,7 +90,7 @@ public sealed class CardParsingAndDeckConstraintsTests
 					ArmorClass = 14,
 					BaseHitPoints = 8,
 					Faction = "Free Kingdoms",
-					Traits = new _003C_003Ez__ReadOnlySingleElementList<string>("Free Kingdoms")
+					Traits = new List<string> { "Free Kingdoms" }
 				},
 				["fk-troop-lvl1"] = new CardDefinition
 				{
@@ -103,7 +103,7 @@ public sealed class CardParsingAndDeckConstraintsTests
 					ArmorClass = 12,
 					BaseHitPoints = 6,
 					Faction = "Free Kingdoms",
-					Traits = new _003C_003Ez__ReadOnlySingleElementList<string>("Free Kingdoms")
+					Traits = new List<string> { "Free Kingdoms" }
 				}
 			}
 		};
