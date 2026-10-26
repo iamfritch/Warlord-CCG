@@ -113,19 +113,13 @@ public sealed class DatabaseLoaderTests
 	[Fact]
 	public void LoadFromFile_Throws_FileNotFoundException_For_Missing_File()
 	{
-		Assert.Throws<FileNotFoundException>(() => DatabaseLoader.LoadFromFile("C:\\nonexistent\\path\\cards.json"));
+		string basePath = AppContext.BaseDirectory;
+		string missingPath = Path.Combine(basePath, "nonexistent", "path", "cards.json");
+		Assert.Throws<FileNotFoundException>(() => DatabaseLoader.LoadFromFile(missingPath));
 	}
 
 	private static string FindCardsJsonPath()
 	{
-		for (DirectoryInfo directoryInfo = new DirectoryInfo(AppContext.BaseDirectory); directoryInfo != null; directoryInfo = directoryInfo.Parent)
-		{
-			string text = Path.Combine(directoryInfo.FullName, "DataParser", "cards.json");
-			if (File.Exists(text))
-			{
-				return text;
-			}
-		}
-		return "c:\\Users\\iamfr\\Documents\\WarlordCCG\\DataParser\\cards.json";
+		return DataPaths.CardsJsonPath;
 	}
 }

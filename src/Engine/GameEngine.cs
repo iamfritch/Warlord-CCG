@@ -639,27 +639,7 @@ public sealed class GameEngine
 		{
 			return _masterCardDb;
 		}
-		DirectoryInfo directoryInfo = new DirectoryInfo(AppContext.BaseDirectory);
-		while (directoryInfo != null && !File.Exists(Path.Combine(directoryInfo.FullName, "WarlordCCG.sln")))
-		{
-			directoryInfo = directoryInfo.Parent;
-		}
-		if (directoryInfo != null)
-		{
-			string text = Path.Combine(directoryInfo.FullName, "DataParser", "cards.json");
-			if (File.Exists(text))
-			{
-				_masterCardDb = DatabaseLoader.LoadFromFile(text);
-				return _masterCardDb;
-			}
-		}
-		string text2 = "C:\\Users\\iamfr\\Documents\\WarlordCCG\\DataParser\\cards.json";
-		if (File.Exists(text2))
-		{
-			_masterCardDb = DatabaseLoader.LoadFromFile(text2);
-			return _masterCardDb;
-		}
-		string text3 = Path.Combine(AppContext.BaseDirectory, "DataParser", "cards.json");
+		string text3 = DataPaths.CardsJsonPath;
 		if (File.Exists(text3))
 		{
 			_masterCardDb = DatabaseLoader.LoadFromFile(text3);

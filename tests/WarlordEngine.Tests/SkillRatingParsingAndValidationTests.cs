@@ -12,23 +12,12 @@ public sealed class SkillRatingParsingAndValidationTests
 {
 	private static string GetRealCardsJsonPath()
 	{
-		string[] array = new string[5]
+		string path = DataPaths.CardsJsonPath;
+		if (File.Exists(path))
 		{
-			Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "DataParser", "cards.json"),
-			Path.Combine(Directory.GetCurrentDirectory(), "DataParser", "cards.json"),
-			Path.Combine(Directory.GetCurrentDirectory(), "..", "..", "DataParser", "cards.json"),
-			Path.Combine(Directory.GetCurrentDirectory(), "..", "..", "..", "DataParser", "cards.json"),
-			"C:\\Users\\iamfr\\Documents\\WarlordCCG\\DataParser\\cards.json"
-		};
-		string[] array2 = array;
-		foreach (string path in array2)
-		{
-			if (File.Exists(path))
-			{
-				return Path.GetFullPath(path);
-			}
+			return path;
 		}
-		throw new FileNotFoundException("cards.json not found.");
+		throw new FileNotFoundException("cards.json not found.", path);
 	}
 
 	[Fact]

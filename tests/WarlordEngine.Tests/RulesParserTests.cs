@@ -74,16 +74,8 @@ public sealed class RulesParserTests
 	[Fact]
 	public void Analyze_StarterDecks_CardRulesCoverage()
 	{
-		string[] source = new string[5]
-		{
-			Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "DataParser", "cards.json"),
-			Path.Combine(Directory.GetCurrentDirectory(), "DataParser", "cards.json"),
-			Path.Combine(Directory.GetCurrentDirectory(), "..", "..", "DataParser", "cards.json"),
-			Path.Combine(Directory.GetCurrentDirectory(), "..", "..", "..", "DataParser", "cards.json"),
-			"C:\\Users\\iamfr\\Documents\\WarlordCCG\\DataParser\\cards.json"
-		};
-		string text = source.FirstOrDefault(File.Exists);
-		if (text == null)
+		string text = DataPaths.CardsJsonPath;
+		if (!File.Exists(text))
 		{
 			return;
 		}

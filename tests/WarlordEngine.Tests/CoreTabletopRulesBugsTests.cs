@@ -18,11 +18,7 @@ public sealed class CoreTabletopRulesBugsTests
 	[Fact]
 	public void Rule1_DatabaseLoader_Loads_Correct_Stats_For_CrownlandStrategist_BrineFiend_TunnelWorm()
 	{
-		string text = Path.Combine(AppContext.BaseDirectory, "DataParser", "cards.json");
-		if (!File.Exists(text))
-		{
-			text = Path.Combine(Directory.GetCurrentDirectory(), "DataParser", "cards.json");
-		}
+		string text = DataPaths.CardsJsonPath;
 		CardDatabase cardDatabase = DatabaseLoader.LoadFromFile(text);
 		Assert.True(cardDatabase.Definitions.TryGetValue("crownland_strategist", out CardDefinition value));
 		Assert.Equal(14, value.ArmorClass);
@@ -1010,11 +1006,7 @@ public sealed class CoreTabletopRulesBugsTests
 	[Fact]
 	public void TabletopRule3_Dupe_AppearsInLegalReacts_WhenTargetedByEnemyMeleeStrike_AndCausesMiss()
 	{
-		string cardsJsonPath = Path.Combine(AppContext.BaseDirectory, "DataParser", "cards.json");
-		if (!File.Exists(cardsJsonPath))
-		{
-			cardsJsonPath = Path.Combine(Directory.GetCurrentDirectory(), "DataParser", "cards.json");
-		}
+		string cardsJsonPath = DataPaths.CardsJsonPath;
 		CardDatabase cardDb = DatabaseLoader.LoadFromFile(cardsJsonPath);
 
 		CardDefinition alraynDef = cardDb.GetDefinition("alrayn_gaunt")!;
@@ -1118,15 +1110,7 @@ public sealed class CoreTabletopRulesBugsTests
 	[Fact]
 	public void TabletopRule3b_Dupe_CannotBePlayed_WhenDefenderIsSoloInRank()
 	{
-		string cardsPath = Path.Combine(AppContext.BaseDirectory, "DataParser", "cards.json");
-		if (!File.Exists(cardsPath))
-		{
-			cardsPath = Path.Combine(Directory.GetCurrentDirectory(), "DataParser", "cards.json");
-		}
-		if (!File.Exists(cardsPath))
-		{
-			cardsPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "DataParser", "cards.json"));
-		}
+		string cardsPath = DataPaths.CardsJsonPath;
 		CardDatabase cardDb = DatabaseLoader.LoadFromFile(cardsPath);
 
 		CardDefinition alraynDef = cardDb.GetDefinition("alrayn_gaunt");

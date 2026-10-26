@@ -11,7 +11,7 @@ Console.WriteLine("Starting Warlord CCG DataParser...");
 string csvPath = DataParser.LocateFilePath("WarlordCards.csv");
 if (string.IsNullOrEmpty(csvPath) || !File.Exists(csvPath))
 {
-    Console.WriteLine("ERROR: Could not find WarlordCards.csv in current directory, DataParser folder, or parent directories.");
+    Console.WriteLine("ERROR: Could not find WarlordCards.csv in the DataParser folder or its parent directories (searched upward from the application base directory).");
     return;
 }
 
@@ -26,28 +26,10 @@ public class DataParser
 {
     public static string LocateFilePath(string filename)
     {
-        // 1. Direct check
-        if (File.Exists(filename)) return Path.GetFullPath(filename);
-
-        // 2. Relative to DataParser directory
-        string fromDataParser = Path.Combine("DataParser", filename);
-        if (File.Exists(fromDataParser)) return Path.GetFullPath(fromDataParser);
-
-        // 3. Search up from AppContext.BaseDirectory
+        // 1. Search up from AppContext.BaseDirectory (build output -> project folder -> repo root).
+        // The current working directory is intentionally not consulted so behaviour is identical
+        // under `dotnet run`, IDE launchers and direct execution of the built binary.
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir != null)
-        {
-            string p1 = Path.Combine(dir.FullName, filename);
-            if (File.Exists(p1)) return p1;
-
-            string p2 = Path.Combine(dir.FullName, "DataParser", filename);
-            if (File.Exists(p2)) return p2;
-
-            dir = dir.Parent;
-        }
-
-        // 4. Search up from Directory.GetCurrentDirectory()
-        dir = new DirectoryInfo(Directory.GetCurrentDirectory());
         while (dir != null)
         {
             string p1 = Path.Combine(dir.FullName, filename);

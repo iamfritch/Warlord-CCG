@@ -480,3 +480,12 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# Antigravity & AI Agent Workspaces
+.antigravity/
+.agent/
+*.patch
+*.diff
+
+# Operating system / shell metadata
+.directory

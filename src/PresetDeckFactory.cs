@@ -50,18 +50,11 @@ public static class PresetDeckFactory
 		{
 			return Path.GetFullPath(customPath);
 		}
-		string[] array = new string[10]
+		string basePath = AppContext.BaseDirectory;
+		string[] array = new string[2]
 		{
-			Path.Combine(AppContext.BaseDirectory, "DataParser", "starter_decks.json"),
-			Path.Combine(AppContext.BaseDirectory, "starter_decks.json"),
-			Path.Combine(Directory.GetCurrentDirectory(), "DataParser", "starter_decks.json"),
-			Path.Combine(Directory.GetCurrentDirectory(), "starter_decks.json"),
-			Path.Combine(Directory.GetCurrentDirectory(), "..", "DataParser", "starter_decks.json"),
-			Path.Combine(Directory.GetCurrentDirectory(), "..", "..", "DataParser", "starter_decks.json"),
-			Path.Combine(Directory.GetCurrentDirectory(), "..", "..", "..", "DataParser", "starter_decks.json"),
-			Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "DataParser", "starter_decks.json"),
-			Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "DataParser", "starter_decks.json"),
-			"C:\\Users\\iamfr\\Documents\\WarlordCCG\\DataParser\\starter_decks.json"
+			DataPaths.StarterDecksJsonPath,
+			Path.Combine(basePath, "starter_decks.json")
 		};
 		foreach (string path in array)
 		{

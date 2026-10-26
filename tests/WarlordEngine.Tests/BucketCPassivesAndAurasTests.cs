@@ -16,14 +16,7 @@ public class BucketCPassivesAndAurasTests
 
 	private static CardDatabase LoadDb()
 	{
-		DirectoryInfo directoryInfo = new DirectoryInfo(AppContext.BaseDirectory);
-		while (directoryInfo != null && !File.Exists(Path.Combine(directoryInfo.FullName, "WarlordCCG.sln")))
-		{
-			directoryInfo = directoryInfo.Parent;
-		}
-		string path = directoryInfo?.FullName ?? "C:\\Users\\iamfr\\Documents\\WarlordCCG";
-		string jsonFilePath = Path.Combine(path, "DataParser", "cards.json");
-		return DatabaseLoader.LoadFromFile(jsonFilePath);
+		return DatabaseLoader.LoadFromFile(DataPaths.CardsJsonPath);
 	}
 
 	public BucketCPassivesAndAurasTests()

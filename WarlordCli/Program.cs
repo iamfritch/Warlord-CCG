@@ -1024,21 +1024,7 @@ public static class Program
 
     private static string? FindCardsJsonPath()
     {
-        string[] candidates =
-        [
-            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "DataParser", "cards.json"),
-            Path.Combine(Directory.GetCurrentDirectory(), "DataParser", "cards.json"),
-            Path.Combine(Directory.GetCurrentDirectory(), "..", "DataParser", "cards.json"),
-            Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "DataParser", "cards.json"),
-            @"C:\Users\iamfr\Documents\WarlordCCG\DataParser\cards.json"
-        ];
-
-        foreach (var path in candidates)
-        {
-            if (File.Exists(path))
-                return Path.GetFullPath(path);
-        }
-
-        return null;
+        string fullPath = WarlordEngine.DataPaths.CardsJsonPath;
+        return File.Exists(fullPath) ? Path.GetFullPath(fullPath) : null;
     }
 }

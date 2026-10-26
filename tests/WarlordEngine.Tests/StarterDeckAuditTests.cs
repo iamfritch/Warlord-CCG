@@ -62,30 +62,26 @@ public class StarterDeckAuditTests
 		_output = output;
 	}
 
-	private static string FindProjectRoot()
+	/// <summary>
+	/// Walks up from <see cref="AppContext.BaseDirectory"/> looking for the solution file.
+	/// Only needed for source-tree concerns (duplicate checks, generated report); returns null
+	/// when running from a layout that has no source tree (e.g. a published test bundle).
+	/// </summary>
+	private static string? TryFindRepoRoot()
 	{
 		DirectoryInfo directoryInfo = new DirectoryInfo(AppContext.BaseDirectory);
 		while (directoryInfo != null && !File.Exists(Path.Combine(directoryInfo.FullName, "WarlordCCG.sln")))
 		{
 			directoryInfo = directoryInfo.Parent;
 		}
-		if (directoryInfo != null && File.Exists(Path.Combine(directoryInfo.FullName, "DataParser", "starter_decks.json")))
-		{
-			return directoryInfo.FullName;
-		}
-		if (File.Exists("C:\\Users\\iamfr\\Documents\\WarlordCCG\\DataParser\\starter_decks.json"))
-		{
-			return "C:\\Users\\iamfr\\Documents\\WarlordCCG";
-		}
-		throw new FileNotFoundException("Could not locate project root containing WarlordCCG.sln and DataParser/starter_decks.json");
+		return directoryInfo?.FullName;
 	}
 
 	[Fact]
 	public void Generate_Starter_Deck_Gap_Report()
 	{
-		string path = FindProjectRoot();
-		string path2 = Path.Combine(path, "DataParser", "starter_decks.json");
-		string jsonFilePath = Path.Combine(path, "DataParser", "cards.json");
+		string path2 = DataPaths.StarterDecksJsonPath;
+		string jsonFilePath = DataPaths.CardsJsonPath;
 		CardDatabase cardDatabase = DatabaseLoader.LoadFromFile(jsonFilePath);
 		string json = File.ReadAllText(path2);
 		List<StarterDeckJson> list = JsonSerializer.Deserialize<List<StarterDeckJson>>(json);
@@ -120,7 +116,7 @@ public class StarterDeckAuditTests
 			list2.Add(item);
 		}
 		string contents = GenerateMarkdownReport(list2);
-		string text = Path.Combine(path, "STARTER_DECK_GAP_REPORT.md");
+		string text = Path.Combine(TryFindRepoRoot() ?? AppContext.BaseDirectory, "STARTER_DECK_GAP_REPORT.md");
 		File.WriteAllText(text, contents);
 		_output.WriteLine("Report generated at " + text);
 		_output.WriteLine($"Category 1 (Fully Implemented): {list2.Count((AuditResult r) => r.Category == CardCompletenessCategory.FullyImplemented)}");
@@ -165,8 +161,7 @@ public class StarterDeckAuditTests
 	[Fact]
 	public void MctsAndHeuristicAi_Simulations_NeverFireStaticOrEngineCallbacks()
 	{
-		string path = FindProjectRoot();
-		CardDatabase cardDb = DatabaseLoader.LoadFromFile(Path.Combine(path, "DataParser", "cards.json"));
+		CardDatabase cardDb = DatabaseLoader.LoadFromFile(DataPaths.CardsJsonPath);
 		GameState gameState = new GameState
 		{
 			CurrentPhase = TurnPhase.Main,
@@ -425,17 +420,20 @@ public class StarterDeckAuditTests
 	[Fact]
 	public void SingleSourceOfTruth_CardsJson_OnlyExistsInDataParser()
 	{
-		string path = FindProjectRoot();
-		Assert.False(File.Exists(Path.Combine(path, "cards.json")), "Duplicate ./cards.json in repo root must not exist.");
-		Assert.False(File.Exists(Path.Combine(path, "src", "cards.json")), "Duplicate src/cards.json must not exist.");
-		Assert.True(File.Exists(Path.Combine(path, "DataParser", "cards.json")), "DataParser/cards.json must exist as the single source of truth.");
+		string? path = TryFindRepoRoot();
+		if (path != null)
+		{
+			Assert.False(File.Exists(Path.Combine(path, "cards.json")), "Duplicate ./cards.json in repo root must not exist.");
+			Assert.False(File.Exists(Path.Combine(path, "src", "cards.json")), "Duplicate src/cards.json must not exist.");
+			Assert.True(File.Exists(Path.Combine(path, "DataParser", "cards.json")), "DataParser/cards.json must exist as the single source of truth.");
+		}
+		Assert.True(File.Exists(DataPaths.CardsJsonPath), "DataParser/cards.json must be copied to the output directory.");
 	}
 
 	[Fact]
 	public void StarterDeckCards_TruthCheck_BehavioralVerification()
 	{
-		string path = FindProjectRoot();
-		CardDatabase cardDatabase = DatabaseLoader.LoadFromFile(Path.Combine(path, "DataParser", "cards.json"));
+		CardDatabase cardDatabase = DatabaseLoader.LoadFromFile(DataPaths.CardsJsonPath);
 		CardDefinition cardDefinition = cardDatabase.Definitions.Values.First((CardDefinition d) => d.Name.Equals("Fireball", StringComparison.OrdinalIgnoreCase));
 		Assert.Single(cardDefinition.Abilities);
 		Assert.Equal(AbilityTrigger.SpendOrder, cardDefinition.Abilities[0].Trigger);
