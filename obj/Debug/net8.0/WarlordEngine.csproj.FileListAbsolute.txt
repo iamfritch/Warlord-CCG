@@ -1,0 +1,13 @@
+C:\Users\iamfr\Documents\WarlordCCG\obj\Debug\net8.0\WarlordEngine.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\iamfr\Documents\WarlordCCG\obj\Debug\net8.0\WarlordEngine.AssemblyInfoInputs.cache
+C:\Users\iamfr\Documents\WarlordCCG\obj\Debug\net8.0\WarlordEngine.AssemblyInfo.cs
+C:\Users\iamfr\Documents\WarlordCCG\obj\Debug\net8.0\WarlordEngine.csproj.CoreCompileInputs.cache
+C:\Users\iamfr\Documents\WarlordCCG\bin\Debug\net8.0\WarlordEngine.deps.json
+C:\Users\iamfr\Documents\WarlordCCG\bin\Debug\net8.0\WarlordEngine.dll
+C:\Users\iamfr\Documents\WarlordCCG\bin\Debug\net8.0\WarlordEngine.pdb
+C:\Users\iamfr\Documents\WarlordCCG\obj\Debug\net8.0\WarlordEngine.dll
+C:\Users\iamfr\Documents\WarlordCCG\obj\Debug\net8.0\refint\WarlordEngine.dll
+C:\Users\iamfr\Documents\WarlordCCG\obj\Debug\net8.0\WarlordEngine.pdb
+C:\Users\iamfr\Documents\WarlordCCG\obj\Debug\net8.0\ref\WarlordEngine.dll
+C:\Users\iamfr\Documents\WarlordCCG\bin\Debug\net8.0\DataParser\cards.json
+C:\Users\iamfr\Documents\WarlordCCG\bin\Debug\net8.0\DataParser\starter_decks.json

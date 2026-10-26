@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>WarlordEngine</RootNamespace>
+    <LangVersion>12</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Text.Json" Version="8.0.*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="DataParser\starter_decks.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="DataParser\cards.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <!-- Exclude sub-project files from the main library compilation -->
+  <ItemGroup>
+    <Compile Remove="tests\**" />
+    <Compile Remove="DataParser\**" />
+    <Compile Remove="WarlordCli\**" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,544 @@
+[
+  {
+    "DeckName": "Deverenian Starter (Church Enforcer Tancred)",
+    "Faction": "Deverenian",
+    "WarlordName": "Church Enforcer Tancred",
+    "StartingArmy": [
+      {
+        "CardName": "Squire Fendric",
+        "Count": 2
+      },
+      {
+        "CardName": "Ambitious Squire",
+        "Count": 3
+      }
+    ],
+    "MainDeck": [
+      {
+        "CardName": "Aureliane",
+        "Count": 3
+      },
+      {
+        "CardName": "Church Inquisitor",
+        "Count": 3
+      },
+      {
+        "CardName": "Sister Kiren",
+        "Count": 3
+      },
+      {
+        "CardName": "Taumar the Protector",
+        "Count": 3
+      },
+      {
+        "CardName": "Ghed Daucet",
+        "Count": 3
+      },
+      {
+        "CardName": "Flame Jester",
+        "Count": 2
+      },
+      {
+        "CardName": "Squire Fendric",
+        "Count": 1
+      },
+      {
+        "CardName": "Ghed Bane",
+        "Count": 1
+      },
+      {
+        "CardName": "Another Tavern Brawl",
+        "Count": 3
+      },
+      {
+        "CardName": "I Have Your Back",
+        "Count": 3
+      },
+      {
+        "CardName": "Arcane Approach",
+        "Count": 3
+      },
+      {
+        "CardName": "Crush",
+        "Count": 3
+      },
+      {
+        "CardName": "Even the Odds",
+        "Count": 1
+      },
+      {
+        "CardName": "Riding Horse",
+        "Count": 3
+      },
+      {
+        "CardName": "War Horse",
+        "Count": 3
+      },
+      {
+        "CardName": "Scale Mail",
+        "Count": 3
+      },
+      {
+        "CardName": "Myerdeth Mare",
+        "Count": 2
+      },
+      {
+        "CardName": "Breastplate of Power",
+        "Count": 1
+      }
+    ]
+  },
+  {
+    "DeckName": "Dwarf Starter (Memoriam)",
+    "Faction": "Dwarf",
+    "WarlordName": "Memoriam",
+    "StartingArmy": [
+      {
+        "CardName": "Sunforge Smith",
+        "Count": 2
+      },
+      {
+        "CardName": "Tunnel Vanguard",
+        "Count": 3
+      }
+    ],
+    "MainDeck": [
+      {
+        "CardName": "Dress",
+        "Count": 3
+      },
+      {
+        "CardName": "Hrun Instigator",
+        "Count": 3
+      },
+      {
+        "CardName": "Tinker",
+        "Count": 3
+      },
+      {
+        "CardName": "Hazahk of Shadow",
+        "Count": 3
+      },
+      {
+        "CardName": "Salvage",
+        "Count": 3
+      },
+      {
+        "CardName": "Frenzy",
+        "Count": 3
+      },
+      {
+        "CardName": "Sunforge Smith",
+        "Count": 1
+      },
+      {
+        "CardName": "Quick Strength",
+        "Count": 3
+      },
+      {
+        "CardName": "Gift From Above",
+        "Count": 3
+      },
+      {
+        "CardName": "Holy Might",
+        "Count": 3
+      },
+      {
+        "CardName": "Well Supplied",
+        "Count": 2
+      },
+      {
+        "CardName": "Divine Respite",
+        "Count": 1
+      },
+      {
+        "CardName": "Bruntor's Helm",
+        "Count": 3
+      },
+      {
+        "CardName": "War Horse",
+        "Count": 3
+      },
+      {
+        "CardName": "Hunting Staff",
+        "Count": 3
+      },
+      {
+        "CardName": "Strongarm Stout",
+        "Count": 2
+      },
+      {
+        "CardName": "Hod's Legacy",
+        "Count": 1
+      },
+      {
+        "CardName": "Shield of Spurning",
+        "Count": 1
+      }
+    ]
+  },
+  {
+    "DeckName": "Elf Starter (Tazian Dythanus)",
+    "Faction": "Elf",
+    "WarlordName": "Tazian Dythanus",
+    "StartingArmy": [
+      {
+        "CardName": "Graveyard Librarian",
+        "Count": 2
+      },
+      {
+        "CardName": "Jigoral",
+        "Count": 3
+      }
+    ],
+    "MainDeck": [
+      {
+        "CardName": "Ciane",
+        "Count": 3
+      },
+      {
+        "CardName": "Frameseer",
+        "Count": 3
+      },
+      {
+        "CardName": "Grimfey Prowler",
+        "Count": 3
+      },
+      {
+        "CardName": "Goldengrove Mage",
+        "Count": 3
+      },
+      {
+        "CardName": "Mistress Allandra",
+        "Count": 3
+      },
+      {
+        "CardName": "Lord's Assailant",
+        "Count": 2
+      },
+      {
+        "CardName": "Graveyard Librarian",
+        "Count": 1
+      },
+      {
+        "CardName": "Callow Rowan",
+        "Count": 1
+      },
+      {
+        "CardName": "Blast",
+        "Count": 3
+      },
+      {
+        "CardName": "Jump",
+        "Count": 3
+      },
+      {
+        "CardName": "Magic Missiles",
+        "Count": 3
+      },
+      {
+        "CardName": "Dissolve",
+        "Count": 2
+      },
+      {
+        "CardName": "Fireball",
+        "Count": 2
+      },
+      {
+        "CardName": "Melt Metal",
+        "Count": 2
+      },
+      {
+        "CardName": "Shadow Bolts",
+        "Count": 2
+      },
+      {
+        "CardName": "Flamelance",
+        "Count": 1
+      },
+      {
+        "CardName": "Burning Scroll",
+        "Count": 3
+      },
+      {
+        "CardName": "Riding Horse",
+        "Count": 3
+      },
+      {
+        "CardName": "Unicorn of Thun",
+        "Count": 1
+      }
+    ]
+  },
+  {
+    "DeckName": "Free Kingdoms Starter (Adathan, Celestial Messenger)",
+    "Faction": "Free Kingdoms",
+    "WarlordName": "Adathan, Celestial Messenger",
+    "StartingArmy": [
+      {
+        "CardName": "Crownland Strategist",
+        "Count": 2
+      },
+      {
+        "CardName": "Keen Eared Sentry",
+        "Count": 3
+      }
+    ],
+    "MainDeck": [
+      {
+        "CardName": "Albrecht Novice",
+        "Count": 3
+      },
+      {
+        "CardName": "Leonora",
+        "Count": 3
+      },
+      {
+        "CardName": "Heresy Huntress",
+        "Count": 3
+      },
+      {
+        "CardName": "Yscarite Berserker",
+        "Count": 3
+      },
+      {
+        "CardName": "Squire Argos",
+        "Count": 3
+      },
+      {
+        "CardName": "Shannon the Daring",
+        "Count": 3
+      },
+      {
+        "CardName": "TFK Brigand",
+        "Count": 1
+      },
+      {
+        "CardName": "Leveled!",
+        "Count": 3
+      },
+      {
+        "CardName": "Meet at the Inn!",
+        "Count": 3
+      },
+      {
+        "CardName": "Pack Tactics",
+        "Count": 3
+      },
+      {
+        "CardName": "Punitive Strike",
+        "Count": 3
+      },
+      {
+        "CardName": "Quick Shielding",
+        "Count": 3
+      },
+      {
+        "CardName": "Quick Strength",
+        "Count": 3
+      },
+      {
+        "CardName": "Spiritual Weapon",
+        "Count": 2
+      },
+      {
+        "CardName": "Fateshift",
+        "Count": 1
+      },
+      {
+        "CardName": "Shillelagh",
+        "Count": 3
+      },
+      {
+        "CardName": "Ardian Greathawk",
+        "Count": 1
+      }
+    ]
+  },
+  {
+    "DeckName": "Mercenary Starter (Alrayn Gaunt)",
+    "Faction": "Mercenary",
+    "WarlordName": "Alrayn Gaunt",
+    "StartingArmy": [
+      {
+        "CardName": "Tyren Ruskin",
+        "Count": 2
+      },
+      {
+        "CardName": "Brine Fiend",
+        "Count": 3
+      }
+    ],
+    "MainDeck": [
+      {
+        "CardName": "Flame Jester",
+        "Count": 3
+      },
+      {
+        "CardName": "Stirges",
+        "Count": 3
+      },
+      {
+        "CardName": "Tunnel Worm",
+        "Count": 3
+      },
+      {
+        "CardName": "Balian",
+        "Count": 3
+      },
+      {
+        "CardName": "Shambling Horror",
+        "Count": 3
+      },
+      {
+        "CardName": "Starbinder",
+        "Count": 3
+      },
+      {
+        "CardName": "Blitzer",
+        "Count": 1
+      },
+      {
+        "CardName": "Swift",
+        "Count": 3
+      },
+      {
+        "CardName": "Sneak Attack",
+        "Count": 3
+      },
+      {
+        "CardName": "Rapid Dash",
+        "Count": 3
+      },
+      {
+        "CardName": "Cunning Shot",
+        "Count": 2
+      },
+      {
+        "CardName": "Pounce",
+        "Count": 2
+      },
+      {
+        "CardName": "Assassin's Strike",
+        "Count": 2
+      },
+      {
+        "CardName": "Dupe",
+        "Count": 1
+      },
+      {
+        "CardName": "Riding Horse",
+        "Count": 3
+      },
+      {
+        "CardName": "Gapfinder",
+        "Count": 3
+      },
+      {
+        "CardName": "Cloudracer",
+        "Count": 2
+      },
+      {
+        "CardName": "Revenger",
+        "Count": 1
+      }
+    ]
+  },
+  {
+    "DeckName": "Nothrog Starter (Vactus, Spirit's Champion)",
+    "Faction": "Nothrog",
+    "WarlordName": "Vactus, Spirit's Champion",
+    "StartingArmy": [
+      {
+        "CardName": "Novice Pyro",
+        "Count": 2
+      },
+      {
+        "CardName": "Joleg",
+        "Count": 3
+      }
+    ],
+    "MainDeck": [
+      {
+        "CardName": "Ac'Vuk",
+        "Count": 3
+      },
+      {
+        "CardName": "'Mad' Pat Carrik",
+        "Count": 3
+      },
+      {
+        "CardName": "Catapult Crew",
+        "Count": 3
+      },
+      {
+        "CardName": "Kraig'dem",
+        "Count": 3
+      },
+      {
+        "CardName": "Doo'run",
+        "Count": 2
+      },
+      {
+        "CardName": "Makusog Steelhorn",
+        "Count": 2
+      },
+      {
+        "CardName": "Novice Pyro",
+        "Count": 1
+      },
+      {
+        "CardName": "The Mighty Mugg",
+        "Count": 1
+      },
+      {
+        "CardName": "Steady Grip",
+        "Count": 3
+      },
+      {
+        "CardName": "Arcane Approach",
+        "Count": 2
+      },
+      {
+        "CardName": "Cleave",
+        "Count": 2
+      },
+      {
+        "CardName": "Pounce",
+        "Count": 2
+      },
+      {
+        "CardName": "Prime Positioning",
+        "Count": 2
+      },
+      {
+        "CardName": "Heroic Confrontation",
+        "Count": 1
+      },
+      {
+        "CardName": "Nothrog S'sike",
+        "Count": 3
+      },
+      {
+        "CardName": "War Horse",
+        "Count": 3
+      },
+      {
+        "CardName": "Bardiche",
+        "Count": 3
+      },
+      {
+        "CardName": "Bruntor's Helm",
+        "Count": 2
+      },
+      {
+        "CardName": "Myerdeth Mare",
+        "Count": 2
+      },
+      {
+        "CardName": "Griffon of Andover",
+        "Count": 1
+      }
+    ]
+  }
+]
