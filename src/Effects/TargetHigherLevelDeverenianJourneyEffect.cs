@@ -13,6 +13,10 @@ public sealed record TargetHigherLevelDeverenianJourneyEffect : IEffect
 			yield break;
 		}
 		int value = context.TargetInstanceId.Value;
+		if (value == context.SourceInstanceId)
+		{
+			yield break;
+		}
 		CardInstance? cardInstance = context.FindCard(value);
 		CardInstance? cardInstance2 = context.FindCard(context.SourceInstanceId);
 		if (!cardInstance.HasValue || !cardInstance2.HasValue)

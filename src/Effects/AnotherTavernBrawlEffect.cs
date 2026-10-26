@@ -33,7 +33,7 @@ public sealed record AnotherTavernBrawlEffect : IEffect
 			yield break;
 		}
 		CardDefinition definition = context.CardDb.GetDefinition(cardInstance.Value.DefinitionId);
-		PerformStrikeEffect performStrikeEffect = new PerformStrikeEffect(((object)definition != null && definition.Attack?.Strikes.Count > 0) ? definition.Attack.Strikes[0].Modifier : 0);
+		PerformStrikeEffect performStrikeEffect = new PerformStrikeEffect(((object)definition != null && definition.Attack?.Strikes.Count > 0) ? definition.Attack.Strikes[0].Modifier : 0, IgnoreRange: true);
 		EffectContext context2 = context with
 		{
 			SourceInstanceId = opponentCharId.Value,
@@ -44,7 +44,7 @@ public sealed record AnotherTavernBrawlEffect : IEffect
 			yield return item;
 		}
 		CardDefinition definition2 = context.CardDb.GetDefinition(performer.Value.DefinitionId);
-		PerformStrikeEffect performStrikeEffect2 = new PerformStrikeEffect(((object)definition2 != null && definition2.Attack?.Strikes.Count > 0) ? definition2.Attack.Strikes[0].Modifier : 0);
+		PerformStrikeEffect performStrikeEffect2 = new PerformStrikeEffect(((object)definition2 != null && definition2.Attack?.Strikes.Count > 0) ? definition2.Attack.Strikes[0].Modifier : 0, IgnoreRange: true);
 		EffectContext context3 = context with
 		{
 			SourceInstanceId = performerId,

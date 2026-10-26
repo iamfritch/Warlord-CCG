@@ -11,6 +11,8 @@ public sealed record EffectContext
 
 	public int? TargetInstanceId { get; init; }
 
+	public IReadOnlyList<int>? TargetInstanceIds { get; init; }
+
 	public required GameState State { get; init; }
 
 	public required CardDatabase CardDb { get; init; }
@@ -51,6 +53,13 @@ public sealed record EffectContext
 					return item4;
 				}
 			}
+			foreach (CardInstance itemAttached in player.AttachedItems)
+			{
+				if (itemAttached.InstanceId == instanceId)
+				{
+					return itemAttached;
+				}
+			}
 			foreach (KeyValuePair<int, List<CardInstance>> rank in player.Ranks)
 			{
 				rank.Deconstruct(out var _, out var value);
@@ -72,6 +81,7 @@ public sealed record EffectContext
 	{
 		SourceInstanceId = original.SourceInstanceId;
 		TargetInstanceId = original.TargetInstanceId;
+		TargetInstanceIds = original.TargetInstanceIds;
 		State = original.State;
 		CardDb = original.CardDb;
 		RollDice = original.RollDice;

@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using WarlordEngine.Actions;
+using WarlordEngine.Effects;
 using WarlordEngine.Engine;
+using WarlordEngine.Events;
 
 namespace WarlordEngine.AI;
 
@@ -85,6 +87,34 @@ public sealed class HeuristicAiAgent : IAiAgent
 				ActionResult actionResult2 = gameEngine2.ExecuteAction(item);
 				DrainReactWindow(gameEngine2, gameState2);
 				num3 = (actionResult2.IsSuccess ? stateEvaluator3.Evaluate(gameState2, playerId) : (-100000.0));
+			}
+			if (item is UseAbilityAction uaa)
+			{
+				if (uaa.TargetInstanceIds != null && uaa.TargetInstanceIds.Length > 1)
+				{
+					var strikeDef = CardLocator.FindCard(state, uaa.TargetInstanceIds[1]);
+					if (strikeDef.HasValue && strikeDef.Value.OwnerPlayerIndex == playerId)
+					{
+						num3 -= 500.0;
+					}
+				}
+				else if (uaa.TargetInstanceIds != null && uaa.TargetInstanceIds.Length == 1)
+				{
+					var performer = CardLocator.FindCard(state, uaa.TargetInstanceIds[0]);
+					if (performer.HasValue && performer.Value.OwnerPlayerIndex == playerId && (performer.Value.Rank ?? 1) > 1)
+					{
+						var srcCard = CardLocator.FindCard(state, uaa.SourceInstanceId);
+						var srcDef = srcCard.HasValue ? engine.CardDb?.GetDefinition(srcCard.Value.DefinitionId) : null;
+						if (srcDef?.Abilities != null && uaa.AbilityIndex >= 0 && uaa.AbilityIndex < srcDef.Abilities.Count)
+						{
+							var ab = srcDef.Abilities[uaa.AbilityIndex];
+							if (ab.Effects.Any(e => e is TargetPerformsStrikeEffect))
+							{
+								num3 -= 500.0;
+							}
+						}
+					}
+				}
 			}
 			if (num3 > num)
 			{

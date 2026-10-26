@@ -41,6 +41,10 @@ public sealed record ResolveAttackEffect : IEffect
 
 	public bool TrueStrike { get; init; }
 
+	public bool HasAdvantage { get; init; }
+
+	public bool HasDisadvantage { get; init; }
+
 	public IEnumerable<GameEvent> Evaluate(EffectContext context)
 	{
 		if (!context.TargetInstanceId.HasValue)
@@ -84,7 +88,19 @@ public sealed record ResolveAttackEffect : IEffect
 		};
 		PassiveBonuses continuousPassiveBonuses = GameEngine.GetContinuousPassiveBonuses(context.State, cardInstance.Value, combatCtx, context.CardDb);
 		num += continuousPassiveBonuses.Ac;
+		bool hasAdv = HasAdvantage || (context.SourceInstanceId != 0 && GameEngine.HasTurnBuff(context.State, context.SourceInstanceId, "ADVANTAGE"));
+		bool hasDis = HasDisadvantage || (context.SourceInstanceId != 0 && GameEngine.HasTurnBuff(context.State, context.SourceInstanceId, "DISADVANTAGE"));
 		int num3 = context.RollDice(1, 20);
+		if (hasAdv && !hasDis)
+		{
+			int roll2 = context.RollDice(1, 20);
+			num3 = Math.Max(num3, roll2);
+		}
+		else if (hasDis && !hasAdv)
+		{
+			int roll2 = context.RollDice(1, 20);
+			num3 = Math.Min(num3, roll2);
+		}
 		bool flag = EnableCriticals && num3 == 1;
 		bool flag2 = EnableCriticals && num3 == 20;
 		int num4 = num3 + StrikeBonus;

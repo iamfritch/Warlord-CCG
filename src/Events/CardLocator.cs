@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 namespace WarlordEngine.Events;
 
-internal static class CardLocator
+public static class CardLocator
 {
 	public delegate void CardMutator(ref CardInstance card);
 
@@ -38,6 +38,13 @@ internal static class CardLocator
 					return item4;
 				}
 			}
+			foreach (CardInstance itemAttached in player.AttachedItems)
+			{
+				if (itemAttached.InstanceId == instanceId)
+				{
+					return itemAttached;
+				}
+			}
 			foreach (KeyValuePair<int, List<CardInstance>> rank in player.Ranks)
 			{
 				rank.Deconstruct(out var _, out var value);
@@ -70,6 +77,10 @@ internal static class CardLocator
 				return true;
 			}
 			if (MutateInList(player.BanishPile, instanceId, mutator))
+			{
+				return true;
+			}
+			if (MutateInList(player.AttachedItems, instanceId, mutator))
 			{
 				return true;
 			}

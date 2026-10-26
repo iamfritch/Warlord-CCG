@@ -47,6 +47,10 @@ public sealed record SalvageEquippedItemEffect : IEffect
 		{
 			PlayerState playerState = context.State.Players[cardInstance3.Value.OwnerPlayerIndex];
 			playerState.DiscardPile.RemoveAll((CardInstance c) => c.InstanceId == itemToSalvage);
+			foreach (PlayerState p in context.State.Players)
+			{
+				p.AttachedItems.RemoveAll((CardInstance c) => c.InstanceId == itemToSalvage);
+			}
 			if (!playerState.Hand.Any((CardInstance c) => c.InstanceId == itemToSalvage))
 			{
 				playerState.Hand.Add(cardInstance3.Value with

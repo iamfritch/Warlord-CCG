@@ -18,6 +18,12 @@ public sealed record PlayCardAction : PlayerAction, IPlayerAction
 
 	public int? TargetCharacterId { get; init; }
 
+	public int? TargetInstanceId
+	{
+		get => TargetCharacterId;
+		init => TargetCharacterId = value;
+	}
+
 	public int? PerformerInstanceId { get; init; }
 
 	public int? AbilityIndex { get; init; }
@@ -116,6 +122,47 @@ public sealed record PlayCardAction : PlayerAction, IPlayerAction
 		{
 			list.Add("Card definition '" + cardInstance.Value.DefinitionId + "' not found in card database.");
 			return ActionResult.Failure(list);
+		}
+		bool isUniqueCard = definition.Traits.Any((string t) => t.Equals("Unique", StringComparison.OrdinalIgnoreCase)) || Regex.IsMatch(definition.RulesText ?? "", @"\bUnique\b", RegexOptions.IgnoreCase);
+		if (isUniqueCard)
+		{
+			bool alreadyControlsSameName = false;
+			foreach (List<CardInstance> rankList in playerState.Ranks.Values)
+			{
+				foreach (CardInstance c in rankList)
+				{
+					CardDefinition def = cardDb.GetDefinition(c.DefinitionId);
+					if (def != null && def.Name.Equals(definition.Name, StringComparison.OrdinalIgnoreCase))
+					{
+						alreadyControlsSameName = true;
+						break;
+					}
+				}
+				if (alreadyControlsSameName) break;
+			}
+			if (!alreadyControlsSameName)
+			{
+				foreach (CardInstance item in playerState.AttachedItems)
+				{
+					CardDefinition def = cardDb.GetDefinition(item.DefinitionId);
+					if (def != null && def.Name.Equals(definition.Name, StringComparison.OrdinalIgnoreCase))
+					{
+						alreadyControlsSameName = true;
+						break;
+					}
+				}
+			}
+			if (alreadyControlsSameName)
+			{
+				if (definition.Type == CardType.Item)
+				{
+					list.Add($"Cannot equip Unique item '{definition.Name}': player already controls a card with the same name in play.");
+				}
+				else
+				{
+					list.Add($"Cannot play Unique character '{definition.Name}': player already controls a card with the same name in play.");
+				}
+			}
 		}
 		if (definition.Type == CardType.Item)
 		{
@@ -391,6 +438,41 @@ public sealed record PlayCardAction : PlayerAction, IPlayerAction
 		if (!MatchesClass(itemDef, targetDef))
 		{
 			list.Add($"Target character '{targetDef.Name}' ({targetDef.Class}) does not match Item class ({itemDef.Class}).");
+		}
+		bool isUniqueItem = itemDef.Traits.Any((string t) => t.Equals("Unique", StringComparison.OrdinalIgnoreCase)) || Regex.IsMatch(itemDef.RulesText ?? "", @"\bUnique\b", RegexOptions.IgnoreCase);
+		if (isUniqueItem && state != null && targetCard.OwnerPlayerIndex >= 0 && targetCard.OwnerPlayerIndex < state.Players.Count)
+		{
+			PlayerState ownerPlayer = state.Players[targetCard.OwnerPlayerIndex];
+			bool alreadyControls = false;
+			foreach (List<CardInstance> rankList in ownerPlayer.Ranks.Values)
+			{
+				foreach (CardInstance c in rankList)
+				{
+					CardDefinition def = cardDb.GetDefinition(c.DefinitionId);
+					if (def != null && def.Name.Equals(itemDef.Name, StringComparison.OrdinalIgnoreCase))
+					{
+						alreadyControls = true;
+						break;
+					}
+				}
+				if (alreadyControls) break;
+			}
+			if (!alreadyControls)
+			{
+				foreach (CardInstance item in ownerPlayer.AttachedItems)
+				{
+					CardDefinition def = cardDb.GetDefinition(item.DefinitionId);
+					if (def != null && def.Name.Equals(itemDef.Name, StringComparison.OrdinalIgnoreCase))
+					{
+						alreadyControls = true;
+						break;
+					}
+				}
+			}
+			if (alreadyControls)
+			{
+				list.Add($"Cannot equip Unique item '{itemDef.Name}': player already controls a card with the same name in play.");
+			}
 		}
 		foreach (int attachedItemId in targetCard.AttachedItemIds)
 		{

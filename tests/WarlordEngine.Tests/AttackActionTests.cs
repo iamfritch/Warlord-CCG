@@ -356,6 +356,7 @@ public sealed class AttackActionTests
 				DefinitionId = "hero",
 				Name = "Hero",
 				Type = CardType.Character,
+				Level = 1,
 				ArmorClass = 5,
 				BaseHitPoints = 10,
 				Attack = new AttackValue
@@ -452,6 +453,7 @@ public sealed class AttackActionTests
 					DefinitionId = "peasant",
 					Name = "Peasant",
 					Type = CardType.Character,
+					Level = 1,
 					ArmorClass = 10,
 					BaseHitPoints = 10,
 					Attack = new AttackValue
@@ -469,6 +471,7 @@ public sealed class AttackActionTests
 					DefinitionId = "golem",
 					Name = "Iron Golem",
 					Type = CardType.Character,
+					Level = 1,
 					ArmorClass = 35,
 					BaseHitPoints = 10,
 					Attack = new AttackValue()
@@ -803,7 +806,8 @@ public sealed class AttackActionTests
 		List<CardInstance> list5 = new List<CardInstance>(num2);
 		CollectionsMarshal.SetCount(list5, num2);
 		CollectionsMarshal.AsSpan(list5)[0] = cardInstance;
-		playerState2.DiscardPile = list5;
+		playerState2.AttachedItems = list5;
+		playerState2.DiscardPile = new List<CardInstance>();
 		reference2 = playerState2;
 		gameState.Players = list2;
 		GameState gameState2 = gameState;

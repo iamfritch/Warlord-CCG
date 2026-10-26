@@ -43,6 +43,12 @@ public record struct CardInstance
 
 	public int? AttachedToInstanceId { get; set; }
 
+	public int? AttachedToId
+	{
+		get => AttachedToInstanceId;
+		set => AttachedToInstanceId = value;
+	}
+
 	private List<string> _statusTags;
 
 	private Dictionary<string, int> _skillRatings;

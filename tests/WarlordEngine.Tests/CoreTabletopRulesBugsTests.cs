@@ -760,7 +760,8 @@ public sealed class CoreTabletopRulesBugsTests
 		List<CardInstance> list5 = new List<CardInstance>(num2);
 		CollectionsMarshal.SetCount(list5, num2);
 		CollectionsMarshal.AsSpan(list5)[0] = cardInstance;
-		playerState2.DiscardPile = list5;
+		playerState2.AttachedItems = list5;
+		playerState2.DiscardPile = new List<CardInstance>();
 		reference2 = playerState2;
 		gameState.Players = list;
 		GameState gameState2 = gameState;

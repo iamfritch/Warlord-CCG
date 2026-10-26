@@ -51,7 +51,8 @@ public sealed record WellSuppliedEffect(int CardsToReveal = 10) : IEffect
 						AttachedToInstanceId = item3
 					};
 					playerState.DiscardPile.RemoveAll((CardInstance c) => c.InstanceId == item.InstanceId);
-					playerState.DiscardPile.Add(item2);
+					playerState.AttachedItems.RemoveAll((CardInstance c) => c.InstanceId == item.InstanceId);
+					playerState.AttachedItems.Add(item2);
 					break;
 				}
 			}

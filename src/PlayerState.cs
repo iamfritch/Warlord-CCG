@@ -14,6 +14,8 @@ public sealed class PlayerState
 
 	public List<CardInstance> DiscardPile { get; set; } = new List<CardInstance>();
 
+	public List<CardInstance> AttachedItems { get; set; } = new List<CardInstance>();
+
 	public List<CardInstance> BanishPile { get; set; } = new List<CardInstance>();
 
 	public SortedDictionary<int, List<CardInstance>> Ranks { get; set; } = new SortedDictionary<int, List<CardInstance>>();
@@ -31,6 +33,7 @@ public sealed class PlayerState
 			Deck = CloneCardList(Deck),
 			Hand = CloneCardList(Hand),
 			DiscardPile = CloneCardList(DiscardPile),
+			AttachedItems = CloneCardList(AttachedItems),
 			BanishPile = CloneCardList(BanishPile),
 			Ranks = CloneRanks(Ranks),
 			WarlordInstanceId = WarlordInstanceId,

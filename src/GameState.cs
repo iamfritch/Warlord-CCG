@@ -69,6 +69,8 @@ public sealed class GameState
 
 	public int? WinningPlayerIndex { get; set; }
 
+	public int? InitiativeWinnerIndex { get; set; }
+
 	public GameOverReason GameOverReason { get; set; }
 
 	public int NextInstanceId { get; set; } = 1;
@@ -89,6 +91,8 @@ public sealed class GameState
 		}
 	}
 
+	public GameState Clone() => DeepClone();
+
 	public GameState DeepClone(int? observerPlayerId = null)
 	{
 		bool isSimulation = _isSimulation || observerPlayerId.HasValue;
@@ -98,6 +102,7 @@ public sealed class GameState
 			AutoPassWhenNoReactsAvailable = AutoPassWhenNoReactsAvailable,
 			IsGameOver = IsGameOver,
 			WinningPlayerIndex = WinningPlayerIndex,
+			InitiativeWinnerIndex = InitiativeWinnerIndex,
 			GameOverReason = GameOverReason,
 			NextInstanceId = NextInstanceId,
 			Players = new List<PlayerState>(Players.Count),

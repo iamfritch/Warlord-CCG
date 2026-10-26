@@ -4,7 +4,7 @@ using System.Runtime.CompilerServices;
 
 namespace WarlordEngine.Events;
 
-public sealed record MarchEvent : GameEvent
+public record MarchEvent : GameEvent
 {
 	public required int PlayerIndex { get; init; }
 
@@ -15,6 +15,21 @@ public sealed record MarchEvent : GameEvent
 	public required int DestinationRank { get; init; }
 
 	public int? TargetSlotIndex { get; init; }
+
+	public MarchEvent()
+	{
+	}
+
+	[SetsRequiredMembers]
+	protected MarchEvent(MarchEvent original)
+		: base(original)
+	{
+		PlayerIndex = original.PlayerIndex;
+		CardInstanceId = original.CardInstanceId;
+		SourceRank = original.SourceRank;
+		DestinationRank = original.DestinationRank;
+		TargetSlotIndex = original.TargetSlotIndex;
+	}
 
 	public override GameState ApplyToState(GameState state)
 	{
@@ -64,17 +79,5 @@ public sealed record MarchEvent : GameEvent
 		}
 		BoardGeometry.EnforceFormation(playerState);
 		return state;
-	}
-
-	[CompilerGenerated]
-	[SetsRequiredMembers]
-	private MarchEvent(MarchEvent original)
-		: base(original)
-	{
-		PlayerIndex = original.PlayerIndex;
-		CardInstanceId = original.CardInstanceId;
-		SourceRank = original.SourceRank;
-		DestinationRank = original.DestinationRank;
-		TargetSlotIndex = original.TargetSlotIndex;
 	}
 }

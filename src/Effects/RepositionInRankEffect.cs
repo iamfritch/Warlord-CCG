@@ -15,12 +15,16 @@ public sealed record RepositionInRankEffect : IEffect
 			List<CardInstance> list = context.State.Players[tuple.Value.Item1].Ranks[tuple.Value.Item2];
 			if (list.Count > 1)
 			{
-				CardInstance item = list[tuple.Value.Item3];
-				list.RemoveAt(tuple.Value.Item3);
-				int index = ((tuple.Value.Item3 == 0) ? list.Count : 0);
-				list.Insert(index, item);
+				int newSlot = (tuple.Value.Item3 == 0) ? list.Count - 1 : 0;
+				yield return new CharacterMovedEvent
+				{
+					PlayerIndex = tuple.Value.Item1,
+					CardInstanceId = instanceId,
+					SourceRank = tuple.Value.Item2,
+					DestinationRank = tuple.Value.Item2,
+					TargetSlotIndex = newSlot
+				};
 			}
 		}
-		yield break;
 	}
 }

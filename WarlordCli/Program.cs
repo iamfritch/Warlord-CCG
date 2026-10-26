@@ -607,7 +607,7 @@ public static class Program
         }
     }
 
-    private static string FormatCharacter(CardInstance card, PlayerState player, CardDatabase cardDb, GameState? state = null)
+    public static string FormatCharacter(CardInstance card, PlayerState player, CardDatabase cardDb, GameState? state = null)
     {
         var def = cardDb.GetDefinition(card.DefinitionId);
         string name = def?.Name ?? card.DefinitionId;
@@ -621,10 +621,30 @@ public static class Program
         int itemHp = 0;
         var itemNames = new List<string>();
 
+        var attachedItems = new List<CardInstance>();
         foreach (var itemId in card.AttachedItemIds)
         {
-            var itemCard = player.DiscardPile.FirstOrDefault(c => c.InstanceId == itemId);
-            var itemDef = itemCard.DefinitionId != null ? cardDb.GetDefinition(itemCard.DefinitionId) : null;
+            var it = player.AttachedItems.FirstOrDefault(c => c.InstanceId == itemId);
+            if (it.DefinitionId == null)
+            {
+                it = player.DiscardPile.FirstOrDefault(c => c.InstanceId == itemId);
+            }
+            if (it.DefinitionId != null)
+            {
+                attachedItems.Add(it);
+            }
+        }
+        foreach (var it in player.AttachedItems)
+        {
+            if ((it.AttachedToInstanceId ?? it.AttachedToId) == card.InstanceId && !attachedItems.Any(ai => ai.InstanceId == it.InstanceId))
+            {
+                attachedItems.Add(it);
+            }
+        }
+
+        foreach (var itemCard in attachedItems)
+        {
+            var itemDef = cardDb.GetDefinition(itemCard.DefinitionId);
             if (itemDef != null)
             {
                 var stats = GameEngine.GetItemPassiveStats(itemDef);
@@ -666,6 +686,8 @@ public static class Program
             DeclareAttackAction dec => FormatDeclareAttack(dec, state, cardDb),
             PlayCardAction play => FormatPlayCard(play, state, cardDb),
             DeployCharacterAction dep => $"Deploy character {dep.DefinitionId} to Rank {dep.TargetRank}",
+            JourneyAction journey => $"Journey {FindCardSimpleName(state, cardDb, journey.CardInstanceId)} (ID: {journey.CardInstanceId}) from Rank {journey.SourceRank} to Rank {journey.DestinationRank}" + (journey.TargetSlotIndex.HasValue ? $" ({GetPlacementDescription(journey.DestinationRank, journey.TargetSlotIndex, journey.CardInstanceId, state.Players[journey.PlayerIndex], cardDb)})" : ""),
+            MarchAction march when march.SourceRank == march.DestinationRank => $"March {FindCardSimpleName(state, cardDb, march.CardInstanceId)} in Rank {march.SourceRank} ({GetPlacementDescription(march.DestinationRank, march.TargetSlotIndex, march.CardInstanceId, state.Players[march.PlayerIndex], cardDb)})",
             MarchAction march => $"March {FindCardSimpleName(state, cardDb, march.CardInstanceId)} (ID: {march.CardInstanceId}) from Rank {march.SourceRank} to Rank {march.DestinationRank}",
             UseAbilityAction ability => FormatUseAbility(ability, state, cardDb),
             DiscardCardAction disc => $"Discard {FindCardSimpleName(state, cardDb, disc.CardInstanceId)} (ID: {disc.CardInstanceId}) from hand",
@@ -675,7 +697,7 @@ public static class Program
         };
     }
 
-    private static string FormatUseAbility(UseAbilityAction ability, GameState state, CardDatabase cardDb)
+    public static string FormatUseAbility(UseAbilityAction ability, GameState state, CardDatabase cardDb)
     {
         string cardName = FindCardName(state, cardDb, ability.SourceInstanceId);
         CardDefinition? def = null;
@@ -692,6 +714,13 @@ public static class Program
                 }
             }
             if (def != null) break;
+
+            var attachedFound = player.AttachedItems.Cast<CardInstance?>().FirstOrDefault(c => c?.InstanceId == ability.SourceInstanceId);
+            if (attachedFound.HasValue)
+            {
+                def = cardDb.GetDefinition(attachedFound.Value.DefinitionId);
+                break;
+            }
         }
 
         if (def != null && ability.AbilityIndex >= 0 && ability.AbilityIndex < def.Abilities.Count)
@@ -764,7 +793,7 @@ public static class Program
         return $"Play {cardName}";
     }
 
-    private static CardInstance? FindBoardCard(GameState state, int instanceId)
+    public static CardInstance? FindBoardCard(GameState state, int instanceId)
     {
         foreach (var player in state.Players)
         {
@@ -776,11 +805,16 @@ public static class Program
                         return card;
                 }
             }
+            foreach (var card in player.AttachedItems)
+            {
+                if (card.InstanceId == instanceId)
+                    return card;
+            }
         }
         return null;
     }
 
-    private static string FindCardName(GameState state, CardDatabase cardDb, int instanceId)
+    public static string FindCardName(GameState state, CardDatabase cardDb, int instanceId)
     {
         foreach (var player in state.Players)
         {
@@ -796,11 +830,20 @@ public static class Program
                     }
                 }
             }
+            foreach (var card in player.AttachedItems)
+            {
+                if (card.InstanceId == instanceId)
+                {
+                    var def = cardDb.GetDefinition(card.DefinitionId);
+                    string name = def?.Name ?? card.DefinitionId;
+                    return $"{name} (Equipped, ID {instanceId})";
+                }
+            }
         }
         return $"Card #{instanceId}";
     }
 
-    private static string FindCardSimpleName(GameState state, CardDatabase cardDb, int instanceId)
+    public static string FindCardSimpleName(GameState state, CardDatabase cardDb, int instanceId)
     {
         foreach (var player in state.Players)
         {
@@ -815,8 +858,42 @@ public static class Program
                     }
                 }
             }
+            foreach (var card in player.AttachedItems)
+            {
+                if (card.InstanceId == instanceId)
+                {
+                    var def = cardDb.GetDefinition(card.DefinitionId);
+                    return def?.Name ?? card.DefinitionId;
+                }
+            }
         }
         return $"Card #{instanceId}";
+    }
+
+    public static string GetPlacementDescription(int destRank, int? targetSlotIndex, int movingCardId, PlayerState player, CardDatabase cardDb)
+    {
+        player.Ranks.TryGetValue(destRank, out var destRankCards);
+        var otherUnits = (destRankCards ?? new List<CardInstance>()).Where(c => c.InstanceId != movingCardId).ToList();
+        if (otherUnits.Count == 0 || !targetSlotIndex.HasValue)
+        {
+            return $"Into Rank {destRank}";
+        }
+
+        int slot = targetSlotIndex.Value;
+        if (slot <= 0)
+        {
+            var firstDef = cardDb.GetDefinition(otherUnits[0].DefinitionId);
+            return $"Left of {firstDef?.Name ?? otherUnits[0].DefinitionId}";
+        }
+        if (slot >= otherUnits.Count)
+        {
+            var lastDef = cardDb.GetDefinition(otherUnits[^1].DefinitionId);
+            return $"Right of {lastDef?.Name ?? otherUnits[^1].DefinitionId}";
+        }
+
+        var leftDef = cardDb.GetDefinition(otherUnits[slot - 1].DefinitionId);
+        var rightDef = cardDb.GetDefinition(otherUnits[slot].DefinitionId);
+        return $"Between {leftDef?.Name ?? otherUnits[slot - 1].DefinitionId} and {rightDef?.Name ?? otherUnits[slot].DefinitionId}";
     }
 
     public sealed class ActionGroup
@@ -921,13 +998,21 @@ public static class Program
                 case MarchAction march:
                 {
                     string cardName = FindCardSimpleName(state, cardDb, march.CardInstanceId);
-                    string key = $"march_{march.CardInstanceId}";
+                    bool isMarch = march.SourceRank == march.DestinationRank;
+                    string key = isMarch ? $"march_{march.CardInstanceId}" : $"journey_{march.CardInstanceId}";
+                    string placement = GetPlacementDescription(march.DestinationRank, march.TargetSlotIndex, march.CardInstanceId, state.Players[march.PlayerIndex], cardDb);
                     if (!dict.TryGetValue(key, out var entry))
                     {
-                        entry = ($"March {cardName} (Rank {march.SourceRank}, ID {march.CardInstanceId})", new List<(IPlayerAction, string)>());
+                        string header = isMarch
+                            ? $"March {cardName} (Rank {march.SourceRank}, ID {march.CardInstanceId})"
+                            : $"Journey {cardName} (Rank {march.SourceRank}, ID {march.CardInstanceId})";
+                        entry = (header, new List<(IPlayerAction, string)>());
                         dict[key] = entry;
                     }
-                    entry.Items.Add((march, $"March from Rank {march.SourceRank} to Rank {march.DestinationRank}"));
+                    string subLabel = isMarch
+                        ? $"{placement}"
+                        : $"To Rank {march.DestinationRank} ({placement})";
+                    entry.Items.Add((march, subLabel));
                     break;
                 }
 

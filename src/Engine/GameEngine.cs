@@ -128,8 +128,9 @@ public sealed class GameEngine
 				strikes.AddRange(continuousPassiveBonuses.AdditionalStrikes);
 			}
 			bool flag = HasTurnBuff(state, declareAttack.AttackerInstanceId, "ADVANTAGE");
+			bool flagDis = HasTurnBuff(state, declareAttack.AttackerInstanceId, "DISADVANTAGE");
 			DiceRoller diceRoller = engine._diceRoller;
-			if (flag)
+			if (flag && !flagDis)
 			{
 				diceRoller = (int count, int sides) =>
 				{
@@ -138,6 +139,19 @@ public sealed class GameEngine
 						int val = engine._diceRoller(1, 20);
 						int val2 = engine._diceRoller(1, 20);
 						return Math.Max(val, val2);
+					}
+					return engine._diceRoller(count, sides);
+				};
+			}
+			else if (flagDis && !flag)
+			{
+				diceRoller = (int count, int sides) =>
+				{
+					if (count == 1 && sides == 20)
+					{
+						int val = engine._diceRoller(1, 20);
+						int val2 = engine._diceRoller(1, 20);
+						return Math.Min(val, val2);
 					}
 					return engine._diceRoller(count, sides);
 				};
@@ -312,9 +326,15 @@ public sealed class GameEngine
 												List<CardInstance> list = state.Players[tuple.Value.Item1].Ranks[tuple.Value.Item2];
 												if (list.Count > 1)
 												{
-													CardInstance item = list[tuple.Value.Item3];
-													list.RemoveAt(tuple.Value.Item3);
-													list.Insert(0, item);
+													int targetSlot = (tuple.Value.Item3 == 0) ? list.Count - 1 : 0;
+													engine._resolver.Push(new CharacterMovedEvent
+													{
+														PlayerIndex = tuple.Value.Item1,
+														CardInstanceId = declareAttack.AttackerInstanceId,
+														SourceRank = tuple.Value.Item2,
+														DestinationRank = tuple.Value.Item2,
+														TargetSlotIndex = targetSlot
+													});
 												}
 											}
 										}
@@ -335,6 +355,10 @@ public sealed class GameEngine
 												c.AttachedToInstanceId = null;
 											});
 											PlayerState playerState3 = state.Players[cardInstance5.Value.OwnerPlayerIndex];
+											foreach (PlayerState p in state.Players)
+											{
+												p.AttachedItems.RemoveAll((CardInstance c) => c.InstanceId == itemToDestroy);
+											}
 											CardInstance? cardInstance6 = CardLocator.FindCard(state, itemToDestroy);
 											if (cardInstance6.HasValue && !playerState3.DiscardPile.Any((CardInstance c) => c.InstanceId == itemToDestroy))
 											{
@@ -553,30 +577,18 @@ public sealed class GameEngine
 					PlayerState itemOwnerState = (itemOwnerIdx >= 0 && itemOwnerIdx < state.Players.Count)
 						? state.Players[itemOwnerIdx]
 						: playerState;
-					bool flag = false;
-					for (int j = 0; j < itemOwnerState.DiscardPile.Count; j++)
+					foreach (PlayerState p in state.Players)
 					{
-						if (itemOwnerState.DiscardPile[j].InstanceId == item)
-						{
-							flag = true;
-							itemOwnerState.DiscardPile[j] = itemOwnerState.DiscardPile[j] with
-							{
-								Zone = CardZone.Discard,
-								AttachedToInstanceId = null
-							};
-							break;
-						}
+						p.AttachedItems.RemoveAll((CardInstance c) => c.InstanceId == item);
 					}
-					if (!flag)
+					itemOwnerState.DiscardPile.RemoveAll((CardInstance c) => c.InstanceId == item);
+					if (cardInstance2.HasValue)
 					{
-						if (cardInstance2.HasValue)
+						itemOwnerState.DiscardPile.Add(cardInstance2.Value with
 						{
-							itemOwnerState.DiscardPile.Add(cardInstance2.Value with
-							{
-								Zone = CardZone.Discard,
-								AttachedToInstanceId = null
-							});
-						}
+							Zone = CardZone.Discard,
+							AttachedToInstanceId = null
+						});
 					}
 				}
 				list[i] = cardInstance with
@@ -659,6 +671,8 @@ public sealed class GameEngine
 		throw new InvalidOperationException("CardDatabase not initialized and DataParser/cards.json could not be found.");
 	}
 
+	public static CardDatabase GetLastActiveCardDb() => _lastActiveCardDb ?? GetActiveCardDb();
+
 	public void SetDiceRoller(DiceRoller roller)
 	{
 		ArgumentNullException.ThrowIfNull(roller, "roller");
@@ -692,7 +706,7 @@ public sealed class GameEngine
 		{
 			_resolver.RestoreStack(_state.PendingEvents);
 		}
-		_resolver.RegisterPostHandler(new DeathCheckHandler());
+		_resolver.RegisterPostHandler(new DeathCheckHandler(_cardDb));
 		_resolver.RegisterPostHandler(new AttachedItemDefeatHandler());
 		_resolver.RegisterPostHandler(new WarlordEliminationHandler());
 		_resolver.RegisterPostHandler(new AbilityEffectHandler(_cardDb, (int min, int max) => _diceRoller(1, max), () => OnAttackResolved));
@@ -1015,6 +1029,11 @@ public sealed class GameEngine
 	public ActionResult ExecuteAction(IPlayerAction action)
 	{
 		return Execute(action);
+	}
+
+	public IReadOnlyList<IPlayerAction> GetLegalActions(int playerId)
+	{
+		return GetLegalActions(_state, playerId);
 	}
 
 	public IReadOnlyList<IPlayerAction> GetLegalActions(GameState state, int playerId)
@@ -1379,28 +1398,76 @@ public sealed class GameEngine
 					}
 					if (num6 > 1)
 					{
-						MarchAction marchAction = new MarchAction
+						int destRank = num6 - 1;
+						int destCount = playerState.Ranks.TryGetValue(destRank, out var destCards) ? destCards.Count : 0;
+						if (destCount == 0)
+						{
+							JourneyAction journeyAction = new JourneyAction
+							{
+								PlayerIndex = playerId,
+								CardInstanceId = item16.InstanceId,
+								SourceRank = num6,
+								DestinationRank = destRank,
+								TargetSlotIndex = 0
+							};
+							if (CanExecute(journeyAction, state).IsSuccess)
+							{
+								list.Add(journeyAction);
+							}
+						}
+						else
+						{
+							for (int slot = 0; slot <= destCount; slot++)
+							{
+								JourneyAction journeyAction = new JourneyAction
+								{
+									PlayerIndex = playerId,
+									CardInstanceId = item16.InstanceId,
+									SourceRank = num6,
+									DestinationRank = destRank,
+									TargetSlotIndex = slot
+								};
+								if (CanExecute(journeyAction, state).IsSuccess)
+								{
+									list.Add(journeyAction);
+								}
+							}
+						}
+					}
+					int fRank = num6 + 1;
+					int fCount = playerState.Ranks.TryGetValue(fRank, out var fCards) ? fCards.Count : 0;
+					if (fCount == 0)
+					{
+						JourneyAction journeyAction2 = new JourneyAction
 						{
 							PlayerIndex = playerId,
 							CardInstanceId = item16.InstanceId,
 							SourceRank = num6,
-							DestinationRank = num6 - 1
+							DestinationRank = fRank,
+							TargetSlotIndex = 0
 						};
-						if (CanExecute(marchAction, state).IsSuccess)
+						if (CanExecute(journeyAction2, state).IsSuccess)
 						{
-							list.Add(marchAction);
+							list.Add(journeyAction2);
 						}
 					}
-					MarchAction marchAction2 = new MarchAction
+					else
 					{
-						PlayerIndex = playerId,
-						CardInstanceId = item16.InstanceId,
-						SourceRank = num6,
-						DestinationRank = num6 + 1
-					};
-					if (CanExecute(marchAction2, state).IsSuccess)
-					{
-						list.Add(marchAction2);
+						for (int slot = 0; slot <= fCount; slot++)
+						{
+							JourneyAction journeyAction2 = new JourneyAction
+							{
+								PlayerIndex = playerId,
+								CardInstanceId = item16.InstanceId,
+								SourceRank = num6,
+								DestinationRank = fRank,
+								TargetSlotIndex = slot
+							};
+							if (CanExecute(journeyAction2, state).IsSuccess)
+							{
+								list.Add(journeyAction2);
+							}
+						}
 					}
 				}
 			}
@@ -1534,6 +1601,21 @@ public sealed class GameEngine
 		return null;
 	}
 
+	public static CardInstance? FindAttachedItem(GameState state, int instanceId)
+	{
+		foreach (PlayerState player in state.Players)
+		{
+			foreach (CardInstance item in player.AttachedItems)
+			{
+				if (item.InstanceId == instanceId)
+				{
+					return item;
+				}
+			}
+		}
+		return null;
+	}
+
 	private GameEvent? GetTopPendingEvent(GameState state)
 	{
 		if (state.PendingEvents.Count > 0)
@@ -1547,7 +1629,20 @@ public sealed class GameEngine
 		return null;
 	}
 
-	private bool IsReactTimingAndConditionMet(AbilityDefinition ability, CardInstance sourceCard, GameState state, int[]? targetInstanceIds, out string? failureReason)
+	public bool CanTriggerReact(GameState state, GameEvent triggerEvent, CardInstance sourceCard, AbilityDefinition ability, out string? failureReason)
+	{
+		state.PendingEvents.Insert(0, triggerEvent);
+		try
+		{
+			return IsReactTimingAndConditionMet(ability, sourceCard, state, null, out failureReason);
+		}
+		finally
+		{
+			state.PendingEvents.RemoveAt(0);
+		}
+	}
+
+	public bool IsReactTimingAndConditionMet(AbilityDefinition ability, CardInstance sourceCard, GameState state, int[]? targetInstanceIds, out string? failureReason)
 	{
 		failureReason = null;
 		if (!ability.IsReact)
@@ -1733,6 +1828,11 @@ public sealed class GameEngine
 		case ReactTiming.BeforeDies:
 			if (topPendingEvent is CharacterDefeatedEvent characterDefeatedEvent)
 			{
+				if (characterDefeatedEvent.BanishInsteadOfDiscard)
+				{
+					failureReason = "Character is being banished instead of destroyed; no death reacts trigger.";
+					return false;
+				}
 				if (characterDefeatedEvent.OwnerPlayerIndex != sourceCard.OwnerPlayerIndex)
 				{
 					failureReason = "Dying character is not friendly.";
@@ -1762,6 +1862,11 @@ public sealed class GameEngine
 			if (!(topPendingEvent is CharacterDefeatedEvent characterDefeatedEvent2))
 			{
 				failureReason = "Ability triggers on kill/death, but no death event is pending.";
+				return false;
+			}
+			if (characterDefeatedEvent2.BanishInsteadOfDiscard)
+			{
+				failureReason = "Character was banished instead of destroyed; no death/kill reacts trigger.";
 				return false;
 			}
 			if (ability.Timing == ReactTiming.Kill)
@@ -1795,14 +1900,14 @@ public sealed class GameEngine
 			break;
 		}
 		case ReactTiming.AfterStrikeHit:
-			if (!(topPendingEvent is DeclareAttackEvent declareAttackEvent))
+			if (!(topPendingEvent is DealDamageEvent hitDamageEvent))
 			{
-				failureReason = "Ability triggers after a strike hit, but no attack event is pending.";
+				failureReason = "Ability triggers after a strike hit, but no damage event is pending.";
 				return false;
 			}
-			if (declareAttackEvent.AttackerInstanceId != sourceCard.InstanceId)
+			if (hitDamageEvent.SourceInstanceId != sourceCard.InstanceId)
 			{
-				failureReason = "This character did not perform the strike.";
+				failureReason = "This character did not perform the strike that hit.";
 				return false;
 			}
 			break;
@@ -1868,6 +1973,10 @@ public sealed class GameEngine
 		if (ability.IsReact)
 		{
 			GameEvent topPendingEvent = GetTopPendingEvent(state);
+			if (topPendingEvent is MarchEvent me && me.CardInstanceId == sourceInstanceId)
+			{
+				sourceRank = me.DestinationRank;
+			}
 			if (topPendingEvent != null)
 			{
 				if (!IsReactTimingAndConditionMet(ability, cardInstance.Value, state, null, out string _))
@@ -1901,6 +2010,72 @@ public sealed class GameEngine
 			{
 				yield break;
 			}
+		}
+		if (ability.Effects.OfType<TargetHigherLevelDeverenianJourneyEffect>().Any())
+		{
+			PlayerState playerState = state.Players[playerId];
+			int performerLevel = GetEffectiveLevel(state, cardInstance.Value, _cardDb);
+			foreach (var (r, rCards) in playerState.Ranks)
+			{
+				foreach (var ally in rCards)
+				{
+					if (ally.InstanceId == sourceInstanceId) continue;
+					CardDefinition? def = _cardDb.GetDefinition(ally.DefinitionId);
+					if (IsDeverenian(def) && GetEffectiveLevel(state, ally, _cardDb) > performerLevel)
+					{
+						yield return new int[1] { ally.InstanceId };
+					}
+				}
+			}
+			yield break;
+		}
+		if (ability.Effects.OfType<TargetPerformsStrikeEffect>().Any())
+		{
+			TargetPerformsStrikeEffect eff = ability.Effects.OfType<TargetPerformsStrikeEffect>().First();
+			PlayerState playerState = state.Players[playerId];
+			foreach (var (pRank, pCards) in playerState.Ranks)
+			{
+				foreach (var performer in pCards)
+				{
+					List<int> candidateTargets = new List<int>();
+					int oppPlayerIdx = 1 - playerId;
+					if (oppPlayerIdx >= 0 && oppPlayerIdx < state.Players.Count)
+					{
+						foreach (var (oppRank, oppCards) in state.Players[oppPlayerIdx].Ranks)
+						{
+							int crossDist = BoardGeometry.GetCrossBoardDistance(pRank, oppRank);
+							if (eff.IsRanged ? BoardGeometry.IsRangedValid(pRank, oppRank, 2) : crossDist <= 1)
+							{
+								candidateTargets.AddRange(oppCards.Select(c => c.InstanceId));
+							}
+						}
+					}
+					if (candidateTargets.Count == 0)
+					{
+						foreach (var (fRank, fCards) in playerState.Ranks)
+						{
+							int fDist = Math.Max(1, Math.Abs(pRank - fRank));
+							if (fDist <= 1)
+							{
+								candidateTargets.AddRange(fCards.Where(c => c.InstanceId != performer.InstanceId).Select(c => c.InstanceId));
+							}
+						}
+					}
+
+					if (candidateTargets.Count > 0)
+					{
+						foreach (int targetId in candidateTargets)
+						{
+							yield return new int[2] { performer.InstanceId, targetId };
+						}
+					}
+					else
+					{
+						yield return new int[1] { performer.InstanceId };
+					}
+				}
+			}
+			yield break;
 		}
 		if (ability.TargetScope == TargetScope.Self && !ability.Effects.Any((IEffect e) => (e is PerformStrikeEffect || e is DealDamageEffect || e is ResolveAttackEffect) ? true : false))
 		{
@@ -2060,7 +2235,28 @@ public sealed class GameEngine
 			}
 			if (!yielded)
 			{
-				yield return Array.Empty<int>();
+				PlayerState playerState = state.Players[playerId];
+				foreach (var (r, rCards) in playerState.Ranks)
+				{
+					int fDist = Math.Max(1, Math.Abs(sourceRank - r));
+					PerformStrikeEffect? strikeEff = ability.Effects.OfType<PerformStrikeEffect>().FirstOrDefault();
+					int maxMelee = ((object)strikeEff != null && strikeEff.HasReach) ? 2 : 1;
+					if (fDist <= maxMelee)
+					{
+						foreach (var ally in rCards)
+						{
+							if (ally.InstanceId != sourceInstanceId)
+							{
+								yielded = true;
+								yield return new int[1] { ally.InstanceId };
+							}
+						}
+					}
+				}
+				if (!yielded)
+				{
+					yield return Array.Empty<int>();
+				}
 			}
 		}
 		else if (flag2)
@@ -2245,6 +2441,24 @@ public sealed class GameEngine
 			}
 			yield break;
 		}
+		if (ability.Effects.OfType<TargetHigherLevelDeverenianJourneyEffect>().Any())
+		{
+			PlayerState playerState = state.Players[playerId];
+			int performerLevel = performer.HasValue ? GetEffectiveLevel(state, performer.Value, _cardDb) : 0;
+			foreach (var (r, rCards) in playerState.Ranks)
+			{
+				foreach (var ally in rCards)
+				{
+					if (performer.HasValue && ally.InstanceId == performer.Value.InstanceId) continue;
+					CardDefinition? def = _cardDb.GetDefinition(ally.DefinitionId);
+					if (IsDeverenian(def) && GetEffectiveLevel(state, ally, _cardDb) > performerLevel)
+					{
+						yield return ally.InstanceId;
+					}
+				}
+			}
+			yield break;
+		}
 		int key;
 		List<CardInstance> value2;
 		if ((ability.Description?.Contains("within one rank", StringComparison.OrdinalIgnoreCase) ?? false) && ability.Effects.Any((IEffect e) => (e is ChangeReadyStateEffect || e is GrantTraitEffect) ? true : false))
@@ -2276,7 +2490,8 @@ public sealed class GameEngine
 			bool targetStunnedOnly = performStrikeEffect?.TargetStunnedOnly ?? false;
 			bool targetSpentOrStunned = ((object)performStrikeEffect != null && performStrikeEffect.TargetSpentOrStunnedOnly) || Regex.IsMatch(ability.Description ?? "", "\\b(?:spent\\s+or\\s+stunned|against\\s+a\\s+spent|target\\s+a\\s+spent)\\b", RegexOptions.IgnoreCase);
 			bool isRanged = (performStrikeEffect != null && performStrikeEffect.IsRanged) || ability.Effects.Any((IEffect e) => (e is FireballEffect || e is ShadowBoltsEffect) ? true : false);
-			int performerRank = performer?.Rank ?? 1;
+			GameEvent topPendingEvt = GetTopPendingEvent(state);
+			int performerRank = (topPendingEvt is MarchEvent me && me.CardInstanceId == performer?.InstanceId) ? me.DestinationRank : (performer?.Rank ?? 1);
 			int maxRange = isRanged ? (performStrikeEffect?.MaxRange ?? 2) : ((performer.HasValue && CharacterHasReach(performer.Value, state, _cardDb)) ? 2 : 1);
 			bool yielded = false;
 			foreach (PlayerState player2 in state.Players)
@@ -2307,7 +2522,27 @@ public sealed class GameEngine
 			}
 			if (!yielded)
 			{
-				yield return null;
+				PlayerState playerState = state.Players[playerId];
+				foreach (var (r, rCards) in playerState.Ranks)
+				{
+					int fDist = Math.Max(1, Math.Abs(performerRank - r));
+					int maxMelee = ((object)performStrikeEffect != null && performStrikeEffect.HasReach) ? 2 : 1;
+					if (fDist <= maxMelee)
+					{
+						foreach (var ally in rCards)
+						{
+							if (!performer.HasValue || ally.InstanceId != performer.Value.InstanceId)
+							{
+								yielded = true;
+								yield return ally.InstanceId;
+							}
+						}
+					}
+				}
+				if (!yielded)
+				{
+					yield return null;
+				}
 			}
 		}
 		else if (flag2)
@@ -2333,30 +2568,114 @@ public sealed class GameEngine
 		}
 	}
 
+	public int GetInitiativeModifier(int playerIndex)
+	{
+		if (playerIndex < 0 || playerIndex >= _state.Players.Count)
+		{
+			return 0;
+		}
+		PlayerState playerState = _state.Players[playerIndex];
+		int num = 0;
+		foreach (List<CardInstance> value in playerState.Ranks.Values)
+		{
+			foreach (CardInstance item in value)
+			{
+				num += GetTurnBuffValue(_state, item.InstanceId, "INITIATIVE");
+				if (item.SkillRatings.TryGetValue("Initiative", out int initVal))
+				{
+					num += initVal;
+				}
+				if (item.SkillRatings.TryGetValue("BonusInitiative", out int bonusInit))
+				{
+					num += bonusInit;
+				}
+				CardDefinition definition = _cardDb.GetDefinition(item.DefinitionId);
+				if (definition != null)
+				{
+					if (definition.SkillRatings.TryGetValue("Initiative", out int defInit) && !item.SkillRatings.ContainsKey("Initiative"))
+					{
+						num += defInit;
+					}
+					foreach (string trait in definition.Traits)
+					{
+						Match match = Regex.Match(trait, @"^\+(\d+)\s+Initiative", RegexOptions.IgnoreCase);
+						if (match.Success && int.TryParse(match.Groups[1].Value, out int traitVal))
+						{
+							num += traitVal;
+						}
+					}
+				}
+			}
+		}
+		foreach (CardInstance attached in playerState.AttachedItems)
+		{
+			num += GetTurnBuffValue(_state, attached.InstanceId, "INITIATIVE");
+			if (attached.SkillRatings.TryGetValue("Initiative", out int initVal2))
+			{
+				num += initVal2;
+			}
+			if (attached.SkillRatings.TryGetValue("BonusInitiative", out int bonusInit2))
+			{
+				num += bonusInit2;
+			}
+		}
+		return num;
+	}
+
 	public (int WinnerIndex, int Roll0, int Roll1) RollInitiative()
 	{
 		InitiativeTieHistory.Clear();
 		int num = 0;
-		int num2;
-		int num3;
+		int raw0;
+		int raw1;
+		int winner = 0;
 		do
 		{
-			num2 = _diceRoller(1, 20);
-			num3 = _diceRoller(1, 20);
+			raw0 = _diceRoller(1, 20);
+			raw1 = _diceRoller(1, 20);
 			num++;
-			if (num2 == num3 && num < 100)
+
+			int mod0 = GetInitiativeModifier(0);
+			int mod1 = GetInitiativeModifier(1);
+
+			bool isNat20_0 = (raw0 == 20);
+			bool isNat20_1 = (raw1 == 20);
+
+			if (isNat20_0 && !isNat20_1)
 			{
-				InitiativeTieHistory.Add((num2, num3));
+				winner = 0;
+				break;
 			}
+			if (isNat20_1 && !isNat20_0)
+			{
+				winner = 1;
+				break;
+			}
+
+			int total0 = raw0 + mod0;
+			int total1 = raw1 + mod1;
+
+			if (total0 == total1)
+			{
+				if (num < 100)
+				{
+					InitiativeTieHistory.Add((raw0, raw1));
+				}
+				continue;
+			}
+
+			winner = (total0 > total1) ? 0 : 1;
+			break;
 		}
-		while (num2 == num3 && num < 100);
-		int num4 = ((num2 < num3) ? 1 : 0);
-		_state.ActivePlayerIndex = num4;
-		_state.Priority.ActivePlayerIndex = num4;
+		while (num < 100);
+
+		_state.InitiativeWinnerIndex = winner;
+		_state.ActivePlayerIndex = winner;
+		_state.Priority.ActivePlayerIndex = winner;
 		_state.Priority.ConsecutivePasses = 0;
 		_state.Priority.HasPassed = false;
-		LastInitiativeRoll = (num4, num2, num3);
-		return (WinnerIndex: num4, Roll0: num2, Roll1: num3);
+		LastInitiativeRoll = (winner, raw0, raw1);
+		return (WinnerIndex: winner, Roll0: raw0, Roll1: raw1);
 	}
 
 	public void AdvancePhase()
@@ -2634,21 +2953,30 @@ public sealed class GameEngine
 				else
 				{
 					int currentIdx = sameRankCards.FindIndex((CardInstance c) => c.InstanceId == march.CardInstanceId);
-					if (march.TargetSlotIndex.HasValue)
+					if (!march.TargetSlotIndex.HasValue)
 					{
-						if (march.TargetSlotIndex.Value < 0 || march.TargetSlotIndex.Value >= sameRankCards.Count)
-						{
-							list.Add($"Target slot index {march.TargetSlotIndex.Value} is out of range for rank with {sameRankCards.Count} characters.");
-						}
-						else if (march.TargetSlotIndex.Value == currentIdx)
-						{
-							list.Add("Target slot index must change character's position in the rank.");
-						}
+						list.Add("Marching within rank requires a TargetSlotIndex.");
+					}
+					else if (march.TargetSlotIndex.Value < 0 || march.TargetSlotIndex.Value >= sameRankCards.Count)
+					{
+						list.Add($"Target slot index {march.TargetSlotIndex.Value} is out of range for rank with {sameRankCards.Count} characters.");
+					}
+					else if (march.TargetSlotIndex.Value == currentIdx)
+					{
+						list.Add("Target slot index must change character's position in the rank.");
 					}
 				}
 			}
 		}
-		else if (Math.Abs(march.SourceRank - march.DestinationRank) > 1)
+		else if (march.TargetSlotIndex.HasValue)
+		{
+			int destCount = playerState.Ranks.TryGetValue(march.DestinationRank, out var destCards) ? destCards.Count : 0;
+			if (march.TargetSlotIndex.Value < 0 || march.TargetSlotIndex.Value > destCount)
+			{
+				list.Add($"Target slot index {march.TargetSlotIndex.Value} is out of range for destination rank with {destCount} characters.");
+			}
+		}
+		if (march.SourceRank != march.DestinationRank && Math.Abs(march.SourceRank - march.DestinationRank) > 1)
 		{
 			list.Add("Characters can only march one rank at a time.");
 		}
@@ -3561,7 +3889,7 @@ public sealed class GameEngine
 						}
 						break;
 					case ReactTiming.AfterStrikeHit:
-						if (!(topPendingEvent is DeclareAttackEvent))
+						if (!(topPendingEvent is DealDamageEvent))
 						{
 							list.Add("Card can only be played after a strike hit.");
 						}
@@ -3573,6 +3901,47 @@ public sealed class GameEngine
 						}
 						break;
 					}
+				}
+			}
+		}
+		bool isUniqueCard = definition.Traits.Any((string t) => t.Equals("Unique", StringComparison.OrdinalIgnoreCase)) || Regex.IsMatch(definition.RulesText ?? "", @"\bUnique\b", RegexOptions.IgnoreCase);
+		if (isUniqueCard)
+		{
+			bool alreadyControlsSameName = false;
+			foreach (List<CardInstance> rankList in playerState.Ranks.Values)
+			{
+				foreach (CardInstance c in rankList)
+				{
+					CardDefinition def = _cardDb.GetDefinition(c.DefinitionId);
+					if (def != null && def.Name.Equals(definition.Name, StringComparison.OrdinalIgnoreCase))
+					{
+						alreadyControlsSameName = true;
+						break;
+					}
+				}
+				if (alreadyControlsSameName) break;
+			}
+			if (!alreadyControlsSameName)
+			{
+				foreach (CardInstance item in playerState.AttachedItems)
+				{
+					CardDefinition def = _cardDb.GetDefinition(item.DefinitionId);
+					if (def != null && def.Name.Equals(definition.Name, StringComparison.OrdinalIgnoreCase))
+					{
+						alreadyControlsSameName = true;
+						break;
+					}
+				}
+			}
+			if (alreadyControlsSameName)
+			{
+				if (definition.Type == CardType.Item)
+				{
+					list.Add($"Cannot equip Unique item '{definition.Name}': player already controls a card with the same name in play.");
+				}
+				else
+				{
+					list.Add($"Cannot play Unique character '{definition.Name}': player already controls a card with the same name in play.");
 				}
 			}
 		}
@@ -3992,6 +4361,10 @@ public sealed class GameEngine
 												c.AttachedToInstanceId = null;
 											});
 											PlayerState playerState4 = _state.Players[cardInstance.Value.OwnerPlayerIndex];
+											foreach (PlayerState p in _state.Players)
+											{
+												p.AttachedItems.RemoveAll((CardInstance c) => c.InstanceId == useAbilityAction.SourceInstanceId);
+											}
 											if (!playerState4.DiscardPile.Any((CardInstance c) => c.InstanceId == useAbilityAction.SourceInstanceId))
 											{
 												playerState4.DiscardPile.Add(cardInstance.Value with
@@ -4270,12 +4643,14 @@ public sealed class GameEngine
 			break;
 		}
 		case CardType.Item:
-			if (playCardAction.TargetCharacterId.HasValue)
+		{
+			int? targetCharId = playCardAction.TargetCharacterId ?? playCardAction.TargetInstanceId;
+			if (targetCharId.HasValue)
 			{
 				CardInstance attachedCard = card with
 				{
 					Zone = CardZone.Attached,
-					AttachedToInstanceId = playCardAction.TargetCharacterId.Value
+					AttachedToInstanceId = targetCharId.Value
 				};
 				(int, int, int) itemPassiveStats = GetItemPassiveStats(definition5);
 				foreach (PlayerState player3 in _state.Players)
@@ -4284,7 +4659,7 @@ public sealed class GameEngine
 					{
 						for (int num14 = 0; num14 < value8.Count; num14++)
 						{
-							if (value8[num14].InstanceId == playCardAction.TargetCharacterId.Value)
+							if (value8[num14].InstanceId == targetCharId.Value)
 							{
 								CardInstance cardInstance10 = value8[num14];
 								List<int> attachedItemIds = new List<int>(cardInstance10.AttachedItemIds) { card.InstanceId };
@@ -4299,9 +4674,9 @@ public sealed class GameEngine
 						}
 					}
 				}
-				if (!playerState6.DiscardPile.Any((CardInstance c) => c.InstanceId == attachedCard.InstanceId))
+				if (!playerState6.AttachedItems.Any((CardInstance c) => c.InstanceId == attachedCard.InstanceId))
 				{
-					playerState6.DiscardPile.Add(attachedCard);
+					playerState6.AttachedItems.Add(attachedCard);
 				}
 			}
 			else
@@ -4316,6 +4691,7 @@ public sealed class GameEngine
 				}
 			}
 			break;
+		}
 		case CardType.Action:
 		{
 			CardInstance item3 = card with
@@ -4353,6 +4729,7 @@ public sealed class GameEngine
 				if (definition5.Name.Equals("Assassin's Strike", StringComparison.OrdinalIgnoreCase))
 				{
 					AddTurnBuff(_state, num7, "ADVANTAGE", 1);
+					AddTurnBuff(_state, num7, "WOUND_BONUS", 1);
 				}
 				else if (definition5.Name.Equals("Cunning Shot", StringComparison.OrdinalIgnoreCase))
 				{
@@ -4473,6 +4850,10 @@ public sealed class GameEngine
 		for (; _resolver.PendingCount > 0; _resolver.Resolve(_state))
 		{
 			GameEvent gameEvent = _resolver.Peek();
+			if (gameEvent is CharacterDefeatedEvent cde && cde.BanishInsteadOfDiscard)
+			{
+				continue;
+			}
 			if ((!EventResolver.RequiresReactWindow(gameEvent) && !(gameEvent is CharacterDefeatedEvent)) || (gameEvent is AbilityActivatedEvent abilityActivatedEvent && abilityActivatedEvent.Ability.SplitSecond))
 			{
 				continue;
@@ -4502,7 +4883,8 @@ public sealed class GameEngine
 			if (_state.Players.Count > 0)
 			{
 				int num2 = actingPlayerIndex ?? _state.ActivePlayerIndex;
-				_state.Priority.ActivePlayerIndex = (num2 + 1) % _state.Players.Count;
+				int initPriority = _state.InitiativeWinnerIndex ?? ((num2 + 1) % _state.Players.Count);
+				_state.Priority.ActivePlayerIndex = initPriority % _state.Players.Count;
 			}
 			SyncPendingEvents();
 			return;
@@ -5155,10 +5537,27 @@ public sealed class GameEngine
 		}
 		int num13 = 0;
 		bool flag5 = false;
-		foreach (int attachedItemId2 in character.AttachedItemIds)
+		var attachedItemIds = new HashSet<int>(character.AttachedItemIds);
+		var charOwner = state.Players.ElementAtOrDefault(character.OwnerPlayerIndex);
+		if (charOwner != null)
+		{
+			foreach (var it in charOwner.AttachedItems)
+			{
+				if ((it.AttachedToInstanceId ?? it.AttachedToId) == character.InstanceId)
+				{
+					attachedItemIds.Add(it.InstanceId);
+				}
+			}
+		}
+		foreach (int attachedItemId2 in attachedItemIds)
 		{
 			CardInstance? cardInstance13 = CardLocator.FindCard(state, attachedItemId2);
 			if (!cardInstance13.HasValue)
+			{
+				continue;
+			}
+			int? actualAttachedTo = cardInstance13.Value.AttachedToInstanceId ?? cardInstance13.Value.AttachedToId;
+			if (actualAttachedTo.HasValue && actualAttachedTo.Value != character.InstanceId)
 			{
 				continue;
 			}
@@ -5185,9 +5584,23 @@ public sealed class GameEngine
 			{
 				num2 += 5;
 			}
-			if (definition12.Name.Equals("Scale Mail", StringComparison.OrdinalIgnoreCase) && combatCtx != null && combatCtx.IsDefending && combatCtx.IsMelee && !combatCtx.IsRanged)
+			if (definition12.Name.Equals("Scale Mail", StringComparison.OrdinalIgnoreCase) && combatCtx != null && combatCtx.IsDefending)
 			{
-				num3 -= 2;
+				int baseCharAc = (definition?.ArmorClass).GetValueOrDefault(12);
+				if (combatCtx.IsRanged)
+				{
+					if (character.CurrentArmorClass <= baseCharAc)
+					{
+						num3 += 2;
+					}
+				}
+				else if (combatCtx.IsMelee && !combatCtx.IsRanged)
+				{
+					if (character.CurrentArmorClass > baseCharAc)
+					{
+						num3 -= (character.CurrentArmorClass - baseCharAc);
+					}
+				}
 			}
 			if (definition12.Name.Equals("Ardian Greathawk", StringComparison.OrdinalIgnoreCase))
 			{

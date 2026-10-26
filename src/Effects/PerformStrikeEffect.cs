@@ -5,15 +5,63 @@ using WarlordEngine.Events;
 
 namespace WarlordEngine.Effects;
 
-public sealed record PerformStrikeEffect(int StrikeBonus = 0, bool IsRanged = false, int AdditionalWounds = 0, bool StunOnHit = false, bool SpendOnHit = false, bool PushOnHit = false, bool PullOnHit = false, bool DestroyItemOnHit = false, bool ZeroDamage = false, bool BonusFromLevel = false, bool TargetSpentOnly = false, bool TargetStunnedOnly = false, bool TargetSpentOrStunnedOnly = false, bool TargetLowerLevelOnly = false, bool BonusWoundAgainstHigherLevel = false, bool HasReach = false, bool TrueStrike = false, bool HasAdvantage = false, bool NoRollBonuses = false, bool CannotReduceWounds = false, bool BanishOnKill = false, int MaxRange = 2) : IEffect
+public sealed record PerformStrikeEffect(int StrikeBonus = 0, bool IsRanged = false, int AdditionalWounds = 0, bool StunOnHit = false, bool SpendOnHit = false, bool PushOnHit = false, bool PullOnHit = false, bool DestroyItemOnHit = false, bool ZeroDamage = false, bool BonusFromLevel = false, bool TargetSpentOnly = false, bool TargetStunnedOnly = false, bool TargetSpentOrStunnedOnly = false, bool TargetLowerLevelOnly = false, bool BonusWoundAgainstHigherLevel = false, bool HasReach = false, bool TrueStrike = false, bool HasAdvantage = false, bool NoRollBonuses = false, bool CannotReduceWounds = false, bool BanishOnKill = false, int MaxRange = 2, bool HasDisadvantage = false, bool IgnoreRange = false) : IEffect
 {
 	public IEnumerable<GameEvent> Evaluate(EffectContext context)
 	{
-		if (!context.TargetInstanceId.HasValue)
+		int? targetIdOpt = context.TargetInstanceId;
+		if (!targetIdOpt.HasValue)
+		{
+			CardInstance? attacker = context.FindCard(context.SourceInstanceId);
+			if (attacker.HasValue)
+			{
+				int? aRank = BoardGeometry.FindCardRank(context.State.Players[attacker.Value.OwnerPlayerIndex], attacker.Value.InstanceId);
+				if (aRank.HasValue)
+				{
+					int oppIdx = 1 - attacker.Value.OwnerPlayerIndex;
+					if (oppIdx >= 0 && oppIdx < context.State.Players.Count)
+					{
+						foreach (var (r, rCards) in context.State.Players[oppIdx].Ranks)
+						{
+							int d = BoardGeometry.GetCrossBoardDistance(aRank.Value, r);
+							int maxMelee = HasReach ? 2 : 1;
+							if (IgnoreRange || (IsRanged ? BoardGeometry.IsRangedValid(aRank.Value, r, MaxRange) : d <= maxMelee))
+							{
+								var valid = rCards.FirstOrDefault(c => (!TargetSpentOnly || c.ReadyState == ReadyState.Spent) && (!TargetStunnedOnly || c.ReadyState == ReadyState.Stunned) && (!TargetSpentOrStunnedOnly || c.ReadyState != ReadyState.Ready));
+								if (valid.InstanceId != 0)
+								{
+									targetIdOpt = valid.InstanceId;
+									break;
+								}
+							}
+						}
+					}
+					if (!targetIdOpt.HasValue)
+					{
+						var fPlayer = context.State.Players[attacker.Value.OwnerPlayerIndex];
+						foreach (var (r, rCards) in fPlayer.Ranks)
+						{
+							int d = Math.Max(1, Math.Abs(aRank.Value - r));
+							int maxMelee = HasReach ? 2 : 1;
+							if (IgnoreRange || d <= maxMelee)
+							{
+								var valid = rCards.FirstOrDefault(c => c.InstanceId != attacker.Value.InstanceId && (!TargetSpentOnly || c.ReadyState == ReadyState.Spent) && (!TargetStunnedOnly || c.ReadyState == ReadyState.Stunned) && (!TargetSpentOrStunnedOnly || c.ReadyState != ReadyState.Ready));
+								if (valid.InstanceId != 0)
+								{
+									targetIdOpt = valid.InstanceId;
+									break;
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		if (!targetIdOpt.HasValue)
 		{
 			yield break;
 		}
-		int targetId = context.TargetInstanceId.Value;
+		int targetId = targetIdOpt.Value;
 		CardInstance? defender = context.FindCard(targetId);
 		if (!defender.HasValue || (TargetSpentOnly && defender.Value.ReadyState != ReadyState.Spent) || (TargetStunnedOnly && defender.Value.ReadyState != ReadyState.Stunned) || (TargetSpentOrStunnedOnly && defender.Value.ReadyState != ReadyState.Spent && defender.Value.ReadyState != ReadyState.Stunned))
 		{
@@ -35,13 +83,12 @@ public sealed record PerformStrikeEffect(int StrikeBonus = 0, bool IsRanged = fa
 			}
 			yield break;
 		}
-		if (opponentCard.HasValue)
+		if (opponentCard.HasValue && !IgnoreRange)
 		{
 			int? atkRank = BoardGeometry.FindCardRank(context.State.Players[opponentCard.Value.OwnerPlayerIndex], opponentCard.Value.InstanceId);
 			int? defRank = BoardGeometry.FindCardRank(context.State.Players[defender.Value.OwnerPlayerIndex], defender.Value.InstanceId);
 			if (atkRank.HasValue && defRank.HasValue)
 			{
-				int dist = BoardGeometry.GetCrossBoardDistance(atkRank.Value, defRank.Value);
 				if (IsRanged)
 				{
 					if (!BoardGeometry.IsRangedValid(atkRank.Value, defRank.Value, MaxRange))
@@ -51,6 +98,15 @@ public sealed record PerformStrikeEffect(int StrikeBonus = 0, bool IsRanged = fa
 				}
 				else
 				{
+					int dist;
+					if (opponentCard.Value.OwnerPlayerIndex == defender.Value.OwnerPlayerIndex)
+					{
+						dist = Math.Max(1, Math.Abs(atkRank.Value - defRank.Value));
+					}
+					else
+					{
+						dist = BoardGeometry.GetCrossBoardDistance(atkRank.Value, defRank.Value);
+					}
 					int maxMelee = HasReach ? 2 : 1;
 					if (dist > maxMelee)
 					{
@@ -132,12 +188,18 @@ public sealed record PerformStrikeEffect(int StrikeBonus = 0, bool IsRanged = fa
 		}
 		bool flag = TrueStrike || passiveBonuses.TrueStrike;
 		bool num10 = HasAdvantage || (opponentCard.HasValue && GameEngine.HasTurnBuff(context.State, opponentCard.Value.InstanceId, "ADVANTAGE"));
+		bool hasDisadvantage = HasDisadvantage || (opponentCard.HasValue && GameEngine.HasTurnBuff(context.State, opponentCard.Value.InstanceId, "DISADVANTAGE"));
 		int num11 = context.RollDice(1, 20);
 		int num12 = num11;
-		if (num10)
+		if (num10 && !hasDisadvantage)
 		{
 			int val = context.RollDice(1, 20);
 			num12 = Math.Max(num11, val);
+		}
+		else if (hasDisadvantage && !num10)
+		{
+			int val2 = context.RollDice(1, 20);
+			num12 = Math.Min(num11, val2);
 		}
 		bool flag2 = num12 == 1;
 		bool flag3 = num12 == 20;
@@ -221,11 +283,26 @@ public sealed record PerformStrikeEffect(int StrikeBonus = 0, bool IsRanged = fa
 			{
 				c.AttachedItemIds.Remove(itemToDestroy);
 			});
+			CardInstance? destroyedItem = CardLocator.FindCard(context.State, itemToDestroy);
+			int ownerIdx = destroyedItem?.OwnerPlayerIndex ?? defender.Value.OwnerPlayerIndex;
+			PlayerState ownerState = context.State.Players[ownerIdx];
+			foreach (PlayerState p in context.State.Players)
+			{
+				p.AttachedItems.RemoveAll((CardInstance c) => c.InstanceId == itemToDestroy);
+			}
 			CardLocator.FindAndMutate(context.State, itemToDestroy, delegate(ref CardInstance c)
 			{
 				c.Zone = CardZone.Discard;
 				c.AttachedToInstanceId = null;
 			});
+			if (destroyedItem.HasValue && !ownerState.DiscardPile.Any((CardInstance c) => c.InstanceId == itemToDestroy))
+			{
+				ownerState.DiscardPile.Add(destroyedItem.Value with
+				{
+					Zone = CardZone.Discard,
+					AttachedToInstanceId = null
+				});
+			}
 		}
 	}
 }

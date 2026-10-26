@@ -178,72 +178,42 @@ public static class BoardGeometry
 		return (player.Ranks.TryGetValue(targetRank, out value2) ? value2.Count : 0) + 1 <= num;
 	}
 
-	public static void CollapseEmptyRanks(PlayerState player)
+	public static void TrimTrailingEmptyRanks(PlayerState player)
 	{
-		foreach (int item in (from kvp in player.Ranks
-			where kvp.Value.Count == 0
-			select kvp.Key).ToList())
+		while (player.Ranks.Count > 0)
 		{
-			player.Ranks.Remove(item);
-		}
-		if (player.Ranks.Count == 0)
-		{
-			return;
-		}
-		while (true)
-		{
-			int num = player.Ranks.Keys.Max();
-			int num2 = -1;
-			for (int num3 = 1; num3 < num; num3++)
+			int maxRank = player.Ranks.Keys.Max();
+			if (!player.Ranks.TryGetValue(maxRank, out var list) || list.Count == 0)
 			{
-				if (!player.Ranks.ContainsKey(num3) || player.Ranks[num3].Count == 0)
-				{
-					num2 = num3;
-					break;
-				}
+				player.Ranks.Remove(maxRank);
 			}
-			if (num2 == -1)
+			else
 			{
 				break;
-			}
-			SortedDictionary<int, List<CardInstance>> sortedDictionary = new SortedDictionary<int, List<CardInstance>>();
-			foreach (var (num5, list2) in player.Ranks)
-			{
-				if (num5 < num2)
-				{
-					sortedDictionary[num5] = list2;
-				}
-				else if (num5 > num2)
-				{
-					int num6 = num5 - 1;
-					for (int num7 = 0; num7 < list2.Count; num7++)
-					{
-						list2[num7] = list2[num7]with
-						{
-							Rank = num6
-						};
-					}
-					sortedDictionary[num6] = list2;
-				}
-			}
-			player.Ranks.Clear();
-			foreach (KeyValuePair<int, List<CardInstance>> item2 in sortedDictionary)
-			{
-				player.Ranks[item2.Key] = item2.Value;
 			}
 		}
 	}
 
+	public static void CollapseEmptyRanks(PlayerState player)
+	{
+		ResolveFallingForward(player);
+	}
+
+	public static void ResolveIllegalRanks(PlayerState player)
+	{
+		ResolveFallingForward(player);
+	}
+
 	public static void ResolveFallingForward(PlayerState player)
 	{
-		foreach (int item2 in (from kvp in player.Ranks
-			where kvp.Value.Count == 0
-			select kvp.Key).ToList())
-		{
-			player.Ranks.Remove(item2);
-		}
+		TrimTrailingEmptyRanks(player);
 		while (player.Ranks.Count != 0)
 		{
+			TrimTrailingEmptyRanks(player);
+			if (player.Ranks.Count == 0)
+			{
+				break;
+			}
 			int num = player.Ranks.Keys.Max();
 			bool flag = false;
 			for (int num2 = 2; num2 <= num; num2++)
@@ -276,10 +246,6 @@ public static class BoardGeometry
 						player.Ranks[num2 - 1] = value3;
 					}
 					value3.Add(item);
-					if (value2.Count == 0)
-					{
-						player.Ranks.Remove(num2);
-					}
 					flag = true;
 					break;
 				}
@@ -289,6 +255,7 @@ public static class BoardGeometry
 				break;
 			}
 		}
+		TrimTrailingEmptyRanks(player);
 	}
 
 	public static void EnforceFormation(PlayerState player)

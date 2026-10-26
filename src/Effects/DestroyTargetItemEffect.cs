@@ -53,6 +53,10 @@ public sealed record DestroyTargetItemEffect(int MaxRankDistance = 2, int LevelO
 			c.Zone = CardZone.Discard;
 			c.AttachedToInstanceId = null;
 		});
+		foreach (PlayerState p in context.State.Players)
+		{
+			p.AttachedItems.RemoveAll((CardInstance c) => c.InstanceId == targetItemId);
+		}
 		PlayerState playerState = context.State.Players[cardInstance3.Value.OwnerPlayerIndex];
 		if (!playerState.DiscardPile.Any((CardInstance c) => c.InstanceId == targetItemId))
 		{

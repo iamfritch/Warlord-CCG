@@ -3,7 +3,7 @@ using System.Runtime.CompilerServices;
 
 namespace WarlordEngine.Actions;
 
-public sealed record MarchAction : PlayerAction
+public record MarchAction : PlayerAction
 {
 	public required int CardInstanceId { get; init; }
 
@@ -13,9 +13,12 @@ public sealed record MarchAction : PlayerAction
 
 	public int? TargetSlotIndex { get; init; }
 
-	[CompilerGenerated]
+	public MarchAction()
+	{
+	}
+
 	[SetsRequiredMembers]
-	private MarchAction(MarchAction original)
+	protected MarchAction(MarchAction original)
 		: base(original)
 	{
 		CardInstanceId = original.CardInstanceId;

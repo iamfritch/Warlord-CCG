@@ -28,9 +28,22 @@ public sealed class AbilityEffectHandler : IPostResolutionHandler
 			yield break;
 		}
 		AbilityDefinition ability = activated.Ability;
+		if (ability.Effects.Any(e => e is TargetPerformsStrikeEffect))
+		{
+			int primaryTarget = activated.TargetInstanceIds.Length > 0 ? activated.TargetInstanceIds[0] : activated.SourceInstanceId;
+			EffectContext context = BuildContext(activated.SourceInstanceId, primaryTarget, state, activated.TargetInstanceIds);
+			foreach (IEffect effect in ability.Effects)
+			{
+				foreach (GameEvent item in effect.Evaluate(context))
+				{
+					yield return item;
+				}
+			}
+			yield break;
+		}
 		if (activated.TargetInstanceIds.Length == 0)
 		{
-			EffectContext context = BuildContext(activated.SourceInstanceId, null, state);
+			EffectContext context = BuildContext(activated.SourceInstanceId, null, state, activated.TargetInstanceIds);
 			foreach (IEffect effect in ability.Effects)
 			{
 				foreach (GameEvent item in effect.Evaluate(context))
@@ -43,7 +56,7 @@ public sealed class AbilityEffectHandler : IPostResolutionHandler
 		int[] targetInstanceIds = activated.TargetInstanceIds;
 		foreach (int value in targetInstanceIds)
 		{
-			EffectContext context = BuildContext(activated.SourceInstanceId, value, state);
+			EffectContext context = BuildContext(activated.SourceInstanceId, value, state, activated.TargetInstanceIds);
 			foreach (IEffect effect2 in ability.Effects)
 			{
 				foreach (GameEvent item2 in effect2.Evaluate(context))
@@ -54,7 +67,7 @@ public sealed class AbilityEffectHandler : IPostResolutionHandler
 		}
 	}
 
-	private EffectContext BuildContext(int sourceId, int? targetId, GameState state)
+	private EffectContext BuildContext(int sourceId, int? targetId, GameState state, IReadOnlyList<int>? targetIds = null)
 	{
 		int sourceInstanceId = sourceId;
 		CardInstance? cardInstance = CardLocator.FindCard(state, sourceId);
@@ -66,6 +79,7 @@ public sealed class AbilityEffectHandler : IPostResolutionHandler
 		{
 			SourceInstanceId = sourceInstanceId,
 			TargetInstanceId = targetId,
+			TargetInstanceIds = targetIds,
 			State = state,
 			CardDb = _cardDb,
 			RollDice = (_diceRoller ?? ((DiceRoller)((int min, int max) => Random.Shared.Next(min, max + 1)))),
