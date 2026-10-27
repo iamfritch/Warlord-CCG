@@ -1997,6 +1997,78 @@ public sealed class GameEngine
 		return true;
 	}
 
+	/// <summary>Rank distance between two board characters (cross-board when controlled by different players).</summary>
+	private static int GetBoardRankDistance(CardInstance a, CardInstance b)
+	{
+		if (!a.Rank.HasValue || !b.Rank.HasValue)
+		{
+			return 0;
+		}
+		return a.OwnerPlayerIndex == b.OwnerPlayerIndex
+			? Math.Abs(a.Rank.Value - b.Rank.Value)
+			: BoardGeometry.GetCrossBoardDistance(a.Rank.Value, b.Rank.Value);
+	}
+
+	/// <summary>
+	/// Validates range and level limits of an action that destroys a target item (read-only), using the parsed
+	/// <see cref="DestroyTargetItemEffect"/> parameters: item holder within MaxRankDistance of the performer and
+	/// item level lower than performer level + LevelOffset.
+	/// </summary>
+	private void ValidateDestroyItemTarget(GameState state, PlayCardAction playCard, CardDefinition actionDef, List<string> errors)
+	{
+		DestroyTargetItemEffect? effect = actionDef.Abilities.SelectMany((AbilityDefinition a) => a.Effects).OfType<DestroyTargetItemEffect>().FirstOrDefault();
+		if (effect == null || !playCard.TargetCharacterId.HasValue || !playCard.PerformerInstanceId.HasValue)
+		{
+			return;
+		}
+		CardInstance? performer = FindBoardCard(state, playCard.PerformerInstanceId.Value);
+		CardInstance? targetCard = CardLocator.FindCard(state, playCard.TargetCharacterId.Value);
+		if (!performer.HasValue || !targetCard.HasValue)
+		{
+			return;
+		}
+		CardInstance? holder;
+		CardInstance? item;
+		if (targetCard.Value.Zone == CardZone.Attached)
+		{
+			item = targetCard;
+			holder = targetCard.Value.AttachedToInstanceId.HasValue ? FindBoardCard(state, targetCard.Value.AttachedToInstanceId.Value) : null;
+		}
+		else
+		{
+			holder = targetCard;
+			item = targetCard.Value.AttachedItemIds.Count > 0 ? CardLocator.FindCard(state, targetCard.Value.AttachedItemIds[0]) : null;
+		}
+		if (!holder.HasValue && item.HasValue)
+		{
+			foreach (PlayerState p in state.Players)
+			{
+				foreach (List<CardInstance> r in p.Ranks.Values)
+				{
+					foreach (CardInstance candidate in r)
+					{
+						if (candidate.AttachedItemIds.Contains(item.Value.InstanceId))
+						{
+							holder = candidate;
+							break;
+						}
+					}
+					if (holder.HasValue) break;
+				}
+				if (holder.HasValue) break;
+			}
+		}
+		if (holder.HasValue && GetBoardRankDistance(performer.Value, holder.Value) > effect.MaxRankDistance)
+		{
+			errors.Add($"Target item must be within {effect.MaxRankDistance} ranks of the performer.");
+		}
+		CardDefinition? itemDef = item.HasValue ? _cardDb.GetDefinition(item.Value.DefinitionId) : null;
+		if (itemDef != null && itemDef.Level >= GetEffectiveLevel(state, performer.Value, _cardDb) + effect.LevelOffset)
+		{
+			errors.Add($"Target item must be lower level than the performer's level + {effect.LevelOffset}.");
+		}
+	}
+
 	/// <summary>
 	/// Validates the complete target set of an ability simultaneously (count, distinctness, existence, control and
 	/// single-target filter phrases) so nothing is committed unless every target is legal. Read-only: never mutates state.
@@ -2030,7 +2102,6 @@ public sealed class GameEngine
 			}
 			return;
 		}
-		// Abilities without an explicit multi-target count may legitimately carry extra context targets (e.g. performer + target), so no further count restriction is applied.
 	}
 
 	private IEnumerable<int[]> EnumerateAbilityTargets(GameState state, int playerId, int sourceInstanceId, AbilityDefinition ability)
@@ -2643,6 +2714,51 @@ public sealed class GameEngine
 			yield break;
 		}
 		bool flag = ability.Effects.Any((IEffect e) => (e is DealDamageEffect || e is ResolveAttackEffect || e is PerformStrikeEffect || e is FireballEffect || e is ShadowBoltsEffect) ? true : false);
+		if (ability.Effects.OfType<DestroyTargetItemEffect>().Any())
+		{
+			DestroyTargetItemEffect destroyEff = ability.Effects.OfType<DestroyTargetItemEffect>().First();
+			int pLevel = performer.HasValue ? GetEffectiveLevel(state, performer.Value, _cardDb) : 0;
+			foreach (PlayerState p in state.Players)
+			{
+				foreach (List<CardInstance> rankList in p.Ranks.Values)
+				{
+					foreach (CardInstance holder in rankList)
+					{
+						if (performer.HasValue && GetBoardRankDistance(performer.Value, holder) > destroyEff.MaxRankDistance)
+						{
+							continue;
+						}
+						foreach (int itemId in holder.AttachedItemIds)
+						{
+							CardInstance? itemCard = CardLocator.FindCard(state, itemId);
+							CardDefinition? itemDef = itemCard.HasValue ? _cardDb.GetDefinition(itemCard.Value.DefinitionId) : null;
+							if (itemDef != null && itemDef.Level < pLevel + destroyEff.LevelOffset)
+							{
+								yield return itemId;
+							}
+						}
+					}
+				}
+			}
+			yield break;
+		}
+		if (ability.Effects.OfType<FortitudeSaveEffect>().Any((FortitudeSaveEffect f) => f.PerEquippedItem))
+		{
+			foreach (PlayerState p in state.Players)
+			{
+				foreach (List<CardInstance> rankList in p.Ranks.Values)
+				{
+					foreach (CardInstance candidate in rankList)
+					{
+						if ((!performer.HasValue || GetBoardRankDistance(performer.Value, candidate) <= 2) && candidate.AttachedItemIds.Count > 0)
+						{
+							yield return candidate.InstanceId;
+						}
+					}
+				}
+			}
+			yield break;
+		}
 		bool flag2 = ability.Effects.Any((IEffect e) => ((e is ModifyStatEffect || e is HealEffect) ? true : false) || e.GetType().Name.Contains("Heal", StringComparison.OrdinalIgnoreCase));
 		if (flag)
 		{
@@ -3718,7 +3834,8 @@ public sealed class GameEngine
 			}
 			else
 			{
-				CardInstance? cardInstance3 = CardLocator.FindCard(state, useAbility.TargetInstanceIds[0]);
+				CardInstance? cardInstance3 = null;
+				for (int targetIdx = 0; targetIdx < useAbility.TargetInstanceIds.Length && ((cardInstance3 = CardLocator.FindCard(state, useAbility.TargetInstanceIds[targetIdx])).HasValue || true); targetIdx++)
 				if (!cardInstance3.HasValue || cardInstance3.Value.OwnerPlayerIndex != useAbility.PlayerIndex)
 				{
 					list.Add("Target character must be controlled by you.");
@@ -3742,7 +3859,8 @@ public sealed class GameEngine
 			}
 			else
 			{
-				CardInstance? cardInstance4 = CardLocator.FindCard(state, useAbility.TargetInstanceIds[0]);
+				CardInstance? cardInstance4 = null;
+				for (int targetIdx = 0; targetIdx < useAbility.TargetInstanceIds.Length && ((cardInstance4 = CardLocator.FindCard(state, useAbility.TargetInstanceIds[targetIdx])).HasValue || true); targetIdx++)
 				if (!cardInstance4.HasValue || cardInstance4.Value.OwnerPlayerIndex != useAbility.PlayerIndex)
 				{
 					list.Add("Target character must be controlled by you.");
@@ -3778,7 +3896,8 @@ public sealed class GameEngine
 			}
 			else
 			{
-				CardInstance? targetCard = CardLocator.FindCard(state, useAbility.TargetInstanceIds[0]);
+				CardInstance? targetCard = null;
+				for (int targetIdx = 0; targetIdx < useAbility.TargetInstanceIds.Length && ((targetCard = CardLocator.FindCard(state, useAbility.TargetInstanceIds[targetIdx])).HasValue || true); targetIdx++)
 				if (!targetCard.HasValue || targetCard.Value.OwnerPlayerIndex != useAbility.PlayerIndex)
 				{
 					list.Add("Target character must be an ally controlled by you.");
@@ -3821,7 +3940,8 @@ public sealed class GameEngine
 			}
 			else
 			{
-				CardInstance? targetCard = CardLocator.FindCard(state, useAbility.TargetInstanceIds[0]);
+				CardInstance? targetCard = null;
+				for (int targetIdx = 0; targetIdx < useAbility.TargetInstanceIds.Length && ((targetCard = CardLocator.FindCard(state, useAbility.TargetInstanceIds[targetIdx])).HasValue || true); targetIdx++)
 				if (!targetCard.HasValue)
 				{
 					list.Add("Target character not found.");
@@ -4345,6 +4465,13 @@ public sealed class GameEngine
 						list.Add($"Target item {playCard.TargetCharacterId.Value} for action card not found on the board.");
 					}
 				}
+				ValidateDestroyItemTarget(state, playCard, definition, list);
+				if (true)
+				{
+					if (false)
+					{
+					}
+				}
 			}
 			else
 			{
@@ -4356,6 +4483,14 @@ public sealed class GameEngine
 				else if ((definition.Name.Equals("Assassin's Strike", StringComparison.OrdinalIgnoreCase) || definition.Abilities.Any((AbilityDefinition a) => a.Effects.OfType<PerformStrikeEffect>().Any((PerformStrikeEffect s) => s.TargetSpentOnly || s.TargetSpentOrStunnedOnly)) || Regex.IsMatch(definition.RulesText, "\\b(?:spent\\s+or\\s+stunned|against\\s+a\\s+spent|target\\s+a\\s+spent)\\b", RegexOptions.IgnoreCase)) && cardInstance5.Value.ReadyState == ReadyState.Ready)
 				{
 					list.Add("'" + definition.Name + "' can only target a spent or stunned character.");
+				}
+				if (playCard.PerformerInstanceId.HasValue && cardInstance5.HasValue && !definition.Abilities.Any((AbilityDefinition a) => a.Effects.OfType<PerformStrikeEffect>().Any()) && Regex.IsMatch(definition.RulesText ?? "", @"\btarget\s+(?:a|an|your|opposing)?\s*(?:\w+\s+)?character\s+within\s+(?:two|2)\s+ranks\b", RegexOptions.IgnoreCase))
+				{
+					CardInstance? rangePerformer = FindBoardCard(state, playCard.PerformerInstanceId.Value);
+					if (rangePerformer.HasValue && GetBoardRankDistance(rangePerformer.Value, cardInstance5.Value) > 2)
+					{
+						list.Add($"Target character {cardInstance5.Value.InstanceId} is not within two ranks of the performer.");
+					}
 				}
 				int numAbil = playCard.AbilityIndex ?? playCard.ChoiceIndex.GetValueOrDefault();
 				PerformStrikeEffect? strikeEff = null;

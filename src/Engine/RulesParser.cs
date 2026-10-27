@@ -762,7 +762,33 @@ public static class RulesParser
 			}
 			return Regex.IsMatch(text, "\\bJourney\\b", RegexOptions.IgnoreCase) ? new JourneyEffect() : null;
 		};
-		span[14] = (string text) => Regex.IsMatch(text, "Destroy\\s+(?:the|an|one|target)\\s+item", RegexOptions.IgnoreCase) ? new DestroyTargetItemEffect() : null;
+		span[14] = (string text) =>
+		{
+			if (!Regex.IsMatch(text, "Destroy\\s+(?:the|an|one|target)\\s+item", RegexOptions.IgnoreCase))
+			{
+				return null;
+			}
+			int maxRank = 2;
+			Match rankMatch = Regex.Match(text, "within\\s+(one|two|three|\\d+)\\s+ranks?", RegexOptions.IgnoreCase);
+			if (rankMatch.Success)
+			{
+				maxRank = rankMatch.Groups[1].Value.ToLowerInvariant() switch
+				{
+					"one" => 1,
+					"two" => 2,
+					"three" => 3,
+					var d when int.TryParse(d, out int parsed) => parsed,
+					_ => 2
+				};
+			}
+			int levelOffset = 5;
+			Match levelMatch = Regex.Match(text, "level\\s*\\+\\s*(\\d+)", RegexOptions.IgnoreCase);
+			if (levelMatch.Success && int.TryParse(levelMatch.Groups[1].Value, out int parsedOffset))
+			{
+				levelOffset = parsedOffset;
+			}
+			return new DestroyTargetItemEffect(maxRank, levelOffset);
+		};
 		span[15] = (string text) => Regex.IsMatch(text, "Return\\s+an?\\s+(?:Armor|Shield|Weapon).*?equipped.*?to\\s+(?:its\\s+owner's\\s+hand|hand)", RegexOptions.IgnoreCase) ? new SalvageEquippedItemEffect() : null;
 		span[16] = (string text) => Regex.IsMatch(text, "Banish\\s+the\\s+targets.*?\\+3\\s+ranged\\s+strike", RegexOptions.IgnoreCase) ? new BanishFromDiscardAndStrikeEffect() : null;
 		span[17] = (string text) => Regex.IsMatch(text, "Reveal\\s+the\\s+top\\s+10\\s+cards", RegexOptions.IgnoreCase) ? new WellSuppliedEffect() : null;

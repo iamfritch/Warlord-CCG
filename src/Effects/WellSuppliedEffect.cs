@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using WarlordEngine.Actions;
 using WarlordEngine.Events;
 
 namespace WarlordEngine.Effects;
@@ -20,55 +21,60 @@ public sealed record WellSuppliedEffect(int CardsToReveal = 10) : IEffect
 		{
 			yield break;
 		}
-		List<CardInstance> list = playerState.Deck.Take(num).ToList();
+		List<CardInstance> revealed = playerState.Deck.Take(num).ToList();
 		playerState.Deck.RemoveRange(0, num);
-		List<CardInstance> list2 = list.Where((CardInstance c) =>
+		List<CardInstance> revealedItems = revealed.Where((CardInstance c) =>
 		{
 			CardDefinition definition = context.CardDb.GetDefinition(c.DefinitionId);
 			return definition != null && definition.Type == CardType.Item;
 		}).ToList();
-		foreach (int item3 in (from c in playerState.Ranks.Values.SelectMany((List<CardInstance> r) => r)
+		foreach (int characterId in (from c in playerState.Ranks.Values.SelectMany((List<CardInstance> r) => r)
 			select c.InstanceId).ToList())
 		{
-			if (list2.Count == 0)
+			if (revealedItems.Count == 0)
 			{
 				break;
 			}
-			for (int num2 = 0; num2 < list2.Count; num2++)
+			// Each character may equip at most one revealed item, and only one it may legally equip.
+			CardInstance? character = playerState.Ranks.Values.SelectMany((List<CardInstance> r) => r)
+				.Where((CardInstance c) => c.InstanceId == characterId)
+				.Select((CardInstance c) => (CardInstance?)c)
+				.FirstOrDefault();
+			CardDefinition characterDef = character.HasValue ? context.CardDb.GetDefinition(character.Value.DefinitionId) : null;
+			if (characterDef == null)
 			{
-				CardInstance item = list2[num2];
-				if (context.CardDb.GetDefinition(item.DefinitionId) != null)
+				continue;
+			}
+			for (int idx = 0; idx < revealedItems.Count; idx++)
+			{
+				CardInstance item = revealedItems[idx];
+				CardDefinition itemDef = context.CardDb.GetDefinition(item.DefinitionId);
+				if (itemDef == null || !PlayCardAction.ValidateItemEquip(itemDef, characterDef, character.Value, context.State, context.CardDb).IsSuccess)
 				{
-					list2.RemoveAt(num2);
-					list.RemoveAll((CardInstance c) => c.InstanceId == item.InstanceId);
-					CardLocator.FindAndMutate(context.State, item3, delegate(ref CardInstance c)
-					{
-						c.AttachedItemIds.Add(item.InstanceId);
-					});
-					CardInstance item2 = item with
-					{
-						Zone = CardZone.Attached,
-						AttachedToInstanceId = item3
-					};
-					playerState.DiscardPile.RemoveAll((CardInstance c) => c.InstanceId == item.InstanceId);
-					playerState.AttachedItems.RemoveAll((CardInstance c) => c.InstanceId == item.InstanceId);
-					playerState.AttachedItems.Add(item2);
-					break;
+					continue;
 				}
+				revealedItems.RemoveAt(idx);
+				revealed.RemoveAll((CardInstance c) => c.InstanceId == item.InstanceId);
+				CardLocator.FindAndMutate(context.State, characterId, delegate(ref CardInstance c)
+				{
+					c.AttachedItemIds.Add(item.InstanceId);
+				});
+				CardInstance attached = item with
+				{
+					Zone = CardZone.Attached,
+					AttachedToInstanceId = characterId
+				};
+				playerState.DiscardPile.RemoveAll((CardInstance c) => c.InstanceId == item.InstanceId);
+				playerState.AttachedItems.RemoveAll((CardInstance c) => c.InstanceId == item.InstanceId);
+				playerState.AttachedItems.Add(attached);
+				break;
 			}
 		}
-		playerState.Deck.AddRange(list);
-		for (int num3 = playerState.Deck.Count - 1; num3 > 0; num3--)
+		playerState.Deck.AddRange(revealed);
+		for (int i = playerState.Deck.Count - 1; i > 0; i--)
 		{
-			int num4 = Random.Shared.Next(num3 + 1);
-			List<CardInstance> deck = playerState.Deck;
-			int index = num3;
-			List<CardInstance> deck2 = playerState.Deck;
-			int index2 = num4;
-			CardInstance value = playerState.Deck[num4];
-			CardInstance value2 = playerState.Deck[num3];
-			deck[index] = value;
-			deck2[index2] = value2;
+			int j = Math.Abs(context.RollDice(0, i)) % (i + 1);
+			(playerState.Deck[i], playerState.Deck[j]) = (playerState.Deck[j], playerState.Deck[i]);
 		}
 	}
 }
