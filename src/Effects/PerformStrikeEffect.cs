@@ -28,7 +28,8 @@ public sealed record PerformStrikeEffect(int StrikeBonus = 0, bool IsRanged = fa
 						{
 							int d = BoardGeometry.GetCrossBoardDistance(aRank.Value, r);
 							int maxMelee = HasReach ? 2 : 1;
-							if (IgnoreRange || (IsRanged ? BoardGeometry.IsRangedValid(aRank.Value, r, MaxRange) : d <= maxMelee))
+							int effectiveMaxRanged = HasReach ? Math.Max(MaxRange, 3) : MaxRange;
+							if (IgnoreRange || (IsRanged ? BoardGeometry.IsRangedValid(aRank.Value, r, effectiveMaxRanged) : d <= maxMelee))
 							{
 								var valid = rCards.FirstOrDefault(c => (!TargetSpentOnly || c.ReadyState == ReadyState.Spent) && (!TargetStunnedOnly || c.ReadyState == ReadyState.Stunned) && (!TargetSpentOrStunnedOnly || c.ReadyState != ReadyState.Ready));
 								if (valid.InstanceId != 0)
@@ -94,7 +95,8 @@ public sealed record PerformStrikeEffect(int StrikeBonus = 0, bool IsRanged = fa
 			{
 				if (IsRanged)
 				{
-					if (!BoardGeometry.IsRangedValid(atkRank.Value, defRank.Value, MaxRange))
+					int effectiveMaxRanged = HasReach ? Math.Max(MaxRange, 3) : MaxRange;
+					if (!BoardGeometry.IsRangedValid(atkRank.Value, defRank.Value, effectiveMaxRanged))
 					{
 						yield break;
 					}

@@ -215,7 +215,7 @@ public class Batch3PlaytestFixesTests
 		int warlordRangedAc = GameEngine.GetEffectiveArmorClass(state, warlordInState, rangedCombat, _cardDb);
 		int rank1RangedAc = GameEngine.GetEffectiveArmorClass(state, rank1InState, rangedCombat, _cardDb);
 
-		Assert.Equal((warlordDef.ArmorClass ?? 15) + 2, warlordRangedAc);
+		Assert.Equal((warlordDef.ArmorClass ?? 15) + 5, warlordRangedAc);
 		Assert.Equal(rank1Def.ArmorClass ?? 10, rank1RangedAc);
 	}
 

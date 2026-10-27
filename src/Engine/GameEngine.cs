@@ -2329,7 +2329,8 @@ public sealed class GameEngine
 					{
 						if (strikeEff.IsRanged)
 						{
-							if (crossDist > strikeEff.MaxRange)
+							int effectiveMax = strikeEff.HasReach ? Math.Max(strikeEff.MaxRange, 3) : strikeEff.MaxRange;
+							if (crossDist > effectiveMax)
 							{
 								continue;
 							}
@@ -2616,7 +2617,8 @@ public sealed class GameEngine
 			bool isRanged = (performStrikeEffect != null && performStrikeEffect.IsRanged) || ability.Effects.Any((IEffect e) => (e is FireballEffect || e is ShadowBoltsEffect) ? true : false);
 			GameEvent topPendingEvt = GetTopPendingEvent(state);
 			int performerRank = (topPendingEvt is MarchEvent me && me.CardInstanceId == performer?.InstanceId) ? me.DestinationRank : (performer?.Rank ?? 1);
-			int maxRange = isRanged ? (performStrikeEffect?.MaxRange ?? 2) : ((performer.HasValue && CharacterHasReach(performer.Value, state, _cardDb)) ? 2 : 1);
+			int effectiveMaxRanged = (performStrikeEffect != null && performStrikeEffect.HasReach) ? Math.Max(performStrikeEffect.MaxRange, 3) : (performStrikeEffect?.MaxRange ?? 2);
+			int maxRange = isRanged ? effectiveMaxRanged : ((performer.HasValue && CharacterHasReach(performer.Value, state, _cardDb)) ? 2 : 1);
 			bool yielded = false;
 			foreach (PlayerState player2 in state.Players)
 			{
@@ -4336,9 +4338,10 @@ public sealed class GameEngine
 						int crossDist = BoardGeometry.GetCrossBoardDistance(perf.Value.Rank.Value, cardInstance5.Value.Rank.Value);
 						if (strikeEff.IsRanged)
 						{
-							if (crossDist > strikeEff.MaxRange)
+							int effectiveMax = strikeEff.HasReach ? Math.Max(strikeEff.MaxRange, 3) : strikeEff.MaxRange;
+							if (crossDist > effectiveMax)
 							{
-								list.Add($"Target character {cardInstance5.Value.InstanceId} is out of range ({crossDist} > {strikeEff.MaxRange}).");
+								list.Add($"Target character {cardInstance5.Value.InstanceId} is out of range ({crossDist} > {effectiveMax}).");
 							}
 						}
 						else
@@ -4956,7 +4959,7 @@ public sealed class GameEngine
 							}
 							foreach (var (num12, list6) in _state.Players[num10].Ranks)
 							{
-								if (Math.Abs(num12 - item5) <= 1)
+								if (BoardGeometry.GetCrossBoardDistance(item5, num12) <= 1)
 								{
 									num9 += list6.Count;
 								}
@@ -5197,16 +5200,17 @@ public sealed class GameEngine
 				}
 			}
 		}
-		if (num == 0 && num2 == 0 && num3 == 0)
+		if (itemDef.ArmorClass.HasValue)
 		{
-			if (text.Equals("Bardiche", StringComparison.OrdinalIgnoreCase))
-			{
-				num += 2;
-			}
-			if (text.Equals("Bruntor's Helm", StringComparison.OrdinalIgnoreCase))
-			{
-				num3++;
-			}
+			num2 += itemDef.ArmorClass.Value;
+		}
+		if (itemDef.Attack?.Strikes.Count > 0)
+		{
+			num += itemDef.Attack.Strikes[0].Modifier;
+		}
+		if (itemDef.BaseHitPoints.HasValue)
+		{
+			num3 += itemDef.BaseHitPoints.Value;
 		}
 		return (Atk: num, Ac: num2, Hp: num3);
 	}
@@ -5543,8 +5547,8 @@ public sealed class GameEngine
 						CardDefinition? definition2 = cardDb.GetDefinition(cardInstance3.Value.DefinitionId);
 						int num7 = (definition2?.Level ?? 0) + (cardInstance3.Value.SkillRatings.TryGetValue("BonusLevel", out var value3) ? value3 : 0);
 						if (IsDeverenian(definition2) && num7 > num)
-						{
-							num2 += 2;
+							{
+								num2 += 2;
 							num3 += 2;
 						}
 					}
@@ -5569,7 +5573,6 @@ public sealed class GameEngine
 			}
 			bool flag2 = definition != null && definition.Name.Equals("Hazahk of Shadow", StringComparison.OrdinalIgnoreCase);
 			bool flag3 = false;
-			CardInstance? cardInstance5 = null;
 			array = new CardInstance?[2] { cardInstance, cardInstance2 };
 			for (i = 0; i < array.Length; i++)
 			{
@@ -5580,23 +5583,13 @@ public sealed class GameEngine
 					if (definition4 != null && definition4.Name.Equals("Hazahk of Shadow", StringComparison.OrdinalIgnoreCase))
 					{
 						flag3 = true;
-						cardInstance5 = cardInstance6.Value;
 						break;
 					}
 				}
 			}
-			if (flag2 & flag)
+			if ((flag2 || flag3) && (character.Wounds > 0 || flag))
 			{
 				num2 += 5;
-			}
-			else if (flag3)
-			{
-				CardDefinition def = (cardInstance5.HasValue ? cardDb.GetDefinition(cardInstance5.Value.DefinitionId) : null);
-				bool flag4 = cardInstance5.HasValue && IsCharacterWounded(cardInstance5.Value, def, state, cardDb);
-				if (flag | flag4)
-				{
-					num2 += 5;
-				}
 			}
 			if (IsNothrog(definition))
 			{
@@ -5608,8 +5601,8 @@ public sealed class GameEngine
 					{
 						CardDefinition definition5 = cardDb.GetDefinition(cardInstance7.Value.DefinitionId);
 						if (definition5 != null && definition5.Name.Equals("Joleg", StringComparison.OrdinalIgnoreCase))
-						{
-							num2 += 2;
+							{
+								num2 += 2;
 							break;
 						}
 					}
@@ -5625,8 +5618,8 @@ public sealed class GameEngine
 					{
 						CardDefinition definition6 = cardDb.GetDefinition(cardInstance8.Value.DefinitionId);
 						if (definition6 != null && definition6.Name.Equals("Makusog Steelhorn", StringComparison.OrdinalIgnoreCase))
-						{
-							num2 += 2;
+							{
+								num2 += 2;
 							break;
 						}
 					}
@@ -5642,8 +5635,8 @@ public sealed class GameEngine
 					{
 						CardDefinition definition7 = cardDb.GetDefinition(cardInstance9.Value.DefinitionId);
 						if (definition7 != null && definition7.Name.Equals("Shannon the Daring", StringComparison.OrdinalIgnoreCase))
-						{
-							num2 += 2;
+							{
+								num2 += 2;
 							break;
 						}
 					}
@@ -5678,8 +5671,8 @@ public sealed class GameEngine
 					{
 						CardDefinition definition9 = cardDb.GetDefinition(cardInstance11.Value.DefinitionId);
 						if (definition9 != null && definition9.Name.Equals("Breastplate of Power", StringComparison.OrdinalIgnoreCase))
-						{
-							num2 += 2;
+							{
+								num2 += 2;
 							num3 += 2;
 						}
 					}
@@ -5707,8 +5700,8 @@ public sealed class GameEngine
 					{
 						int num9 = definition10.Level + (cardInstance12.SkillRatings.TryGetValue("BonusLevel", out var value4) ? value4 : 0);
 						if (num <= num9)
-						{
-							num2 += 2;
+							{
+								num2 += 2;
 							num3++;
 						}
 					}
@@ -5738,7 +5731,7 @@ public sealed class GameEngine
 					rank.Deconstruct(out i, out var value6);
 					int num11 = i;
 					List<CardInstance> list3 = value6;
-					if (Math.Abs(num11 - item2) > 1)
+					if (BoardGeometry.GetCrossBoardDistance(item2, num11) > 1)
 					{
 						continue;
 					}
@@ -5747,13 +5740,14 @@ public sealed class GameEngine
 						CardDefinition definition11 = cardDb.GetDefinition(item4.DefinitionId);
 						if (definition11 != null && definition11.Name.Equals("Ghed Bane", StringComparison.OrdinalIgnoreCase))
 						{
-							int num12 = definition11.Level + (item4.SkillRatings.TryGetValue("BonusLevel", out var value7) ? value7 : 0);
-							if (num < num12)
+							int targetLevel = GetEffectiveLevel(state, character, cardDb);
+							int ghedLevel = GetEffectiveLevel(state, item4, cardDb);
+							if (targetLevel < ghedLevel)
 							{
 								num2 -= 2;
-								num3 -= 2;
+							num3 -= 2;
 							}
-						}
+					}
 					}
 				}
 			}
@@ -5807,23 +5801,9 @@ public sealed class GameEngine
 			{
 				num2 += 5;
 			}
-			if (definition12.Name.Equals("Scale Mail", StringComparison.OrdinalIgnoreCase) && combatCtx != null && combatCtx.IsDefending)
+			if (definition12.Name.Equals("Scale Mail", StringComparison.OrdinalIgnoreCase) && combatCtx != null && combatCtx.IsDefending && combatCtx.IsRanged)
 			{
-				int baseCharAc = (definition?.ArmorClass).GetValueOrDefault(12);
-				if (combatCtx.IsRanged)
-				{
-					if (character.CurrentArmorClass <= baseCharAc)
-					{
-						num3 += 2;
-					}
-				}
-				else if (combatCtx.IsMelee && !combatCtx.IsRanged)
-				{
-					if (character.CurrentArmorClass > baseCharAc)
-					{
-						num3 -= (character.CurrentArmorClass - baseCharAc);
-					}
-				}
+				num3 += 2;
 			}
 			if (definition12.Name.Equals("Ardian Greathawk", StringComparison.OrdinalIgnoreCase))
 			{

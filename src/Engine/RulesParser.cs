@@ -507,7 +507,7 @@ public static class RulesParser
 		};
 		span[1] = (string text) =>
 		{
-			if (Regex.IsMatch(text, "for\\s+each\\s+card\\s+drawn|permanently\\s+gains\\s+\\+1\\s+level", RegexOptions.IgnoreCase))
+			if (Regex.IsMatch(text, "for\\s+each|permanently\\s+gains\\s+\\+1\\s+level", RegexOptions.IgnoreCase))
 			{
 				return (IEffect?)null;
 			}
@@ -521,7 +521,7 @@ public static class RulesParser
 		};
 		span[2] = (string text) =>
 		{
-			if (Regex.IsMatch(text, "for\\s+each\\s+card\\s+drawn|permanently\\s+gains\\s+\\+1\\s+level", RegexOptions.IgnoreCase))
+			if (Regex.IsMatch(text, "for\\s+each|permanently\\s+gains\\s+\\+1\\s+level", RegexOptions.IgnoreCase))
 			{
 				return (IEffect?)null;
 			}
@@ -530,7 +530,7 @@ public static class RulesParser
 		};
 		span[3] = (string text) =>
 		{
-			if (Regex.IsMatch(text, "for\\s+each\\s+card\\s+drawn|permanently\\s+gains\\s+\\+1\\s+level", RegexOptions.IgnoreCase))
+			if (Regex.IsMatch(text, "for\\s+each|permanently\\s+gains\\s+\\+1\\s+level", RegexOptions.IgnoreCase))
 			{
 				return (IEffect?)null;
 			}
@@ -701,7 +701,7 @@ public static class RulesParser
 			bool cannotReduceWounds = Regex.IsMatch(text, "wounds from this action may not be reduced", RegexOptions.IgnoreCase);
 			bool banishOnKill = Regex.IsMatch(text, "banish it instead", RegexOptions.IgnoreCase);
 			int maxRange = 2;
-			if (Regex.IsMatch(text, "three\\s+ranks\\s+away", RegexOptions.IgnoreCase))
+			if (Regex.IsMatch(text, "three\\s+ranks\\s+away", RegexOptions.IgnoreCase) || (isRanged && Regex.IsMatch(text, "(?:an\\s+)?additional rank away", RegexOptions.IgnoreCase)))
 			{
 				maxRange = 3;
 			}

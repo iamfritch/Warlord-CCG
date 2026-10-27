@@ -231,7 +231,11 @@ public class BucketCPassivesAndAurasTests
 		PassiveBonuses continuousPassiveBonuses2 = GameEngine.GetContinuousPassiveBonuses(state, cardInstance, null, _cardDb);
 		Assert.Equal(5, continuousPassiveBonuses2.Atk);
 		PassiveBonuses continuousPassiveBonuses3 = GameEngine.GetContinuousPassiveBonuses(state, cardInstance2, null, _cardDb);
-		Assert.Equal(5, continuousPassiveBonuses3.Atk);
+		Assert.Equal(0, continuousPassiveBonuses3.Atk);
+		cardInstance2.CurrentHitPoints = (def2.BaseHitPoints ?? 2) - 1;
+		playerState.Ranks[1][1] = cardInstance2;
+		PassiveBonuses continuousPassiveBonuses4 = GameEngine.GetContinuousPassiveBonuses(state, cardInstance2, null, _cardDb);
+		Assert.Equal(5, continuousPassiveBonuses4.Atk);
 	}
 
 	[Fact]
@@ -413,7 +417,7 @@ public class BucketCPassivesAndAurasTests
 		PlayerState playerState = CreatePlayer(0, "P1");
 		PlayerState p = CreatePlayer(1, "P2");
 		CardInstance cardInstance = CreateInstance(def2, 1, 0, 1);
-		cardInstance.CurrentArmorClass += 2;
+		cardInstance.CurrentArmorClass += GameEngine.GetItemPassiveStats(def).Ac;
 		CardInstance item = CreateInstance(def, 2, 0, 1);
 		AttachItem(playerState, cardInstance, item);
 		playerState.Ranks[1].Add(cardInstance);
@@ -434,8 +438,8 @@ public class BucketCPassivesAndAurasTests
 		};
 		int effectiveArmorClass = GameEngine.GetEffectiveArmorClass(state, cardInstance, combatCtx, _cardDb);
 		int effectiveArmorClass2 = GameEngine.GetEffectiveArmorClass(state, cardInstance, combatCtx2, _cardDb);
-		Assert.Equal((def2.ArmorClass ?? 12) + 2, effectiveArmorClass);
-		Assert.Equal(def2.ArmorClass ?? 12, effectiveArmorClass2);
+		Assert.Equal((def2.ArmorClass ?? 12) + 5, effectiveArmorClass);
+		Assert.Equal((def2.ArmorClass ?? 12) + 3, effectiveArmorClass2);
 	}
 
 	[Fact]

@@ -118,8 +118,8 @@ public sealed class CardParsingAndDeckConstraintsTests
 		Assert.NotNull(definition);
 		Assert.Equal(CardType.Item, definition.Type);
 		Assert.Equal(CharacterClass.Fighter, definition.Class);
-		Assert.Null(definition.ArmorClass);
-		Assert.Null(definition.BaseHitPoints);
+		Assert.Equal(15, definition.ArmorClass);
+		Assert.Equal(12, definition.BaseHitPoints);
 		Assert.Null(definition.Skill);
 		Assert.Null(definition.Attack);
 	}
