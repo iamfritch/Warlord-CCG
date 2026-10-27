@@ -403,7 +403,7 @@ public sealed class GameEngine
 										if (cardInstance7.HasValue)
 										{
 											CardDefinition definition2 = engine._cardDb.GetDefinition(cardInstance7.Value.DefinitionId);
-											if (definition2 != null && definition2.Name.Equals("Shield of Spurning", StringComparison.OrdinalIgnoreCase))
+											if (definition2 != null && definition2.RulesText.Contains("Push the attacker one rank backward", StringComparison.OrdinalIgnoreCase))
 											{
 												flag3 = true;
 												break;
@@ -1689,6 +1689,20 @@ public sealed class GameEngine
 					failureReason = "Moving character is not an opponent.";
 					return false;
 				}
+				if (ability.MaxRankDistance.HasValue)
+				{
+					int crossDist = BoardGeometry.GetCrossBoardDistance(num, marchEvent.DestinationRank);
+					if (crossDist > ability.MaxRankDistance.Value)
+					{
+						failureReason = $"Moved character is not within {ability.MaxRankDistance.Value} ranks.";
+						return false;
+					}
+				}
+				if (targetInstanceIds != null && targetInstanceIds.Length > 0 && targetInstanceIds[0] != marchEvent.CardInstanceId)
+				{
+					failureReason = "Target must be the moving opposing character.";
+					return false;
+				}
 			}
 			if (ability.TargetScope == TargetScope.Friendly)
 			{
@@ -1792,6 +1806,23 @@ public sealed class GameEngine
 			{
 				failureReason = "This character did not perform the attack.";
 				return false;
+			}
+			if (ability.Description?.Contains("targeting this character", StringComparison.OrdinalIgnoreCase) == true)
+			{
+				if (declareAttackEvent3.DefenderInstanceId != performerId)
+				{
+					failureReason = "This character was not targeted by the attack.";
+					return false;
+				}
+			}
+			if (ability.TargetScope == TargetScope.Opposing)
+			{
+				CardInstance? atkCard = FindBoardCard(state, declareAttackEvent3.AttackerInstanceId);
+				if (!atkCard.HasValue || atkCard.Value.OwnerPlayerIndex == performerCard.OwnerPlayerIndex)
+				{
+					failureReason = "Attacker is not an opponent.";
+					return false;
+				}
 			}
 			if (ability.TargetScope == TargetScope.SameRank)
 			{
@@ -1991,11 +2022,42 @@ public sealed class GameEngine
 				}
 				if (topPendingEvent is MarchEvent marchEvent && ability.Timing == ReactTiming.AfterMove)
 				{
-					if (marchEvent.PlayerIndex != playerId)
+					if (ability.TargetScope == TargetScope.Opposing)
+					{
+						if (marchEvent.PlayerIndex == playerId)
+						{
+							yield break;
+						}
+						if (ability.Effects.OfType<JourneyEffect>().Any())
+						{
+							yield return Array.Empty<int>();
+							yield break;
+						}
+						if (ability.Effects.Any((IEffect e) => (e is PerformStrikeEffect || e is DealDamageEffect || e is ResolveAttackEffect)))
+						{
+							yield return new int[1] { marchEvent.CardInstanceId };
+							yield break;
+						}
+						yield return new int[1] { marchEvent.CardInstanceId };
+						yield break;
+					}
+					else if (ability.TargetScope == TargetScope.Self)
+					{
+						if (marchEvent.CardInstanceId != performerId)
+						{
+							yield break;
+						}
+						if (!ability.Effects.Any((IEffect e) => (e is PerformStrikeEffect || e is DealDamageEffect || e is ResolveAttackEffect)))
+						{
+							yield return new int[1] { marchEvent.CardInstanceId };
+							yield break;
+						}
+					}
+					else if (marchEvent.PlayerIndex != playerId)
 					{
 						yield break;
 					}
-					if (!ability.Effects.Any((IEffect e) => (e is PerformStrikeEffect || e is DealDamageEffect || e is ResolveAttackEffect) ? true : false))
+					else if (!ability.Effects.Any((IEffect e) => (e is PerformStrikeEffect || e is DealDamageEffect || e is ResolveAttackEffect)))
 					{
 						yield return new int[1] { marchEvent.CardInstanceId };
 						yield break;
@@ -2006,10 +2068,13 @@ public sealed class GameEngine
 					yield return new int[1] { dealDamageEvent.TargetInstanceId };
 					yield break;
 				}
-				if (topPendingEvent is DeclareAttackEvent declareAttackEvent && ability.Timing == ReactTiming.AfterAttack && ability.TargetScope == TargetScope.WithinRankDistance)
+				if (topPendingEvent is DeclareAttackEvent declareAttackEvent && ability.Timing == ReactTiming.AfterAttack)
 				{
-					yield return new int[1] { declareAttackEvent.AttackerInstanceId };
-					yield break;
+					if (ability.TargetScope == TargetScope.WithinRankDistance || ability.TargetScope == TargetScope.Opposing || (ability.Description?.Contains("targeting this character", StringComparison.OrdinalIgnoreCase) ?? false))
+					{
+						yield return new int[1] { declareAttackEvent.AttackerInstanceId };
+						yield break;
+					}
 				}
 			}
 			else if (ability.Timing != ReactTiming.None)
@@ -2017,6 +2082,59 @@ public sealed class GameEngine
 				yield break;
 			}
 		}
+		CardInstance? sourceCardInstance = CardLocator.FindCard(state, sourceInstanceId);
+		CardDefinition? sourceCardDef = sourceCardInstance.HasValue ? _cardDb.GetDefinition(sourceCardInstance.Value.DefinitionId) : null;
+		bool isHodsLegacy = sourceCardDef != null && sourceCardDef.Name.Equals("Hod's Legacy", StringComparison.OrdinalIgnoreCase);
+		bool isHuntingStaff = sourceCardDef != null && sourceCardDef.Name.Equals("Hunting Staff", StringComparison.OrdinalIgnoreCase);
+
+		if (isHodsLegacy || (ability.Description?.Contains("Hod's Legacy", StringComparison.OrdinalIgnoreCase) ?? false) || ((ability.Description?.Contains("lower level", StringComparison.OrdinalIgnoreCase) ?? false) && (ability.Description?.Contains("same faction", StringComparison.OrdinalIgnoreCase) ?? false)))
+		{
+			int bearerLevel = GetEffectiveLevel(state, cardInstance.Value, _cardDb);
+			CardDefinition? bearerDef = _cardDb.GetDefinition(cardInstance.Value.DefinitionId);
+			PlayerState playerState = state.Players[playerId];
+			bool readyAbility = ability.Effects.OfType<ChangeReadyStateEffect>().Any((ChangeReadyStateEffect e) => e.TargetState == ReadyState.Ready);
+			bool unstunAbility = ability.Effects.OfType<ChangeReadyStateEffect>().Any((ChangeReadyStateEffect e) => e.OnlyIfStunned);
+			foreach (List<CardInstance> rankCards in playerState.Ranks.Values)
+			{
+				foreach (CardInstance ally in rankCards)
+				{
+					if (ally.InstanceId == performerId)
+					{
+						continue;
+					}
+					if (GetEffectiveLevel(state, ally, _cardDb) >= bearerLevel)
+					{
+						continue;
+					}
+					CardDefinition? allyDef = _cardDb.GetDefinition(ally.DefinitionId);
+					if (!ShareFaction(bearerDef, allyDef))
+					{
+						continue;
+					}
+					if (readyAbility && (ally.ReadyState == ReadyState.Stunned || ally.ReadyState == ReadyState.Ready))
+					{
+						continue;
+					}
+					if (unstunAbility && ally.ReadyState != ReadyState.Stunned)
+					{
+						continue;
+					}
+					yield return new int[1] { ally.InstanceId };
+				}
+			}
+			yield break;
+		}
+
+		if (isHuntingStaff || (ability.Description?.Contains("Hunting Staff", StringComparison.OrdinalIgnoreCase) ?? false) || ((ability.Description?.Contains("adjacent character", StringComparison.OrdinalIgnoreCase) ?? false) && (ability.Description?.Contains("moves forward one rank", StringComparison.OrdinalIgnoreCase) ?? false)))
+		{
+			PlayerState playerState = state.Players[playerId];
+			foreach (CardInstance adj in BoardGeometry.GetAdjacentCharacters(playerState, performerId))
+			{
+				yield return new int[1] { adj.InstanceId };
+			}
+			yield break;
+		}
+
 		if (ability.Effects.OfType<TargetHigherLevelDeverenianJourneyEffect>().Any())
 		{
 			PlayerState playerState = state.Players[playerId];
@@ -3608,6 +3726,82 @@ public sealed class GameEngine
 				}
 			}
 		}
+		CardInstance? srcCardInst = CardLocator.FindCard(state, useAbility.SourceInstanceId);
+		CardDefinition? srcCardDef = srcCardInst.HasValue ? _cardDb.GetDefinition(srcCardInst.Value.DefinitionId) : null;
+		bool isHodsLegacyAbility = srcCardDef != null && srcCardDef.Name.Equals("Hod's Legacy", StringComparison.OrdinalIgnoreCase);
+		bool isHuntingStaffAbility = srcCardDef != null && srcCardDef.Name.Equals("Hunting Staff", StringComparison.OrdinalIgnoreCase);
+
+		if (isHodsLegacyAbility || (abilityDefinition.Description?.Contains("Hod's Legacy", StringComparison.OrdinalIgnoreCase) ?? false) || ((abilityDefinition.Description?.Contains("lower level", StringComparison.OrdinalIgnoreCase) ?? false) && (abilityDefinition.Description?.Contains("same faction", StringComparison.OrdinalIgnoreCase) ?? false)))
+		{
+			if (useAbility.TargetInstanceIds.Length == 0)
+			{
+				list.Add("Must target a lower level character of the same faction.");
+			}
+			else
+			{
+				CardInstance? targetCard = CardLocator.FindCard(state, useAbility.TargetInstanceIds[0]);
+				if (!targetCard.HasValue || targetCard.Value.OwnerPlayerIndex != useAbility.PlayerIndex)
+				{
+					list.Add("Target character must be an ally controlled by you.");
+				}
+				else
+				{
+					int performerId = ResolvePerformerCharacterId(state, useAbility.SourceInstanceId, _cardDb);
+					CardInstance? bearerCard = FindBoardCard(state, performerId);
+					int bearerLevel = bearerCard.HasValue ? GetEffectiveLevel(state, bearerCard.Value, _cardDb) : 0;
+					int targetLevel = GetEffectiveLevel(state, targetCard.Value, _cardDb);
+					if (targetLevel >= bearerLevel)
+					{
+						list.Add("Target must be lower level than the bearer.");
+					}
+					CardDefinition? bearerDef = bearerCard.HasValue ? _cardDb.GetDefinition(bearerCard.Value.DefinitionId) : null;
+					CardDefinition? targetDef = _cardDb.GetDefinition(targetCard.Value.DefinitionId);
+					if (!ShareFaction(bearerDef, targetDef))
+					{
+						list.Add("Target must share a faction with the bearer.");
+					}
+					bool readyAbil = abilityDefinition.Effects.OfType<ChangeReadyStateEffect>().Any((ChangeReadyStateEffect e) => e.TargetState == ReadyState.Ready);
+					bool unstunAbil = abilityDefinition.Effects.OfType<ChangeReadyStateEffect>().Any((ChangeReadyStateEffect e) => e.OnlyIfStunned);
+					if (readyAbil && targetCard.Value.ReadyState == ReadyState.Stunned)
+					{
+						list.Add("Target character cannot be stunned.");
+					}
+					if (unstunAbil && targetCard.Value.ReadyState != ReadyState.Stunned)
+					{
+						list.Add("Target character must be stunned.");
+					}
+				}
+			}
+		}
+
+		if (isHuntingStaffAbility || (abilityDefinition.Description?.Contains("Hunting Staff", StringComparison.OrdinalIgnoreCase) ?? false) || ((abilityDefinition.Description?.Contains("adjacent character", StringComparison.OrdinalIgnoreCase) ?? false) && (abilityDefinition.Description?.Contains("moves forward one rank", StringComparison.OrdinalIgnoreCase) ?? false)))
+		{
+			if (useAbility.TargetInstanceIds.Length == 0)
+			{
+				list.Add("Must target an adjacent character.");
+			}
+			else
+			{
+				CardInstance? targetCard = CardLocator.FindCard(state, useAbility.TargetInstanceIds[0]);
+				if (!targetCard.HasValue)
+				{
+					list.Add("Target character not found.");
+				}
+				else
+				{
+					int performerId = ResolvePerformerCharacterId(state, useAbility.SourceInstanceId, _cardDb);
+					CardInstance? bearerCard = FindBoardCard(state, performerId);
+					if (bearerCard.HasValue)
+					{
+						PlayerState playerState = state.Players[bearerCard.Value.OwnerPlayerIndex];
+						if (!BoardGeometry.AreAdjacent(playerState, bearerCard.Value.InstanceId, targetCard.Value.InstanceId))
+						{
+							list.Add("Target must be adjacent to the bearer.");
+						}
+					}
+				}
+			}
+		}
 		if (state.Priority.IsReactWindowOpen)
 		{
 			string failureReason;
@@ -4332,7 +4526,7 @@ public sealed class GameEngine
 												c.ReadyState = ReadyState.Stunned;
 											});
 										}
-										if (abilityDefinition.DestroysSource || Regex.IsMatch(abilityDefinition.Description ?? "", "\\b(?:Destroy|Discard|Sacrifice)\\s+(?:this\\s+item|this\\s+card)\\b", RegexOptions.IgnoreCase) || (definition != null && definition.Type == CardType.Item && (Regex.IsMatch(definition.RulesText, "\\b(?:Destroy|Discard)\\s+(?:this\\s+item|Order:)\\b", RegexOptions.IgnoreCase) || Regex.IsMatch(abilityDefinition.Description ?? "", "\\bSpend\\s+(?:Hod's Legacy|Hunting Staff)\\b", RegexOptions.IgnoreCase) || definition.Name.Equals("Hod's Legacy", StringComparison.OrdinalIgnoreCase) || definition.Name.Equals("Hunting Staff", StringComparison.OrdinalIgnoreCase) || definition.Name.Equals("Strongarm Stout", StringComparison.OrdinalIgnoreCase))))
+										if (!definition.Name.Equals("Hod's Legacy", StringComparison.OrdinalIgnoreCase) && !definition.Name.Equals("Hunting Staff", StringComparison.OrdinalIgnoreCase) && (abilityDefinition.DestroysSource || Regex.IsMatch(abilityDefinition.Description ?? "", "\\b(?:Destroy|Discard|Sacrifice)\\s+(?:this\\s+item|this\\s+card)\\b", RegexOptions.IgnoreCase) || (definition != null && definition.Type == CardType.Item && (Regex.IsMatch(definition.RulesText, "\\b(?:Destroy|Discard)\\s+(?:this\\s+item|Order:)\\b", RegexOptions.IgnoreCase) || definition.Name.Equals("Strongarm Stout", StringComparison.OrdinalIgnoreCase)))))
 										{
 											foreach (PlayerState player2 in _state.Players)
 											{
@@ -4405,27 +4599,7 @@ public sealed class GameEngine
 													}
 												}
 											}
-											else if (definition.Name.Equals("Shield of Spurning", StringComparison.OrdinalIgnoreCase))
-											{
-												foreach (GameEvent pendingEvent in _resolver.PendingEvents)
-												{
-													if (pendingEvent is DeclareAttackEvent declareAttackEvent)
-													{
-														(int, int, int)? tuple3 = FindCharacterPosition(_state, declareAttackEvent.AttackerInstanceId);
-														if (tuple3.HasValue)
-														{
-															_resolver.Push(new MarchEvent
-															{
-																PlayerIndex = tuple3.Value.Item1,
-																CardInstanceId = declareAttackEvent.AttackerInstanceId,
-																SourceRank = tuple3.Value.Item2,
-																DestinationRank = tuple3.Value.Item2 + 1
-															});
-														}
-														break;
-													}
-												}
-											}
+
 											else if (definition.Name.Equals("Albrecht Novice", StringComparison.OrdinalIgnoreCase))
 											{
 												(int, int, int)? tuple4 = FindCharacterPosition(_state, performerId);
@@ -5157,6 +5331,47 @@ public sealed class GameEngine
 			return def.Traits.Any((string t) => t.Contains("Nothrog", StringComparison.OrdinalIgnoreCase));
 		}
 		return true;
+	}
+
+	public static bool ShareFaction(CardDefinition? a, CardDefinition? b)
+	{
+		if (a == null || b == null)
+		{
+			return false;
+		}
+		if (IsDeverenian(a) && IsDeverenian(b))
+		{
+			return true;
+		}
+		if (IsNothrog(a) && IsNothrog(b))
+		{
+			return true;
+		}
+		if (IsDwarf(a) && IsDwarf(b))
+		{
+			return true;
+		}
+		if (IsFreeKingdoms(a) && IsFreeKingdoms(b))
+		{
+			return true;
+		}
+		if (IsMercenary(a) && IsMercenary(b))
+		{
+			return true;
+		}
+		bool aElf = (a.GetEffectiveFaction()?.Contains("Elf", StringComparison.OrdinalIgnoreCase) ?? false) || a.Traits.Any((string t) => t.Contains("Elf", StringComparison.OrdinalIgnoreCase));
+		bool bElf = (b.GetEffectiveFaction()?.Contains("Elf", StringComparison.OrdinalIgnoreCase) ?? false) || b.Traits.Any((string t) => t.Contains("Elf", StringComparison.OrdinalIgnoreCase));
+		if (aElf && bElf)
+		{
+			return true;
+		}
+		string? factA = a.GetEffectiveFaction() ?? a.Faction;
+		string? factB = b.GetEffectiveFaction() ?? b.Faction;
+		if (!string.IsNullOrWhiteSpace(factA) && !string.IsNullOrWhiteSpace(factB) && factA.Equals(factB, StringComparison.OrdinalIgnoreCase))
+		{
+			return true;
+		}
+		return false;
 	}
 
 	public static bool IsDwarf(CardDefinition? def)

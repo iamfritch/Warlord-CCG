@@ -230,7 +230,7 @@ public class BucketBSacrificeAndCostsTests
 		};
 		gameState.Players[0].Ranks[1].Add(item);
 		gameState.Players[0].Ranks[1].Add(item3);
-		gameState.Players[0].DiscardPile.Add(item2);
+		gameState.Players[0].AttachedItems.Add(item2);
 		GameEngine gameEngine = new GameEngine(gameState, _cardDb);
 		UseAbilityAction action = new UseAbilityAction
 		{
@@ -245,8 +245,9 @@ public class BucketBSacrificeAndCostsTests
 		Assert.True(actionResult2.IsSuccess, string.Join(", ", actionResult2.Errors));
 		CardInstance? value = FindCardInState(gameState, 11);
 		Assert.NotNull(value);
-		Assert.Equal(CardZone.Discard, value.Value.Zone);
-		Assert.Null(value.Value.AttachedToInstanceId);
+		Assert.Equal(CardZone.Attached, value.Value.Zone);
+		Assert.Equal(ReadyState.Spent, value.Value.ReadyState);
+		Assert.Equal(10, value.Value.AttachedToInstanceId);
 		CardInstance? value2 = FindCardInState(gameState, 12);
 		Assert.NotNull(value2);
 		Assert.Equal(ReadyState.Ready, value2.Value.ReadyState);

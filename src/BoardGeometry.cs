@@ -141,6 +141,23 @@ public static class BoardGeometry
 		return list;
 	}
 
+	public static bool AreAdjacent(PlayerState player, int instanceId1, int instanceId2)
+	{
+		return GetAdjacentCharacters(player, instanceId1).Any((CardInstance c) => c.InstanceId == instanceId2);
+	}
+
+	public static bool AreAdjacent(GameState state, int instanceId1, int instanceId2)
+	{
+		foreach (PlayerState player in state.Players)
+		{
+			if (AreAdjacent(player, instanceId1, instanceId2))
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
 	public static bool IsFormationLegal(PlayerState player)
 	{
 		if (player.Ranks.Count == 0)

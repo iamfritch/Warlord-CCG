@@ -221,7 +221,7 @@ public static class RulesParser
 		{
 			return null;
 		}
-		bool destroysSource = text2.StartsWith("Destroy", StringComparison.OrdinalIgnoreCase) || Regex.IsMatch(text3, "^Destroy\\s+this\\s+(?:item|card):\\s*", RegexOptions.IgnoreCase) || Regex.IsMatch(text3, "^Discard\\s+this\\s+(?:item|card):\\s*", RegexOptions.IgnoreCase) || Regex.IsMatch(text, "\\bSpend\\s+(?:Hod's Legacy|Hunting Staff)\\b", RegexOptions.IgnoreCase) || (cardName != null && (cardName.Equals("Hod's Legacy", StringComparison.OrdinalIgnoreCase) || cardName.Equals("Hunting Staff", StringComparison.OrdinalIgnoreCase) || cardName.Equals("Strongarm Stout", StringComparison.OrdinalIgnoreCase)));
+		bool destroysSource = text2.StartsWith("Destroy", StringComparison.OrdinalIgnoreCase) || Regex.IsMatch(text3, "^Destroy\\s+this\\s+(?:item|card):\\s*", RegexOptions.IgnoreCase) || Regex.IsMatch(text3, "^Discard\\s+this\\s+(?:item|card):\\s*", RegexOptions.IgnoreCase) || (cardName != null && cardName.Equals("Strongarm Stout", StringComparison.OrdinalIgnoreCase));
 		if (Regex.IsMatch(text3, "^Destroy\\s+this\\s+(?:item|card):\\s*", RegexOptions.IgnoreCase))
 		{
 			text3 = Regex.Replace(text3, "^Destroy\\s+this\\s+(?:item|card):\\s*", "", RegexOptions.IgnoreCase);
@@ -270,6 +270,16 @@ public static class RulesParser
 		{
 			value = AbilityTrigger.SpendReact;
 			text3 = Regex.Replace(text3, "(?:^|,\\s*)spend\\s+Ardian\\s+Greathawk:\\s*", " ", RegexOptions.IgnoreCase).Trim();
+		}
+		else if (Regex.IsMatch(text3, "(?:^|,\\s*)spend\\s+Nothrog\\s+S'sike:\\s*", RegexOptions.IgnoreCase))
+		{
+			value = AbilityTrigger.SpendReact;
+			text3 = Regex.Replace(text3, "(?:^|,\\s*)spend\\s+Nothrog\\s+S'sike:\\s*", " ", RegexOptions.IgnoreCase).Trim();
+		}
+		else if (Regex.IsMatch(text3, "(?:^|,\\s*)spend\\s+Shield\\s+of\\s+Spurning:\\s*", RegexOptions.IgnoreCase))
+		{
+			value = AbilityTrigger.SpendReact;
+			text3 = Regex.Replace(text3, "(?:^|,\\s*)spend\\s+Shield\\s+of\\s+Spurning:\\s*", " ", RegexOptions.IgnoreCase).Trim();
 		}
 		else if (Regex.IsMatch(text3, "^Spend\\s+Hunting\\s+Staff\\s+and\\s+target\\s+an\\s+adjacent\\s+character:\\s*", RegexOptions.IgnoreCase))
 		{
@@ -392,6 +402,10 @@ public static class RulesParser
 		{
 			item = ReactTiming.AfterWizardCastsSpell;
 		}
+		else if (Regex.IsMatch(text2, "\\bafter\\s+.*?\\b(?:performs a (?:melee\\s+)?strike|attacks)\\b"))
+		{
+			item = ReactTiming.AfterAttack;
+		}
 		else if (Regex.IsMatch(text2, "\\bafter\\s+.*?\\b(?:targeted with a strike|targets this character|is targeted by)\\b"))
 		{
 			item = ReactTiming.AfterTargetedWithStrike;
@@ -405,10 +419,6 @@ public static class RulesParser
 			item = ReactTiming.AfterMove;
 		}
 		else if (Regex.IsMatch(text2, "\\bafter\\s+.*?\\bstrike that missed\\b"))
-		{
-			item = ReactTiming.AfterAttack;
-		}
-		else if (Regex.IsMatch(text2, "\\bafter\\s+.*?\\battacks\\b"))
 		{
 			item = ReactTiming.AfterAttack;
 		}
@@ -426,7 +436,23 @@ public static class RulesParser
 		}
 		TargetScope item2 = TargetScope.Any;
 		int? item3 = null;
-		if (text2.Contains("another character in this rank"))
+		if (Regex.IsMatch(text2, @"\bafter\s+(?:target\s+)?opposing\s+character\s+moves\b"))
+		{
+			item2 = TargetScope.Opposing;
+			if (Regex.IsMatch(text2, @"\bwithin\s+(?:one|1)\s+rank\b"))
+			{
+				item3 = 1;
+			}
+			else if (Regex.IsMatch(text2, @"\bwithin\s+(?:two|2)\s+ranks\b"))
+			{
+				item3 = 2;
+			}
+		}
+		else if (Regex.IsMatch(text2, @"\bafter\s+.*?\bperforms a (?:melee\s+)?strike targeting this character\b"))
+		{
+			item2 = TargetScope.Opposing;
+		}
+		else if (text2.Contains("another character in this rank"))
 		{
 			item2 = TargetScope.OtherInSameRank;
 		}
@@ -630,7 +656,7 @@ public static class RulesParser
 			{
 				return (IEffect?)null;
 			}
-			if (Regex.IsMatch(text, "target\\s+performs\\s+a\\s+(?:\\+?\\d+\\s+)?melee\\s+strike|inflicts\\s+an\\s+additional\\s+wound\\s+against\\s+characters\\s+that\\s+are\\s+equal\\s+or\\s+lower", RegexOptions.IgnoreCase))
+			if (Regex.IsMatch(text, "target\\s+(?:character\\s+)?performs\\s+a\\s+(?:\\+?\\d+\\s+)?melee\\s+strike|\\bAfter\\b.*?\\bperforms\\s+a\\s+melee\\s+strike|inflicts\\s+an\\s+additional\\s+wound\\s+against\\s+characters\\s+that\\s+are\\s+equal\\s+or\\s+lower", RegexOptions.IgnoreCase))
 			{
 				return (IEffect?)null;
 			}
@@ -687,7 +713,8 @@ public static class RulesParser
 					maxRange = parsedRange;
 				}
 			}
-			return new PerformStrikeEffect(strikeBonus, isRanged, additionalWounds ? 1 : 0, stunOnHit, spendOnHit, PushOnHit: false, pullOnHit, destroyItemOnHit, zeroDamage, bonusFromLevel, flag && !flag3, flag2 && !flag3, flag3, targetLowerLevelOnly, bonusWoundAgainstHigherLevel, hasReach, TrueStrike: false, hasAdvantage, NoRollBonuses: false, cannotReduceWounds, banishOnKill, maxRange);
+			bool ignoreRange = Regex.IsMatch(text, "against the target|target character", RegexOptions.IgnoreCase);
+			return new PerformStrikeEffect(strikeBonus, isRanged, additionalWounds ? 1 : 0, stunOnHit, spendOnHit, PushOnHit: false, pullOnHit, destroyItemOnHit, zeroDamage, bonusFromLevel, flag && !flag3, flag2 && !flag3, flag3, targetLowerLevelOnly, bonusWoundAgainstHigherLevel, hasReach, TrueStrike: false, hasAdvantage, NoRollBonuses: false, cannotReduceWounds, banishOnKill, maxRange, IgnoreRange: ignoreRange);
 		};
 		span[11] = (string text) =>
 		{
