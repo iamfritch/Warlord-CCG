@@ -13,10 +13,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="DataParser\starter_decks.json">
+    <None Update="Data\starter_decks.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="DataParser\cards.json">
+    <None Update="Data\cards.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
@@ -24,7 +24,7 @@
   <!-- Exclude sub-project files from the main library compilation -->
   <ItemGroup>
     <Compile Remove="tests\**" />
-    <Compile Remove="DataParser\**" />
+    <Compile Remove="Data\**" />
     <Compile Remove="WarlordCli\**" />
   </ItemGroup>
 

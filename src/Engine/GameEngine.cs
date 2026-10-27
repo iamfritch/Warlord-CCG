@@ -735,7 +735,7 @@ public sealed class GameEngine
 		{
 			return _lastActiveCardDb;
 		}
-		throw new InvalidOperationException("CardDatabase not initialized and DataParser/cards.json could not be found.");
+		throw new InvalidOperationException("CardDatabase not initialized and Data/cards.json could not be found.");
 	}
 
 	public static CardDatabase GetLastActiveCardDb() => _lastActiveCardDb ?? GetActiveCardDb();

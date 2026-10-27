@@ -12,7 +12,7 @@ namespace WarlordEngine;
 public static class DataPaths
 {
 	/// <summary>Sub-folder (relative to the output directory) that contains the data files.</summary>
-	public const string DataFolderName = "DataParser";
+	public const string DataFolderName = "Data";
 
 	public const string CardsFileName = "cards.json";
 

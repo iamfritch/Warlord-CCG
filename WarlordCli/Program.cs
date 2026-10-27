@@ -23,7 +23,7 @@ public static class Program
         if (cardsPath == null)
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine("Error: Could not locate DataParser/cards.json.");
+            Console.WriteLine("Error: Could not locate Data/cards.json.");
             Console.ResetColor();
             return;
         }
