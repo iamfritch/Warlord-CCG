@@ -34,6 +34,28 @@ public static class RulesParser
 
 	private static readonly List<EffectMatcher> EffectMatchers;
 
+	private static readonly Regex MultiTargetCountRegex = new Regex("\\b(?<own>your\\s+|friendly\\s+)?(?<count>two|three|2|3)\\s+target\\s+(?:\\w+\\s+)?(?:characters?|allies|ally)\\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+	/// <summary>
+	/// Parses how many distinct targets an ability's text requires (e.g. "Your two target characters attack").
+	/// Returns null when the text does not specify a multi-target count.
+	/// </summary>
+	public static (int Count, bool MustBeFriendly)? ParseRequiredTargets(string? text)
+	{
+		if (string.IsNullOrWhiteSpace(text))
+		{
+			return null;
+		}
+		Match match = MultiTargetCountRegex.Match(text);
+		if (!match.Success)
+		{
+			return null;
+		}
+		string count = match.Groups["count"].Value.ToLowerInvariant();
+		int num = (count == "two" || count == "2") ? 2 : 3;
+		return (num, match.Groups["own"].Success);
+	}
+
 	public static List<AbilityDefinition> Parse(string rulesText)
 	{
 		return Parse(rulesText, null);

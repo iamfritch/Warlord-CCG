@@ -1997,6 +1997,42 @@ public sealed class GameEngine
 		return true;
 	}
 
+	/// <summary>
+	/// Validates the complete target set of an ability simultaneously (count, distinctness, existence, control and
+	/// single-target filter phrases) so nothing is committed unless every target is legal. Read-only: never mutates state.
+	/// </summary>
+	private void ValidateMultiTargetSelection(GameState state, UseAbilityAction useAbility, AbilityDefinition ability, List<string> errors)
+	{
+		int[] targets = useAbility.TargetInstanceIds ?? Array.Empty<int>();
+		(int Count, bool MustBeFriendly)? required = RulesParser.ParseRequiredTargets(ability.Description);
+		if (required.HasValue)
+		{
+			if (targets.Length != required.Value.Count)
+			{
+				errors.Add($"Ability requires exactly {required.Value.Count} targets (got {targets.Length}).");
+				return;
+			}
+			if (targets.Distinct().Count() != targets.Length)
+			{
+				errors.Add("Each target must be a different character.");
+			}
+			foreach (int targetId in targets)
+			{
+				CardInstance? target = FindBoardCard(state, targetId);
+				if (!target.HasValue)
+				{
+					errors.Add($"Target {targetId} not found.");
+				}
+				else if (required.Value.MustBeFriendly && target.Value.OwnerPlayerIndex != useAbility.PlayerIndex)
+				{
+					errors.Add($"Target {targetId} must be a character you control.");
+				}
+			}
+			return;
+		}
+		// Abilities without an explicit multi-target count may legitimately carry extra context targets (e.g. performer + target), so no further count restriction is applied.
+	}
+
 	private IEnumerable<int[]> EnumerateAbilityTargets(GameState state, int playerId, int sourceInstanceId, AbilityDefinition ability)
 	{
 		int performerId = ResolvePerformerCharacterId(state, sourceInstanceId, _cardDb);
@@ -2252,7 +2288,7 @@ public sealed class GameEngine
 			}
 			else if (list.Count == 1)
 			{
-				yield return new int[1] { list[0] };
+				yield break; // Pack Tactics requires two distinct targets; a single ready character is not a legal selection.
 			}
 			yield break;
 		}
@@ -3728,6 +3764,7 @@ public sealed class GameEngine
 				}
 			}
 		}
+		ValidateMultiTargetSelection(state, useAbility, abilityDefinition, list);
 		CardInstance? srcCardInst = CardLocator.FindCard(state, useAbility.SourceInstanceId);
 		CardDefinition? srcCardDef = srcCardInst.HasValue ? _cardDb.GetDefinition(srcCardInst.Value.DefinitionId) : null;
 		bool isHodsLegacyAbility = srcCardDef != null && srcCardDef.Name.Equals("Hod's Legacy", StringComparison.OrdinalIgnoreCase);
