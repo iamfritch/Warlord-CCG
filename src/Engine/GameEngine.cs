@@ -393,6 +393,40 @@ public sealed class GameEngine
 											c.CurrentHitPoints = Math.Max(0, c.CurrentHitPoints - 1);
 										});
 									}
+									if (!strikeDescriptor.IsRanged && currentDefCard.HasValue && CharacterHasRiposte(currentDefCard.Value, state, engine._cardDb))
+									{
+										CardInstance? riposteDef = CardLocator.FindCard(state, currentDefId);
+										if (riposteDef.HasValue && riposteDef.Value.ReadyState != ReadyState.Stunned && riposteDef.Value.CurrentHitPoints > 0 && riposteDef.Value.Wounds < GetEffectiveMaxHitPoints(state, riposteDef.Value, engine._cardDb))
+										{
+											int riposteBonus = GetRiposteModifier(state, riposteDef.Value, engine._cardDb);
+											ResolveAttackEffect riposteStrike = new ResolveAttackEffect
+											{
+												StrikeBonus = riposteBonus,
+												Damage = 1,
+												DamageType = "melee",
+												EnableCriticals = true,
+												InstanceOnAttackResolved = (AttackResolutionDetails rDetails) =>
+												{
+													if (!state.IsSimulation)
+													{
+														engine.OnAttackResolved?.Invoke(rDetails);
+													}
+												}
+											};
+											EffectContext riposteCtx = new EffectContext
+											{
+												SourceInstanceId = currentDefId,
+												TargetInstanceId = declareAttack.AttackerInstanceId,
+												State = state,
+												CardDb = engine._cardDb,
+												RollDice = engine._diceRoller
+											};
+											foreach (GameEvent rEvt in riposteStrike.Evaluate(riposteCtx))
+											{
+												engine._resolver.Push(rEvt);
+											}
+										}
+									}
 								}
 								bool flag3 = HasTurnBuff(state, currentDefId, "SHIELD_OF_SPURNING_PUSH");
 								if (!flag3 && currentDefCard.HasValue)
@@ -529,6 +563,10 @@ public sealed class GameEngine
 					}
 					foreach (CardInstance item in list3)
 					{
+						if (IsTargetProtectedByStealth(state, attacker, item, strike.IsRanged, cardDb))
+						{
+							continue;
+						}
 						int num5 = pendingWounds?.GetValueOrDefault(item.InstanceId, 0) ?? 0;
 						int num6 = GetEffectiveCurrentHitPoints(state, item, cardDb) - num5;
 						int effectiveMaxHitPoints = GetEffectiveMaxHitPoints(state, item, cardDb);
@@ -545,6 +583,35 @@ public sealed class GameEngine
 				}
 			}
 			return list;
+		}
+	}
+
+	private sealed class MagicDamageResistanceHandler(GameEngine engine) : IPostResolutionHandler
+	{
+		public IEnumerable<GameEvent> AfterResolve(GameEvent resolvedEvent, GameState state)
+		{
+			if (resolvedEvent is DealDamageEvent dmg && string.Equals(dmg.DamageType, "magic", StringComparison.OrdinalIgnoreCase) && dmg.Amount > 0)
+			{
+				CardInstance? target = FindBoardCard(state, dmg.TargetInstanceId) ?? CardLocator.FindCard(state, dmg.TargetInstanceId);
+				if (target.HasValue && CharacterHasMagicResistance(target.Value, state, engine._cardDb))
+				{
+					int mrRating = GetMagicResistanceRating(state, target.Value, engine._cardDb);
+					int effectiveSkill = GetEffectiveSkill(state, target.Value, engine._cardDb);
+					int roll = engine._diceRoller(1, 20);
+					bool passedCheck = (roll == 20) || (roll != 1 && roll + effectiveSkill + mrRating >= 15);
+					int mitigated = passedCheck ? dmg.Amount : Math.Min(dmg.Amount, Math.Max(1, mrRating));
+					if (mitigated > 0)
+					{
+						int maxHp = GetEffectiveMaxHitPoints(state, target.Value, engine._cardDb);
+						CardLocator.FindAndMutate(state, dmg.TargetInstanceId, delegate(ref CardInstance c)
+						{
+							c.Wounds = Math.Max(0, c.Wounds - mitigated);
+							c.CurrentHitPoints = Math.Min(maxHp, c.CurrentHitPoints + mitigated);
+						});
+					}
+				}
+			}
+			yield break;
 		}
 	}
 
@@ -706,6 +773,7 @@ public sealed class GameEngine
 		{
 			_resolver.RestoreStack(_state.PendingEvents);
 		}
+		_resolver.RegisterPostHandler(new MagicDamageResistanceHandler(this));
 		_resolver.RegisterPostHandler(new DeathCheckHandler(_cardDb));
 		_resolver.RegisterPostHandler(new AttachedItemDefeatHandler());
 		_resolver.RegisterPostHandler(new WarlordEliminationHandler());
@@ -2460,6 +2528,10 @@ public sealed class GameEngine
 					}
 					foreach (CardInstance item6 in list3)
 					{
+						if (strikeEff != null && cardInstance.HasValue && IsTargetProtectedByStealth(state, cardInstance.Value, item6, strikeEff.IsRanged, _cardDb))
+						{
+							continue;
+						}
 						yielded = true;
 						yield return new int[1] { item6.InstanceId };
 					}
@@ -2790,6 +2862,10 @@ public sealed class GameEngine
 					}
 					foreach (CardInstance item2 in list3)
 					{
+						if (performer.HasValue && IsTargetProtectedByStealth(state, performer.Value, item2, isRanged, _cardDb))
+						{
+							continue;
+						}
 						if ((!targetSpentOnly || item2.ReadyState == ReadyState.Spent) && (!targetStunnedOnly || item2.ReadyState == ReadyState.Stunned) && (!targetSpentOrStunned || item2.ReadyState != ReadyState.Ready))
 						{
 							yielded = true;
@@ -3345,6 +3421,150 @@ public sealed class GameEngine
 		return false;
 	}
 
+	public static bool CharacterHasStealth(CardInstance character, GameState state, CardDatabase cardDb)
+	{
+		if (HasTurnBuff(state, character.InstanceId, "STEALTH") || character.SkillRatings.ContainsKey("Stealth"))
+		{
+			return true;
+		}
+		CardDefinition? definition = cardDb.GetDefinition(character.DefinitionId);
+		if (RulesParser.HasStealth(definition))
+		{
+			return true;
+		}
+		foreach (int attachedItemId in character.AttachedItemIds)
+		{
+			CardInstance? cardInstance = CardLocator.FindCard(state, attachedItemId);
+			if (cardInstance.HasValue && RulesParser.HasStealth(cardDb.GetDefinition(cardInstance.Value.DefinitionId)))
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	public static bool IsTargetProtectedByStealth(GameState state, CardInstance attacker, CardInstance defender, bool isRanged, CardDatabase cardDb)
+	{
+		if (defender.OwnerPlayerIndex == attacker.OwnerPlayerIndex)
+		{
+			return false;
+		}
+		if (defender.ReadyState == ReadyState.Stunned || !CharacterHasStealth(defender, state, cardDb))
+		{
+			return false;
+		}
+		CardDefinition? atkDef = cardDb.GetDefinition(attacker.DefinitionId);
+		bool attackerHasTrueStrike = HasTurnBuff(state, attacker.InstanceId, "TRUE_STRIKE") ||
+			GetContinuousPassiveBonuses(state, attacker, new CombatContext { IsAttacking = true, OpponentCard = defender }, cardDb).TrueStrike ||
+			(atkDef != null && (atkDef.Traits.Any((string t) => t.Equals("True Strike", StringComparison.OrdinalIgnoreCase)) || atkDef.RulesText.Contains("True Strike", StringComparison.OrdinalIgnoreCase)));
+		if (attackerHasTrueStrike)
+		{
+			return false;
+		}
+		if (isRanged)
+		{
+			return true;
+		}
+		int defRank = defender.Rank ?? 1;
+		if (state.Players[defender.OwnerPlayerIndex].Ranks.TryGetValue(defRank, out List<CardInstance>? rankCards))
+		{
+			bool hasNonStealthInRank = rankCards.Any(c => c.InstanceId != defender.InstanceId && c.CurrentHitPoints > 0 && (c.ReadyState == ReadyState.Stunned || !CharacterHasStealth(c, state, cardDb)));
+			if (hasNonStealthInRank)
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	public static bool CharacterHasRiposte(CardInstance character, GameState state, CardDatabase cardDb)
+	{
+		if (HasTurnBuff(state, character.InstanceId, "RIPOSTE") || character.SkillRatings.ContainsKey("Riposte"))
+		{
+			return true;
+		}
+		CardDefinition? definition = cardDb.GetDefinition(character.DefinitionId);
+		if (RulesParser.HasRiposte(definition))
+		{
+			return true;
+		}
+		foreach (int attachedItemId in character.AttachedItemIds)
+		{
+			CardInstance? cardInstance = CardLocator.FindCard(state, attachedItemId);
+			if (cardInstance.HasValue && RulesParser.HasRiposte(cardDb.GetDefinition(cardInstance.Value.DefinitionId)))
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	public static int GetRiposteModifier(GameState state, CardInstance character, CardDatabase cardDb)
+	{
+		int bonus = GetTurnBuffValue(state, character.InstanceId, "RIPOSTE");
+		if (character.SkillRatings.TryGetValue("Riposte", out int rating))
+		{
+			bonus += rating;
+		}
+		else
+		{
+			bonus += RulesParser.GetRiposteRating(cardDb.GetDefinition(character.DefinitionId));
+		}
+		foreach (int attachedItemId in character.AttachedItemIds)
+		{
+			CardInstance? item = CardLocator.FindCard(state, attachedItemId);
+			if (item.HasValue)
+			{
+				bonus += RulesParser.GetRiposteRating(cardDb.GetDefinition(item.Value.DefinitionId));
+			}
+		}
+		return GetEffectiveAttack(state, character, new CombatContext { IsAttacking = true, IsMelee = true }, cardDb) + bonus;
+	}
+
+	public static bool CharacterHasMagicResistance(CardInstance character, GameState state, CardDatabase cardDb)
+	{
+		if (HasTurnBuff(state, character.InstanceId, "MAGIC_RESISTANCE") || character.SkillRatings.ContainsKey("Magic Resistance") || character.SkillRatings.ContainsKey("MagicResistance"))
+		{
+			return true;
+		}
+		CardDefinition? definition = cardDb.GetDefinition(character.DefinitionId);
+		if (RulesParser.HasMagicResistance(definition))
+		{
+			return true;
+		}
+		foreach (int attachedItemId in character.AttachedItemIds)
+		{
+			CardInstance? cardInstance = CardLocator.FindCard(state, attachedItemId);
+			if (cardInstance.HasValue && RulesParser.HasMagicResistance(cardDb.GetDefinition(cardInstance.Value.DefinitionId)))
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	public static int GetMagicResistanceRating(GameState state, CardInstance character, CardDatabase cardDb)
+	{
+		int rating = GetTurnBuffValue(state, character.InstanceId, "MAGIC_RESISTANCE");
+		if (character.SkillRatings.TryGetValue("Magic Resistance", out int r) || character.SkillRatings.TryGetValue("MagicResistance", out r))
+		{
+			rating += r;
+		}
+		else
+		{
+			rating += RulesParser.GetMagicResistanceRating(cardDb.GetDefinition(character.DefinitionId));
+		}
+		foreach (int attachedItemId in character.AttachedItemIds)
+		{
+			CardInstance? item = CardLocator.FindCard(state, attachedItemId);
+			if (item.HasValue)
+			{
+				rating += RulesParser.GetMagicResistanceRating(cardDb.GetDefinition(item.Value.DefinitionId));
+			}
+		}
+		return rating;
+	}
+
 	private ActionResult ValidateAttack(DeclareAttackAction attack, GameState state)
 	{
 		List<string> list = new List<string>();
@@ -3451,6 +3671,10 @@ public sealed class GameEngine
 		{
 			CardDefinition? definition = _cardDb.GetDefinition(cardInstance.Value.DefinitionId);
 			bool num4 = (object)definition != null && definition.Attack?.Strikes.Any((StrikeDescriptor s) => s.IsRanged) == true;
+			if (IsTargetProtectedByStealth(state, cardInstance.Value, cardInstance2.Value, num4, _cardDb))
+			{
+				list.Add($"Cannot target '{_cardDb.GetDefinition(cardInstance2.Value.DefinitionId)?.Name ?? cardInstance2.Value.DefinitionId}' due to Stealth.");
+			}
 			int rankDistance = BoardGeometry.GetCrossBoardDistance(num.Value, num2.Value);
 			if (num4)
 			{
@@ -3594,6 +3818,10 @@ public sealed class GameEngine
 		{
 			CardDefinition? definition = _cardDb.GetDefinition(cardInstance.Value.DefinitionId);
 			bool num4 = (object)definition != null && definition.Attack?.Strikes.Any((StrikeDescriptor s) => s.IsRanged) == true;
+			if (IsTargetProtectedByStealth(state, cardInstance.Value, cardInstance2.Value, num4, _cardDb))
+			{
+				list.Add($"Cannot target '{_cardDb.GetDefinition(cardInstance2.Value.DefinitionId)?.Name ?? cardInstance2.Value.DefinitionId}' due to Stealth.");
+			}
 			int rankDistance = BoardGeometry.GetCrossBoardDistance(num.Value, num2.Value);
 			if (num4)
 			{
@@ -4507,6 +4735,10 @@ public sealed class GameEngine
 					CardInstance? perf = FindBoardCard(state, playCard.PerformerInstanceId.Value);
 					if (perf.HasValue && perf.Value.Rank.HasValue && cardInstance5.Value.Rank.HasValue)
 					{
+						if (IsTargetProtectedByStealth(state, perf.Value, cardInstance5.Value, strikeEff.IsRanged, _cardDb))
+						{
+							list.Add($"Target character {cardInstance5.Value.InstanceId} cannot be targeted due to Stealth.");
+						}
 						int crossDist = BoardGeometry.GetCrossBoardDistance(perf.Value.Rank.Value, cardInstance5.Value.Rank.Value);
 						if (strikeEff.IsRanged)
 						{

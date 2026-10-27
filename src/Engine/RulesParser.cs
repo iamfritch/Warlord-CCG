@@ -34,6 +34,61 @@ public static class RulesParser
 
 	private static readonly List<EffectMatcher> EffectMatchers;
 
+	private static readonly Regex StealthTraitRegex = new Regex(@"\bStealth(?:\s*\+?(\d+))?\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+	private static readonly Regex RiposteTraitRegex = new Regex(@"\bRiposte(?:\s*\+?(\d+))?\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+	private static readonly Regex MagicResistanceTraitRegex = new Regex(@"\bMagic\s+Resistance(?:\s*\+?(\d+))?\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+	public static bool HasStealth(CardDefinition? def) =>
+		def != null && (def.Traits.Any(t => StealthTraitRegex.IsMatch(t)) || StealthTraitRegex.IsMatch(def.RulesText ?? string.Empty));
+
+	public static int GetStealthRating(CardDefinition? def)
+	{
+		if (def == null) return 0;
+		if (def.SkillRatings.TryGetValue("Stealth", out int r)) return r;
+		foreach (string t in def.Traits)
+		{
+			Match m = StealthTraitRegex.Match(t);
+			if (m.Success) return m.Groups[1].Success && int.TryParse(m.Groups[1].Value, out int v) ? v : 1;
+		}
+		Match rm = StealthTraitRegex.Match(def.RulesText ?? string.Empty);
+		if (rm.Success) return rm.Groups[1].Success && int.TryParse(rm.Groups[1].Value, out int rv) ? rv : 1;
+		return 0;
+	}
+
+	public static bool HasRiposte(CardDefinition? def) =>
+		def != null && (def.Traits.Any(t => RiposteTraitRegex.IsMatch(t)) || RiposteTraitRegex.IsMatch(def.RulesText ?? string.Empty));
+
+	public static int GetRiposteRating(CardDefinition? def)
+	{
+		if (def == null) return 0;
+		if (def.SkillRatings.TryGetValue("Riposte", out int r)) return r;
+		foreach (string t in def.Traits)
+		{
+			Match m = RiposteTraitRegex.Match(t);
+			if (m.Success) return m.Groups[1].Success && int.TryParse(m.Groups[1].Value, out int v) ? v : 1;
+		}
+		Match rm = RiposteTraitRegex.Match(def.RulesText ?? string.Empty);
+		if (rm.Success) return rm.Groups[1].Success && int.TryParse(rm.Groups[1].Value, out int rv) ? rv : 1;
+		return 0;
+	}
+
+	public static bool HasMagicResistance(CardDefinition? def) =>
+		def != null && (def.Traits.Any(t => MagicResistanceTraitRegex.IsMatch(t)) || MagicResistanceTraitRegex.IsMatch(def.RulesText ?? string.Empty));
+
+	public static int GetMagicResistanceRating(CardDefinition? def)
+	{
+		if (def == null) return 0;
+		if (def.SkillRatings.TryGetValue("Magic Resistance", out int r) || def.SkillRatings.TryGetValue("MagicResistance", out r)) return r;
+		foreach (string t in def.Traits)
+		{
+			Match m = MagicResistanceTraitRegex.Match(t);
+			if (m.Success) return m.Groups[1].Success && int.TryParse(m.Groups[1].Value, out int v) ? v : 1;
+		}
+		Match rm = MagicResistanceTraitRegex.Match(def.RulesText ?? string.Empty);
+		if (rm.Success) return rm.Groups[1].Success && int.TryParse(rm.Groups[1].Value, out int rv) ? rv : 1;
+		return 0;
+	}
+
 	private static readonly Regex MultiTargetCountRegex = new Regex("\\b(?<own>your\\s+|friendly\\s+)?(?<count>two|three|2|3)\\s+target\\s+(?:\\w+\\s+)?(?:characters?|allies|ally)\\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
 	/// <summary>
@@ -600,6 +655,18 @@ public static class RulesParser
 			if (Regex.IsMatch(text, "strike that missed:\\s*(?:The attacker suffers a wound|Inflict a wound on the target)", RegexOptions.IgnoreCase))
 			{
 				return new GrantTraitEffect("POUNCE_MISS_WOUND");
+			}
+			if (Regex.IsMatch(text, "\\bStealth\\b", RegexOptions.IgnoreCase))
+			{
+				return new GrantTraitEffect("STEALTH");
+			}
+			if (Regex.IsMatch(text, "\\bRiposte\\b", RegexOptions.IgnoreCase))
+			{
+				return new GrantTraitEffect("RIPOSTE");
+			}
+			if (Regex.IsMatch(text, "\\bMagic Resistance\\b", RegexOptions.IgnoreCase))
+			{
+				return new GrantTraitEffect("MAGIC_RESISTANCE");
 			}
 			return Regex.IsMatch(text, "Push the attacker one rank backward", RegexOptions.IgnoreCase) ? new GrantTraitEffect("SHIELD_OF_SPURNING_PUSH") : null;
 		};
