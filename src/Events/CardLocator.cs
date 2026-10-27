@@ -110,4 +110,65 @@ public static class CardLocator
 		}
 		return false;
 	}
+
+	public static int ResolvePerformerCharacterId(GameState state, int instanceId, CardDatabase? cardDb = null)
+	{
+		for (int i = 0; i < state.Players.Count; i++)
+		{
+			foreach (var (_, rankCards) in state.Players[i].Ranks)
+			{
+				for (int j = 0; j < rankCards.Count; j++)
+				{
+					if (rankCards[j].InstanceId == instanceId)
+					{
+						return instanceId;
+					}
+				}
+			}
+		}
+
+		CardInstance? card = FindCard(state, instanceId);
+		if (card.HasValue)
+		{
+			int? bearerId = card.Value.AttachedToInstanceId ?? card.Value.AttachedToId;
+			if (bearerId.HasValue)
+			{
+				for (int i = 0; i < state.Players.Count; i++)
+				{
+					foreach (var (_, rankCards) in state.Players[i].Ranks)
+					{
+						for (int j = 0; j < rankCards.Count; j++)
+						{
+							if (rankCards[j].InstanceId == bearerId.Value)
+							{
+								return bearerId.Value;
+							}
+						}
+					}
+				}
+			}
+		}
+
+		for (int i = 0; i < state.Players.Count; i++)
+		{
+			foreach (var (_, rankCards) in state.Players[i].Ranks)
+			{
+				for (int j = 0; j < rankCards.Count; j++)
+				{
+					if (rankCards[j].AttachedItemIds != null && rankCards[j].AttachedItemIds.Contains(instanceId))
+					{
+						return rankCards[j].InstanceId;
+					}
+				}
+			}
+		}
+
+		return instanceId;
+	}
+
+	public static CardInstance? ResolvePerformerCharacter(GameState state, int instanceId, CardDatabase? cardDb = null)
+	{
+		int bearerId = ResolvePerformerCharacterId(state, instanceId, cardDb);
+		return FindCard(state, bearerId);
+	}
 }

@@ -8,7 +8,11 @@ public sealed record RepositionInRankEffect : IEffect
 {
 	public IEnumerable<GameEvent> Evaluate(EffectContext context)
 	{
-		int instanceId = context.TargetInstanceId ?? context.SourceInstanceId;
+		int targetId = context.TargetInstanceId ?? context.SourceInstanceId;
+		int instanceId = (targetId == context.SourceInstanceId)
+			? context.GetPerformerCharacterId()
+			: context.GetPerformerCharacterId(targetId);
+
 		(int, int, int)? tuple = GameEngine.FindCharacterPosition(context.State, instanceId);
 		if (tuple.HasValue)
 		{

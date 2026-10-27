@@ -2,12 +2,17 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
+using WarlordEngine.Events;
 
 namespace WarlordEngine.Effects;
 
 public sealed record EffectContext
 {
 	public required int SourceInstanceId { get; init; }
+
+	public int? PerformerInstanceId { get; init; }
+
+	public int? PerformerSourceId { get; init; }
 
 	public int? TargetInstanceId { get; init; }
 
@@ -20,6 +25,25 @@ public sealed record EffectContext
 	public DiceRoller RollDice { get; init; } = (int min, int max) => Random.Shared.Next(min, max + 1);
 
 	public Action<AttackResolutionDetails>? OnAttackResolved { get; init; }
+
+	public int GetPerformerCharacterId(int? instanceId = null)
+	{
+		if (instanceId.HasValue)
+		{
+			return CardLocator.ResolvePerformerCharacterId(State, instanceId.Value, CardDb);
+		}
+		if (PerformerInstanceId.HasValue && (!PerformerSourceId.HasValue || PerformerSourceId.Value == SourceInstanceId))
+		{
+			return PerformerInstanceId.Value;
+		}
+		return CardLocator.ResolvePerformerCharacterId(State, SourceInstanceId, CardDb);
+	}
+
+	public CardInstance? GetPerformerCharacter(int? instanceId = null)
+	{
+		int id = GetPerformerCharacterId(instanceId);
+		return FindCard(id);
+	}
 
 	public CardInstance? FindCard(int instanceId)
 	{
@@ -80,6 +104,8 @@ public sealed record EffectContext
 	private EffectContext(EffectContext original)
 	{
 		SourceInstanceId = original.SourceInstanceId;
+		PerformerInstanceId = original.PerformerInstanceId;
+		PerformerSourceId = original.PerformerSourceId;
 		TargetInstanceId = original.TargetInstanceId;
 		TargetInstanceIds = original.TargetInstanceIds;
 		State = original.State;

@@ -25,7 +25,7 @@ public sealed record RedirectStrikeEffect : IEffect
 				}
 			}
 		}
-		GameEngine.AddTurnBuff(context.State, context.SourceInstanceId, "REDIRECT_TO_ME", 1);
+		GameEngine.AddTurnBuff(context.State, context.GetPerformerCharacterId(), "REDIRECT_TO_ME", 1);
 		yield break;
 	}
 }

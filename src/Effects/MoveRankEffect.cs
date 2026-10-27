@@ -8,25 +8,29 @@ public sealed record MoveRankEffect(int? DestinationRank = null, int? Delta = nu
 {
 	public IEnumerable<GameEvent> Evaluate(EffectContext context)
 	{
-		int num = context.TargetInstanceId ?? context.SourceInstanceId;
-		CardInstance? cardInstance = context.FindCard(num);
+		int targetId = context.TargetInstanceId ?? context.SourceInstanceId;
+		int movingCardId = (targetId == context.SourceInstanceId)
+			? context.GetPerformerCharacterId()
+			: context.GetPerformerCharacterId(targetId);
+
+		CardInstance? cardInstance = context.FindCard(movingCardId);
 		if (!cardInstance.HasValue)
 		{
 			yield break;
 		}
 		int ownerPlayerIndex = cardInstance.Value.OwnerPlayerIndex;
-		int? num2 = BoardGeometry.FindCardRank(context.State.Players[ownerPlayerIndex], num);
-		if (num2.HasValue)
+		int? currentRank = BoardGeometry.FindCardRank(context.State.Players[ownerPlayerIndex], movingCardId);
+		if (currentRank.HasValue)
 		{
-			int val = DestinationRank ?? (num2.Value + Delta.GetValueOrDefault());
+			int val = DestinationRank ?? (currentRank.Value + Delta.GetValueOrDefault());
 			val = Math.Max(1, val);
-			if (num2.Value != val)
+			if (currentRank.Value != val)
 			{
 				yield return new MarchEvent
 				{
 					PlayerIndex = ownerPlayerIndex,
-					CardInstanceId = num,
-					SourceRank = num2.Value,
+					CardInstanceId = movingCardId,
+					SourceRank = currentRank.Value,
 					DestinationRank = val
 				};
 			}

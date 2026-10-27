@@ -4,12 +4,16 @@ using WarlordEngine.Events;
 
 namespace WarlordEngine.Effects;
 
-public sealed record GrantAdditionalStrikeEffect(int Modifier = 0, bool IsRanged = false) : IEffect
+public sealed record GrantAdditionalStrikeEffect(int NumberOfStrikes = 1) : IEffect
 {
 	public IEnumerable<GameEvent> Evaluate(EffectContext context)
 	{
-		int instanceId = context.TargetInstanceId ?? context.SourceInstanceId;
-		GameEngine.AddTurnBuff(context.State, instanceId, "EXTRA_STRIKE", Modifier);
+		int targetId = context.TargetInstanceId ?? context.SourceInstanceId;
+		int instanceId = (targetId == context.SourceInstanceId)
+			? context.GetPerformerCharacterId()
+			: context.GetPerformerCharacterId(targetId);
+
+		GameEngine.AddTurnBuff(context.State, instanceId, "ADDITIONAL_STRIKES", NumberOfStrikes);
 		yield break;
 	}
 }

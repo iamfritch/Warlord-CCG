@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using WarlordEngine.Engine;
 using WarlordEngine.Events;
 
@@ -10,12 +11,14 @@ public sealed record PerformStrikeEffect(int StrikeBonus = 0, bool IsRanged = fa
 	public IEnumerable<GameEvent> Evaluate(EffectContext context)
 	{
 		int? targetIdOpt = context.TargetInstanceId;
+		int attackerInstanceId = context.GetPerformerCharacterId();
+		CardInstance? attacker = context.GetPerformerCharacter();
+
 		if (!targetIdOpt.HasValue)
 		{
-			CardInstance? attacker = context.FindCard(context.SourceInstanceId);
 			if (attacker.HasValue)
 			{
-				int? aRank = BoardGeometry.FindCardRank(context.State.Players[attacker.Value.OwnerPlayerIndex], attacker.Value.InstanceId);
+				int? aRank = BoardGeometry.FindCardRank(context.State.Players[attacker.Value.OwnerPlayerIndex], attackerInstanceId);
 				if (aRank.HasValue)
 				{
 					int oppIdx = 1 - attacker.Value.OwnerPlayerIndex;
@@ -45,7 +48,7 @@ public sealed record PerformStrikeEffect(int StrikeBonus = 0, bool IsRanged = fa
 							int maxMelee = HasReach ? 2 : 1;
 							if (IgnoreRange || d <= maxMelee)
 							{
-								var valid = rCards.FirstOrDefault(c => c.InstanceId != attacker.Value.InstanceId && (!TargetSpentOnly || c.ReadyState == ReadyState.Spent) && (!TargetStunnedOnly || c.ReadyState == ReadyState.Stunned) && (!TargetSpentOrStunnedOnly || c.ReadyState != ReadyState.Ready));
+								var valid = rCards.FirstOrDefault(c => c.InstanceId != attackerInstanceId && (!TargetSpentOnly || c.ReadyState == ReadyState.Spent) && (!TargetStunnedOnly || c.ReadyState == ReadyState.Stunned) && (!TargetSpentOrStunnedOnly || c.ReadyState != ReadyState.Ready));
 								if (valid.InstanceId != 0)
 								{
 									targetIdOpt = valid.InstanceId;
@@ -67,7 +70,7 @@ public sealed record PerformStrikeEffect(int StrikeBonus = 0, bool IsRanged = fa
 		{
 			yield break;
 		}
-		CardInstance? opponentCard = context.FindCard(context.SourceInstanceId);
+		CardInstance? opponentCard = attacker;
 		PassiveBonuses earlyPassiveBonuses = (opponentCard.HasValue ? GameEngine.GetContinuousPassiveBonuses(context.State, opponentCard.Value, new CombatContext { IsAttacking = true, OpponentCard = defender, IsMelee = !IsRanged, IsRanged = IsRanged }, context.CardDb) : new PassiveBonuses());
 		bool hasTrueStrike = TrueStrike || earlyPassiveBonuses.TrueStrike;
 		if (!hasTrueStrike && !IsRanged && GameEngine.HasTurnBuff(context.State, targetId, "DUPE_ACTIVE"))
@@ -206,11 +209,11 @@ public sealed record PerformStrikeEffect(int StrikeBonus = 0, bool IsRanged = fa
 		int num13 = num12 + num5;
 		bool flag4 = !flag2 && (flag3 || num13 >= num8);
 		int damageDealt = ((flag4 && !ZeroDamage) ? (1 + num9) : 0);
-		string attackerName = ((!opponentCard.HasValue || context.CardDb == null) ? $"Card #{context.SourceInstanceId}" : (context.CardDb.GetDefinition(opponentCard.Value.DefinitionId)?.Name ?? $"Card #{context.SourceInstanceId}"));
+		string attackerName = ((!opponentCard.HasValue || context.CardDb == null) ? $"Card #{attackerInstanceId}" : (context.CardDb.GetDefinition(opponentCard.Value.DefinitionId)?.Name ?? $"Card #{attackerInstanceId}"));
 		string defenderName = definition3?.Name ?? $"Card #{targetId}";
 		AttackResolutionDetails obj = new AttackResolutionDetails
 		{
-			AttackerInstanceId = context.SourceInstanceId,
+			AttackerInstanceId = attackerInstanceId,
 			DefenderInstanceId = targetId,
 			AttackerName = attackerName,
 			DefenderName = defenderName,

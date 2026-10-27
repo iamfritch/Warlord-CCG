@@ -11,7 +11,7 @@ public sealed record PreventWoundsEffect(int Amount = 1, bool WoundSelf = false)
 		{
 			yield return new DealDamageEvent
 			{
-				TargetInstanceId = context.SourceInstanceId,
+				TargetInstanceId = context.GetPerformerCharacterId(),
 				Amount = 1,
 				DamageType = "physical"
 			};

@@ -7,7 +7,11 @@ public sealed record ChangeReadyStateEffect(ReadyState TargetState, bool OnlyIfS
 {
 	public IEnumerable<GameEvent> Evaluate(EffectContext context)
 	{
-		int num = context.TargetInstanceId ?? context.SourceInstanceId;
+		int targetId = context.TargetInstanceId ?? context.SourceInstanceId;
+		int num = (targetId == context.SourceInstanceId)
+			? context.GetPerformerCharacterId()
+			: context.GetPerformerCharacterId(targetId);
+
 		CardInstance? cardInstance = context.FindCard(num);
 		if (cardInstance.HasValue && (!OnlyIfStunned || cardInstance.Value.ReadyState == ReadyState.Stunned))
 		{

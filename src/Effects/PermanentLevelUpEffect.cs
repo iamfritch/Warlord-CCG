@@ -7,7 +7,11 @@ public sealed record PermanentLevelUpEffect(int LevelBonus = 1, int AtkBonus = 3
 {
 	public IEnumerable<GameEvent> Evaluate(EffectContext context)
 	{
-		int instanceId = context.TargetInstanceId ?? context.SourceInstanceId;
+		int targetId = context.TargetInstanceId ?? context.SourceInstanceId;
+		int instanceId = (targetId == context.SourceInstanceId)
+			? context.GetPerformerCharacterId()
+			: context.GetPerformerCharacterId(targetId);
+
 		CardLocator.FindAndMutate(context.State, instanceId, delegate(ref CardInstance c)
 		{
 			c.CurrentArmorClass += AcBonus;

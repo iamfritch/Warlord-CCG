@@ -9,7 +9,11 @@ public sealed record HealEffect(int Amount = 1) : IEffect
 {
 	public IEnumerable<GameEvent> Evaluate(EffectContext context)
 	{
-		int num = context.TargetInstanceId ?? context.SourceInstanceId;
+		int targetId = context.TargetInstanceId ?? context.SourceInstanceId;
+		int num = (targetId == context.SourceInstanceId)
+			? context.GetPerformerCharacterId()
+			: context.GetPerformerCharacterId(targetId);
+
 		CardInstance? cardInstance = context.FindCard(num);
 		if (cardInstance.HasValue)
 		{

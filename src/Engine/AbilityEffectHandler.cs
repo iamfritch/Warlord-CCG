@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using WarlordEngine.Abilities;
 using WarlordEngine.Effects;
 using WarlordEngine.Events;
@@ -31,7 +32,7 @@ public sealed class AbilityEffectHandler : IPostResolutionHandler
 		if (ability.Effects.Any(e => e is TargetPerformsStrikeEffect))
 		{
 			int primaryTarget = activated.TargetInstanceIds.Length > 0 ? activated.TargetInstanceIds[0] : activated.SourceInstanceId;
-			EffectContext context = BuildContext(activated.SourceInstanceId, primaryTarget, state, activated.TargetInstanceIds);
+			EffectContext context = BuildContext(activated.SourceInstanceId, primaryTarget, state, activated.TargetInstanceIds, activated.PerformerInstanceId);
 			foreach (IEffect effect in ability.Effects)
 			{
 				foreach (GameEvent item in effect.Evaluate(context))
@@ -43,7 +44,7 @@ public sealed class AbilityEffectHandler : IPostResolutionHandler
 		}
 		if (activated.TargetInstanceIds.Length == 0)
 		{
-			EffectContext context = BuildContext(activated.SourceInstanceId, null, state, activated.TargetInstanceIds);
+			EffectContext context = BuildContext(activated.SourceInstanceId, null, state, activated.TargetInstanceIds, activated.PerformerInstanceId);
 			foreach (IEffect effect in ability.Effects)
 			{
 				foreach (GameEvent item in effect.Evaluate(context))
@@ -56,7 +57,7 @@ public sealed class AbilityEffectHandler : IPostResolutionHandler
 		int[] targetInstanceIds = activated.TargetInstanceIds;
 		foreach (int value in targetInstanceIds)
 		{
-			EffectContext context = BuildContext(activated.SourceInstanceId, value, state, activated.TargetInstanceIds);
+			EffectContext context = BuildContext(activated.SourceInstanceId, value, state, activated.TargetInstanceIds, activated.PerformerInstanceId);
 			foreach (IEffect effect2 in ability.Effects)
 			{
 				foreach (GameEvent item2 in effect2.Evaluate(context))
@@ -67,17 +68,14 @@ public sealed class AbilityEffectHandler : IPostResolutionHandler
 		}
 	}
 
-	private EffectContext BuildContext(int sourceId, int? targetId, GameState state, IReadOnlyList<int>? targetIds = null)
+	private EffectContext BuildContext(int sourceId, int? targetId, GameState state, IReadOnlyList<int>? targetIds = null, int? performerId = null)
 	{
-		int sourceInstanceId = sourceId;
-		CardInstance? cardInstance = CardLocator.FindCard(state, sourceId);
-		if (cardInstance.HasValue && cardInstance.Value.AttachedToInstanceId.HasValue)
-		{
-			sourceInstanceId = cardInstance.Value.AttachedToInstanceId.Value;
-		}
+		int resolvedPerformerId = performerId ?? CardLocator.ResolvePerformerCharacterId(state, sourceId, _cardDb);
 		return new EffectContext
 		{
-			SourceInstanceId = sourceInstanceId,
+			SourceInstanceId = sourceId,
+			PerformerInstanceId = resolvedPerformerId,
+			PerformerSourceId = sourceId,
 			TargetInstanceId = targetId,
 			TargetInstanceIds = targetIds,
 			State = state,

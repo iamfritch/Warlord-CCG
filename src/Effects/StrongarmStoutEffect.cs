@@ -22,12 +22,16 @@ public sealed record StrongarmStoutEffect : IEffect
 				cardsDrawn++;
 			}
 		}
-		int instanceId = context.TargetInstanceId ?? context.SourceInstanceId;
+		int targetId = context.TargetInstanceId ?? context.SourceInstanceId;
+		int characterId = (targetId == context.SourceInstanceId)
+			? context.GetPerformerCharacterId()
+			: context.GetPerformerCharacterId(targetId);
+
 		if (cardsDrawn > 0)
 		{
-			GameEngine.AddTurnBuff(context.State, instanceId, "ATK", 2 * cardsDrawn);
-			GameEngine.AddTurnBuff(context.State, instanceId, "HP", cardsDrawn);
-			CardLocator.FindAndMutate(context.State, instanceId, delegate(ref CardInstance c)
+			GameEngine.AddTurnBuff(context.State, characterId, "ATK", 2 * cardsDrawn);
+			GameEngine.AddTurnBuff(context.State, characterId, "HP", cardsDrawn);
+			CardLocator.FindAndMutate(context.State, characterId, delegate(ref CardInstance c)
 			{
 				c.CurrentHitPoints += cardsDrawn;
 			});

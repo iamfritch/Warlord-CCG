@@ -79,6 +79,13 @@ public class BucketBSacrificeAndCostsTests
 	{
 		foreach (PlayerState player in state.Players)
 		{
+			foreach (CardInstance itemAttached in player.AttachedItems)
+			{
+				if (itemAttached.InstanceId == instanceId)
+				{
+					return itemAttached;
+				}
+			}
 			foreach (List<CardInstance> value4 in player.Ranks.Values)
 			{
 				CardInstance value = value4.FirstOrDefault((CardInstance x) => x.InstanceId == instanceId);
@@ -166,7 +173,7 @@ public class BucketBSacrificeAndCostsTests
 	}
 
 	[Fact]
-	public void BurningScroll_DestroysItemOnSpend_AndPerformsRangedStrike()
+	public void BurningScroll_SpendsItemOnSpend_AndPerformsRangedStrike()
 	{
 		GameState gameState = CreateInitialState();
 		CardDefinition def = GetDef("Novice Pyro");
@@ -177,12 +184,13 @@ public class BucketBSacrificeAndCostsTests
 		item.AttachedItemIds.Add(11);
 		CardInstance item3 = CreateCharacterInstance(def3, 20, 1, 1);
 		gameState.Players[0].Ranks[1].Add(item);
-		gameState.Players[0].DiscardPile.Add(item2);
+		gameState.Players[0].AttachedItems.Add(item2);
 		gameState.Players[1].Ranks[1].Add(item3);
 		GameEngine gameEngine = new GameEngine(gameState, _cardDb, (int count, int sides) => 20);
 		Assert.NotEmpty(def2.Abilities);
 		AbilityDefinition abilityDefinition = def2.Abilities[0];
-		Assert.True(abilityDefinition.DestroysSource);
+		Assert.False(abilityDefinition.DestroysSource);
+		Assert.True(abilityDefinition.RequiresSpend);
 		UseAbilityAction action = new UseAbilityAction
 		{
 			PlayerIndex = 0,
@@ -196,12 +204,13 @@ public class BucketBSacrificeAndCostsTests
 		Assert.True(actionResult2.IsSuccess, string.Join(", ", actionResult2.Errors));
 		CardInstance? value = FindCardInState(gameState, 11);
 		Assert.NotNull(value);
-		Assert.Equal(CardZone.Discard, value.Value.Zone);
-		Assert.Null(value.Value.AttachedToInstanceId);
+		Assert.Equal(CardZone.Attached, value.Value.Zone);
+		Assert.Equal(ReadyState.Spent, value.Value.ReadyState);
+		Assert.Equal(10, value.Value.AttachedToInstanceId);
 		CardInstance? value2 = FindCardInState(gameState, 10);
 		Assert.NotNull(value2);
-		Assert.DoesNotContain(11, value2.Value.AttachedItemIds);
-		Assert.Contains(gameState.Players[0].DiscardPile, (CardInstance c) => c.InstanceId == 11);
+		Assert.Contains(11, value2.Value.AttachedItemIds);
+		Assert.Contains(gameState.Players[0].AttachedItems, (CardInstance c) => c.InstanceId == 11);
 	}
 
 	[Fact]

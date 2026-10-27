@@ -221,7 +221,7 @@ public static class RulesParser
 		{
 			return null;
 		}
-		bool destroysSource = text2.StartsWith("Destroy", StringComparison.OrdinalIgnoreCase) || Regex.IsMatch(text3, "^Destroy\\s+this\\s+(?:item|card):\\s*", RegexOptions.IgnoreCase) || Regex.IsMatch(text3, "^Discard\\s+this\\s+(?:item|card):\\s*", RegexOptions.IgnoreCase) || Regex.IsMatch(text, "\\bSpend\\s+(?:Burning Scroll|Hod's Legacy|Hunting Staff)\\b", RegexOptions.IgnoreCase) || (cardName != null && (cardName.Equals("Burning Scroll", StringComparison.OrdinalIgnoreCase) || cardName.Equals("Hod's Legacy", StringComparison.OrdinalIgnoreCase) || cardName.Equals("Hunting Staff", StringComparison.OrdinalIgnoreCase) || cardName.Equals("Strongarm Stout", StringComparison.OrdinalIgnoreCase)));
+		bool destroysSource = text2.StartsWith("Destroy", StringComparison.OrdinalIgnoreCase) || Regex.IsMatch(text3, "^Destroy\\s+this\\s+(?:item|card):\\s*", RegexOptions.IgnoreCase) || Regex.IsMatch(text3, "^Discard\\s+this\\s+(?:item|card):\\s*", RegexOptions.IgnoreCase) || Regex.IsMatch(text, "\\bSpend\\s+(?:Hod's Legacy|Hunting Staff)\\b", RegexOptions.IgnoreCase) || (cardName != null && (cardName.Equals("Hod's Legacy", StringComparison.OrdinalIgnoreCase) || cardName.Equals("Hunting Staff", StringComparison.OrdinalIgnoreCase) || cardName.Equals("Strongarm Stout", StringComparison.OrdinalIgnoreCase)));
 		if (Regex.IsMatch(text3, "^Destroy\\s+this\\s+(?:item|card):\\s*", RegexOptions.IgnoreCase))
 		{
 			text3 = Regex.Replace(text3, "^Destroy\\s+this\\s+(?:item|card):\\s*", "", RegexOptions.IgnoreCase);

@@ -1663,7 +1663,11 @@ public sealed class GameEngine
 			}
 			return true;
 		}
-		int num = sourceCard.Rank ?? 1;
+		int performerId = ResolvePerformerCharacterId(state, sourceCard.InstanceId, _cardDb);
+		CardInstance performerCard = (performerId == sourceCard.InstanceId)
+			? sourceCard
+			: (FindBoardCard(state, performerId) ?? CardLocator.FindCard(state, performerId) ?? sourceCard);
+		int num = performerCard.Rank ?? 1;
 		switch (ability.Timing)
 		{
 		case ReactTiming.AfterMove:
@@ -1672,7 +1676,7 @@ public sealed class GameEngine
 				failureReason = "Ability triggers after a move, but no move event is pending.";
 				return false;
 			}
-			if (ability.TargetScope == TargetScope.Self && marchEvent.CardInstanceId != sourceCard.InstanceId)
+			if (ability.TargetScope == TargetScope.Self && marchEvent.CardInstanceId != performerId)
 			{
 				failureReason = "This character did not move.";
 				return false;
@@ -1680,7 +1684,7 @@ public sealed class GameEngine
 			if (ability.TargetScope == TargetScope.Opposing)
 			{
 				CardInstance? cardInstance2 = FindBoardCard(state, marchEvent.CardInstanceId);
-				if (!cardInstance2.HasValue || cardInstance2.Value.OwnerPlayerIndex == sourceCard.OwnerPlayerIndex)
+				if (!cardInstance2.HasValue || cardInstance2.Value.OwnerPlayerIndex == performerCard.OwnerPlayerIndex)
 				{
 					failureReason = "Moving character is not an opponent.";
 					return false;
@@ -1689,7 +1693,7 @@ public sealed class GameEngine
 			if (ability.TargetScope == TargetScope.Friendly)
 			{
 				CardInstance? cardInstance3 = FindBoardCard(state, marchEvent.CardInstanceId);
-				if (!cardInstance3.HasValue || cardInstance3.Value.OwnerPlayerIndex != sourceCard.OwnerPlayerIndex)
+				if (!cardInstance3.HasValue || cardInstance3.Value.OwnerPlayerIndex != performerCard.OwnerPlayerIndex)
 				{
 					failureReason = "Moving character is not friendly.";
 					return false;
@@ -1703,7 +1707,7 @@ public sealed class GameEngine
 				failureReason = "Ability triggers on suffering wounds, but no damage event is pending.";
 				return false;
 			}
-			if (ability.TargetScope == TargetScope.Self && dealDamageEvent.TargetInstanceId != sourceCard.InstanceId)
+			if (ability.TargetScope == TargetScope.Self && dealDamageEvent.TargetInstanceId != performerId)
 			{
 				failureReason = "This character is not suffering wounds.";
 				return false;
@@ -1711,7 +1715,7 @@ public sealed class GameEngine
 			if (ability.TargetScope == TargetScope.SameRank)
 			{
 				CardInstance? cardInstance4 = FindBoardCard(state, dealDamageEvent.TargetInstanceId);
-				if (!cardInstance4.HasValue || (cardInstance4.Value.Rank ?? 1) != num || cardInstance4.Value.OwnerPlayerIndex != sourceCard.OwnerPlayerIndex)
+				if (!cardInstance4.HasValue || (cardInstance4.Value.Rank ?? 1) != num || cardInstance4.Value.OwnerPlayerIndex != performerCard.OwnerPlayerIndex)
 				{
 					failureReason = "The character suffering wounds is not in the same rank.";
 					return false;
@@ -1724,7 +1728,7 @@ public sealed class GameEngine
 				failureReason = "Ability triggers before a strike roll, but no attack is pending.";
 				return false;
 			}
-			if (ability.TargetScope == TargetScope.Self && declareAttackEvent2.AttackerInstanceId != sourceCard.InstanceId)
+			if (ability.TargetScope == TargetScope.Self && declareAttackEvent2.AttackerInstanceId != performerId)
 			{
 				failureReason = "This character is not performing the strike.";
 				return false;
@@ -1745,7 +1749,7 @@ public sealed class GameEngine
 				failureReason = "Ability triggers when targeted with a strike, but no attack is pending.";
 				return false;
 			}
-			if (ability.TargetScope == TargetScope.Self && declareAttackEvent4.DefenderInstanceId != sourceCard.InstanceId)
+			if (ability.TargetScope == TargetScope.Self && declareAttackEvent4.DefenderInstanceId != performerId)
 			{
 				failureReason = "This character is not the target of the strike.";
 				return false;
@@ -1784,7 +1788,7 @@ public sealed class GameEngine
 				failureReason = "Ability triggers after attack, but no attack is pending.";
 				return false;
 			}
-			if (ability.TargetScope == TargetScope.Self && declareAttackEvent3.AttackerInstanceId != sourceCard.InstanceId)
+			if (ability.TargetScope == TargetScope.Self && declareAttackEvent3.AttackerInstanceId != performerId)
 			{
 				failureReason = "This character did not perform the attack.";
 				return false;
@@ -1964,7 +1968,8 @@ public sealed class GameEngine
 
 	private IEnumerable<int[]> EnumerateAbilityTargets(GameState state, int playerId, int sourceInstanceId, AbilityDefinition ability)
 	{
-		CardInstance? cardInstance = FindBoardCard(state, sourceInstanceId);
+		int performerId = ResolvePerformerCharacterId(state, sourceInstanceId, _cardDb);
+		CardInstance? cardInstance = FindBoardCard(state, performerId);
 		if (!cardInstance.HasValue)
 		{
 			yield break;
@@ -1973,13 +1978,14 @@ public sealed class GameEngine
 		if (ability.IsReact)
 		{
 			GameEvent topPendingEvent = GetTopPendingEvent(state);
-			if (topPendingEvent is MarchEvent me && me.CardInstanceId == sourceInstanceId)
+			if (topPendingEvent is MarchEvent me && (me.CardInstanceId == sourceInstanceId || me.CardInstanceId == performerId))
 			{
 				sourceRank = me.DestinationRank;
 			}
 			if (topPendingEvent != null)
 			{
-				if (!IsReactTimingAndConditionMet(ability, cardInstance.Value, state, null, out string _))
+				CardInstance? sourceCard = CardLocator.FindCard(state, sourceInstanceId) ?? cardInstance;
+				if (!IsReactTimingAndConditionMet(ability, sourceCard.Value, state, null, out string _))
 				{
 					yield break;
 				}
@@ -2079,7 +2085,7 @@ public sealed class GameEngine
 		}
 		if (ability.TargetScope == TargetScope.Self && !ability.Effects.Any((IEffect e) => (e is PerformStrikeEffect || e is DealDamageEffect || e is ResolveAttackEffect) ? true : false))
 		{
-			yield return new int[1] { sourceInstanceId };
+			yield return new int[1] { performerId };
 			yield break;
 		}
 		if (ability.Description?.Contains("wounded Dwarven Forges character", StringComparison.OrdinalIgnoreCase) ?? false)
@@ -2245,7 +2251,7 @@ public sealed class GameEngine
 					{
 						foreach (var ally in rCards)
 						{
-							if (ally.InstanceId != sourceInstanceId)
+							if (ally.InstanceId != performerId)
 							{
 								yielded = true;
 								yield return new int[1] { ally.InstanceId };
@@ -3504,28 +3510,16 @@ public sealed class GameEngine
 		CardInstance? cardInstance2 = null;
 		if (!cardInstance.HasValue)
 		{
-			foreach (PlayerState player2 in state.Players)
+			CardInstance? maybeItem = CardLocator.FindCard(state, useAbility.SourceInstanceId);
+			if (maybeItem.HasValue)
 			{
-				foreach (List<CardInstance> value2 in player2.Ranks.Values)
+				int bearerId = ResolvePerformerCharacterId(state, useAbility.SourceInstanceId, _cardDb);
+				CardInstance? bearer = FindBoardCard(state, bearerId);
+				if (bearer.HasValue)
 				{
-					foreach (CardInstance item3 in value2)
-					{
-						if (item3.AttachedItemIds.Contains(useAbility.SourceInstanceId))
-						{
-							cardInstance2 = item3;
-							cardInstance = CardLocator.FindCard(state, useAbility.SourceInstanceId);
-							num = player2.PlayerIndex;
-							break;
-						}
-					}
-					if (cardInstance.HasValue)
-					{
-						break;
-					}
-				}
-				if (cardInstance.HasValue)
-				{
-					break;
+					cardInstance2 = bearer;
+					cardInstance = maybeItem;
+					num = bearer.Value.OwnerPlayerIndex;
 				}
 			}
 		}
@@ -3656,7 +3650,8 @@ public sealed class GameEngine
 		}
 		if (abilityDefinition.RequiresSpendAdjacentAlly)
 		{
-			(int, int, int)? tuple = FindCharacterPosition(state, useAbility.SourceInstanceId);
+			int performerId = ResolvePerformerCharacterId(state, useAbility.SourceInstanceId, _cardDb);
+			(int, int, int)? tuple = FindCharacterPosition(state, performerId);
 			if (!tuple.HasValue)
 			{
 				list.Add("Caster position not found.");
@@ -3693,7 +3688,8 @@ public sealed class GameEngine
 		}
 		if (abilityDefinition.RequiresSpendAllyInRank)
 		{
-			(int, int, int)? tuple2 = FindCharacterPosition(state, useAbility.SourceInstanceId);
+			int performerId = ResolvePerformerCharacterId(state, useAbility.SourceInstanceId, _cardDb);
+			(int, int, int)? tuple2 = FindCharacterPosition(state, performerId);
 			if (!tuple2.HasValue)
 			{
 				list.Add("Caster position not found.");
@@ -3706,14 +3702,14 @@ public sealed class GameEngine
 				{
 					int costId2 = useAbility.CostCharacterInstanceId.Value;
 					int num5 = list3.FindIndex((CardInstance c) => c.InstanceId == costId2);
-					if (num5 >= 0 && list3[num5].InstanceId != useAbility.SourceInstanceId && list3[num5].ReadyState == ReadyState.Ready)
+					if (num5 >= 0 && list3[num5].InstanceId != performerId && list3[num5].ReadyState == ReadyState.Ready)
 					{
 						flag2 = true;
 					}
 				}
 				else
 				{
-					flag2 = list3.Any((CardInstance c) => c.InstanceId != useAbility.SourceInstanceId && c.ReadyState == ReadyState.Ready);
+					flag2 = list3.Any((CardInstance c) => c.InstanceId != performerId && c.ReadyState == ReadyState.Ready);
 				}
 				if (!flag2)
 				{
@@ -4266,10 +4262,11 @@ public sealed class GameEngine
 												});
 											}
 										}
+										int performerId = ResolvePerformerCharacterId(_state, useAbilityAction.SourceInstanceId, _cardDb);
 										if (abilityDefinition.RequiresSpendAdjacentAlly || abilityDefinition.RequiresSpendAllyInRank)
 										{
 											int? num2 = useAbilityAction.CostCharacterInstanceId;
-											(int, int, int)? tuple = FindCharacterPosition(_state, useAbilityAction.SourceInstanceId);
+											(int, int, int)? tuple = FindCharacterPosition(_state, performerId);
 											if (tuple.HasValue)
 											{
 												List<CardInstance> list = _state.Players[tuple.Value.Item1].Ranks[tuple.Value.Item2];
@@ -4277,7 +4274,7 @@ public sealed class GameEngine
 												{
 													foreach (CardInstance item7 in list)
 													{
-														if (item7.InstanceId != useAbilityAction.SourceInstanceId && item7.ReadyState == ReadyState.Ready && (!abilityDefinition.RequiresSpendAdjacentAlly || Math.Abs(list.IndexOf(item7) - tuple.Value.Item3) == 1))
+														if (item7.InstanceId != performerId && item7.ReadyState == ReadyState.Ready && (!abilityDefinition.RequiresSpendAdjacentAlly || Math.Abs(list.IndexOf(item7) - tuple.Value.Item3) == 1))
 														{
 															num2 = item7.InstanceId;
 															break;
@@ -4303,9 +4300,9 @@ public sealed class GameEngine
 											}).Take(abilityDefinition.BanishActionFromDiscardCost).ToList())
 											{
 												playerState2.DiscardPile.RemoveAll((CardInstance c) => c.InstanceId == ac.InstanceId);
-												CardLocator.FindAndMutate(_state, ac.InstanceId, delegate(ref CardInstance c)
+												playerState2.BanishPile.Add(ac with
 												{
-													c.Zone = CardZone.Banished;
+													Zone = CardZone.Banished
 												});
 											}
 										}
@@ -4335,7 +4332,7 @@ public sealed class GameEngine
 												c.ReadyState = ReadyState.Stunned;
 											});
 										}
-										if (abilityDefinition.DestroysSource || Regex.IsMatch(abilityDefinition.Description ?? "", "\\b(?:Destroy|Discard|Sacrifice)\\s+(?:this\\s+item|this\\s+card)\\b", RegexOptions.IgnoreCase) || (definition != null && definition.Type == CardType.Item && (Regex.IsMatch(definition.RulesText, "\\b(?:Destroy|Discard)\\s+(?:this\\s+item|Order:)\\b", RegexOptions.IgnoreCase) || Regex.IsMatch(abilityDefinition.Description ?? "", "\\bSpend\\s+(?:Burning Scroll|Hod's Legacy|Hunting Staff)\\b", RegexOptions.IgnoreCase) || definition.Name.Equals("Burning Scroll", StringComparison.OrdinalIgnoreCase) || definition.Name.Equals("Hod's Legacy", StringComparison.OrdinalIgnoreCase) || definition.Name.Equals("Hunting Staff", StringComparison.OrdinalIgnoreCase) || definition.Name.Equals("Strongarm Stout", StringComparison.OrdinalIgnoreCase))))
+										if (abilityDefinition.DestroysSource || Regex.IsMatch(abilityDefinition.Description ?? "", "\\b(?:Destroy|Discard|Sacrifice)\\s+(?:this\\s+item|this\\s+card)\\b", RegexOptions.IgnoreCase) || (definition != null && definition.Type == CardType.Item && (Regex.IsMatch(definition.RulesText, "\\b(?:Destroy|Discard)\\s+(?:this\\s+item|Order:)\\b", RegexOptions.IgnoreCase) || Regex.IsMatch(abilityDefinition.Description ?? "", "\\bSpend\\s+(?:Hod's Legacy|Hunting Staff)\\b", RegexOptions.IgnoreCase) || definition.Name.Equals("Hod's Legacy", StringComparison.OrdinalIgnoreCase) || definition.Name.Equals("Hunting Staff", StringComparison.OrdinalIgnoreCase) || definition.Name.Equals("Strongarm Stout", StringComparison.OrdinalIgnoreCase))))
 										{
 											foreach (PlayerState player2 in _state.Players)
 											{
@@ -4389,7 +4386,7 @@ public sealed class GameEngine
 											}
 											else if (definition.Name.Equals("Shannon the Daring", StringComparison.OrdinalIgnoreCase))
 											{
-												(int, int, int)? tuple2 = FindCharacterPosition(_state, useAbilityAction.SourceInstanceId);
+												(int, int, int)? tuple2 = FindCharacterPosition(_state, performerId);
 												if (tuple2.HasValue)
 												{
 													int item2 = tuple2.Value.Item1;
@@ -4431,7 +4428,7 @@ public sealed class GameEngine
 											}
 											else if (definition.Name.Equals("Albrecht Novice", StringComparison.OrdinalIgnoreCase))
 											{
-												(int, int, int)? tuple4 = FindCharacterPosition(_state, useAbilityAction.SourceInstanceId);
+												(int, int, int)? tuple4 = FindCharacterPosition(_state, performerId);
 												if (tuple4.HasValue)
 												{
 													List<CardInstance> list3 = _state.Players[tuple4.Value.Item1].Ranks[tuple4.Value.Item2];
@@ -4451,6 +4448,7 @@ public sealed class GameEngine
 										_resolver.Push(new AbilityActivatedEvent
 										{
 											SourceInstanceId = useAbilityAction.SourceInstanceId,
+											PerformerInstanceId = performerId,
 											AbilityIndex = abilityIdx,
 											TargetInstanceIds = useAbilityAction.TargetInstanceIds,
 											Ability = abilityDefinition,
@@ -5092,6 +5090,16 @@ public sealed class GameEngine
 			}
 		}
 		return num;
+	}
+
+	public static int ResolvePerformerCharacterId(GameState state, int instanceId, CardDatabase? cardDb = null)
+	{
+		return CardLocator.ResolvePerformerCharacterId(state, instanceId, cardDb);
+	}
+
+	public static CardInstance? ResolvePerformerCharacter(GameState state, int instanceId, CardDatabase? cardDb = null)
+	{
+		return CardLocator.ResolvePerformerCharacter(state, instanceId, cardDb);
 	}
 
 	public static (int PlayerIndex, int Rank, int Index)? FindCharacterPosition(GameState state, int instanceId)
