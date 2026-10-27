@@ -104,7 +104,7 @@ The repository consists of a core CCG engine library, an interactive CLI front-e
   - `DeepClone()`: Creates an isolated, deep copy for simulation/MCTS.
 
 #### `src/CardType.cs`
-- **Purpose**: Card category enum (`Character`, `Action`, `Item`, `Warlord`).
+- **Purpose**: Card category enum (`Character`, `Action`, `Item`, `Token`).
 
 #### `src/CardZone.cs`
 - **Purpose**: Enumeration of zones (`Deck`, `Hand`, `InPlay`, `DiscardPile`, `BanishPile`).
