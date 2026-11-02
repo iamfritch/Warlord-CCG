@@ -18,14 +18,4 @@ public sealed record RollD20Event : GameEvent
 		return state;
 	}
 
-	[CompilerGenerated]
-	[SetsRequiredMembers]
-	private RollD20Event(RollD20Event original)
-		: base(original)
-	{
-		SourceInstanceId = original.SourceInstanceId;
-		TargetDC = original.TargetDC;
-		Bonus = original.Bonus;
-		RollResult = original.RollResult;
-	}
 }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -63,7 +63,7 @@ public sealed partial class GameEngine
 		CardInstance performerCard = (performerId == sourceCard.InstanceId)
 			? sourceCard
 			: (FindBoardCard(state, performerId) ?? CardLocator.FindCard(state, performerId) ?? sourceCard);
-		int num = performerCard.Rank ?? 1;
+		int performerRank = performerCard.Rank ?? 1;
 		switch (ability.Timing)
 		{
 		case ReactTiming.AfterMove:
@@ -79,15 +79,15 @@ public sealed partial class GameEngine
 			}
 			if (ability.TargetScope == TargetScope.Opposing)
 			{
-				CardInstance? cardInstance2 = FindBoardCard(state, marchEvent.CardInstanceId);
-				if (!cardInstance2.HasValue || cardInstance2.Value.OwnerPlayerIndex == performerCard.OwnerPlayerIndex)
+				CardInstance? movedCard = FindBoardCard(state, marchEvent.CardInstanceId);
+				if (!movedCard.HasValue || movedCard.Value.OwnerPlayerIndex == performerCard.OwnerPlayerIndex)
 				{
 					failureReason = "Moving character is not an opponent.";
 					return false;
 				}
 				if (ability.MaxRankDistance.HasValue)
 				{
-					int crossDist = BoardGeometry.GetCrossBoardDistance(num, marchEvent.DestinationRank);
+					int crossDist = BoardGeometry.GetCrossBoardDistance(performerRank, marchEvent.DestinationRank);
 					if (crossDist > ability.MaxRankDistance.Value)
 					{
 						failureReason = $"Moved character is not within {ability.MaxRankDistance.Value} ranks.";
@@ -102,8 +102,8 @@ public sealed partial class GameEngine
 			}
 			if (ability.TargetScope == TargetScope.Friendly)
 			{
-				CardInstance? cardInstance3 = FindBoardCard(state, marchEvent.CardInstanceId);
-				if (!cardInstance3.HasValue || cardInstance3.Value.OwnerPlayerIndex != performerCard.OwnerPlayerIndex)
+				CardInstance? movedCard = FindBoardCard(state, marchEvent.CardInstanceId);
+				if (!movedCard.HasValue || movedCard.Value.OwnerPlayerIndex != performerCard.OwnerPlayerIndex)
 				{
 					failureReason = "Moving character is not friendly.";
 					return false;
@@ -124,8 +124,8 @@ public sealed partial class GameEngine
 			}
 			if (ability.TargetScope == TargetScope.SameRank)
 			{
-				CardInstance? cardInstance4 = FindBoardCard(state, dealDamageEvent.TargetInstanceId);
-				if (!cardInstance4.HasValue || (cardInstance4.Value.Rank ?? 1) != num || cardInstance4.Value.OwnerPlayerIndex != performerCard.OwnerPlayerIndex)
+				CardInstance? damageTargetCard = FindBoardCard(state, dealDamageEvent.TargetInstanceId);
+				if (!damageTargetCard.HasValue || (damageTargetCard.Value.Rank ?? 1) != performerRank || damageTargetCard.Value.OwnerPlayerIndex != performerCard.OwnerPlayerIndex)
 				{
 					failureReason = "The character suffering wounds is not in the same rank.";
 					return false;
@@ -145,8 +145,8 @@ public sealed partial class GameEngine
 			}
 			if (ability.TargetScope == TargetScope.WithinRankDistance && ability.MaxRankDistance.HasValue)
 			{
-				CardInstance? cardInstance5 = FindBoardCard(state, declareAttackEvent2.AttackerInstanceId);
-				if (!cardInstance5.HasValue || Math.Abs((cardInstance5.Value.Rank ?? 1) - num) > ability.MaxRankDistance.Value)
+				CardInstance? attackerCard = FindBoardCard(state, declareAttackEvent2.AttackerInstanceId);
+				if (!attackerCard.HasValue || Math.Abs((attackerCard.Value.Rank ?? 1) - performerRank) > ability.MaxRankDistance.Value)
 				{
 					failureReason = $"Attacker is not within {ability.MaxRankDistance.Value} ranks.";
 					return false;
@@ -166,7 +166,7 @@ public sealed partial class GameEngine
 			}
 			if (Regex.IsMatch(ability.Description ?? "", "\\bmove\\s+to\\s+a\\s+different\\s+position\\s+in\\s+this\\s+rank\\b", RegexOptions.IgnoreCase))
 			{
-				if (!state.Players[sourceCard.OwnerPlayerIndex].Ranks.TryGetValue(num, out var rankCards) || rankCards.Count <= 1)
+				if (!state.Players[sourceCard.OwnerPlayerIndex].Ranks.TryGetValue(performerRank, out var rankCards) || rankCards.Count <= 1)
 				{
 					failureReason = "Character must be in a rank with at least one other character to move to a different position in this rank.";
 					return false;
@@ -174,8 +174,8 @@ public sealed partial class GameEngine
 			}
 			if (ability.TargetScope == TargetScope.OtherInSameRank)
 			{
-				CardInstance? cardInstance9 = FindBoardCard(state, declareAttackEvent4.DefenderInstanceId);
-				if (!cardInstance9.HasValue || (cardInstance9.Value.Rank ?? 1) != num || cardInstance9.Value.InstanceId == sourceCard.InstanceId || cardInstance9.Value.OwnerPlayerIndex != sourceCard.OwnerPlayerIndex)
+				CardInstance? defenderCard = FindBoardCard(state, declareAttackEvent4.DefenderInstanceId);
+				if (!defenderCard.HasValue || (defenderCard.Value.Rank ?? 1) != performerRank || defenderCard.Value.InstanceId == sourceCard.InstanceId || defenderCard.Value.OwnerPlayerIndex != sourceCard.OwnerPlayerIndex)
 				{
 					failureReason = "Defender is not another character in this rank.";
 					return false;
@@ -183,8 +183,8 @@ public sealed partial class GameEngine
 			}
 			if (ability.TargetScope == TargetScope.WithinRankDistance && ability.MaxRankDistance.HasValue)
 			{
-				CardInstance? cardInstance10 = FindBoardCard(state, declareAttackEvent4.DefenderInstanceId);
-				if (!cardInstance10.HasValue || Math.Abs((cardInstance10.Value.Rank ?? 1) - num) > ability.MaxRankDistance.Value)
+				CardInstance? defenderCard = FindBoardCard(state, declareAttackEvent4.DefenderInstanceId);
+				if (!defenderCard.HasValue || Math.Abs((defenderCard.Value.Rank ?? 1) - performerRank) > ability.MaxRankDistance.Value)
 				{
 					failureReason = $"Target is not within {ability.MaxRankDistance.Value} ranks.";
 					return false;
@@ -222,8 +222,8 @@ public sealed partial class GameEngine
 			}
 			if (ability.TargetScope == TargetScope.SameRank)
 			{
-				CardInstance? cardInstance6 = FindBoardCard(state, declareAttackEvent3.DefenderInstanceId);
-				if (!cardInstance6.HasValue || (cardInstance6.Value.Rank ?? 1) != num || cardInstance6.Value.OwnerPlayerIndex != sourceCard.OwnerPlayerIndex)
+				CardInstance? defenderCard = FindBoardCard(state, declareAttackEvent3.DefenderInstanceId);
+				if (!defenderCard.HasValue || (defenderCard.Value.Rank ?? 1) != performerRank || defenderCard.Value.OwnerPlayerIndex != sourceCard.OwnerPlayerIndex)
 				{
 					failureReason = "Target of the attack is not in this rank.";
 					return false;
@@ -233,8 +233,8 @@ public sealed partial class GameEngine
 			{
 				break;
 			}
-			CardInstance? cardInstance7 = FindBoardCard(state, declareAttackEvent3.AttackerInstanceId);
-			if (!cardInstance7.HasValue || Math.Abs((cardInstance7.Value.Rank ?? 1) - num) > ability.MaxRankDistance.Value)
+			CardInstance? attackerCard = FindBoardCard(state, declareAttackEvent3.AttackerInstanceId);
+			if (!attackerCard.HasValue || Math.Abs((attackerCard.Value.Rank ?? 1) - performerRank) > ability.MaxRankDistance.Value)
 			{
 				failureReason = $"Attacker is not within {ability.MaxRankDistance.Value} ranks.";
 				return false;
@@ -242,13 +242,13 @@ public sealed partial class GameEngine
 			string description = ability.Description;
 			if (description != null && description.Contains("ATK is lower than", StringComparison.OrdinalIgnoreCase))
 			{
-				CardDefinition definition = _cardDb.GetDefinition(cardInstance7.Value.DefinitionId);
-				int num3 = (((object)definition != null && definition.Attack?.Strikes.Count > 0) ? definition.Attack.Strikes[0].Modifier : 0) + GetContinuousPassiveBonuses(state, cardInstance7.Value, new CombatContext
+				CardDefinition definition = _cardDb.GetDefinition(attackerCard.Value.DefinitionId);
+				int attackerAtk = (((object)definition != null && definition.Attack?.Strikes.Count > 0) ? definition.Attack.Strikes[0].Modifier : 0) + GetContinuousPassiveBonuses(state, attackerCard.Value, new CombatContext
 				{
 					IsAttacking = true
 				}, _cardDb).Atk;
 				int effectiveLevel = GetEffectiveLevel(state, sourceCard, _cardDb);
-				if (num3 >= effectiveLevel)
+				if (attackerAtk >= effectiveLevel)
 				{
 					failureReason = "Attacker's ATK is not lower than this character's level.";
 					return false;
@@ -269,8 +269,8 @@ public sealed partial class GameEngine
 					failureReason = "Dying character is not friendly.";
 					return false;
 				}
-				int num2 = sourceCard.AttachedToInstanceId ?? sourceCard.InstanceId;
-				if (ability.TargetScope == TargetScope.Self && characterDefeatedEvent.DefeatedInstanceId != num2)
+				int bearerOrSourceId = sourceCard.AttachedToInstanceId ?? sourceCard.InstanceId;
+				if (ability.TargetScope == TargetScope.Self && characterDefeatedEvent.DefeatedInstanceId != bearerOrSourceId)
 				{
 					failureReason = "This character is not being killed.";
 					return false;
@@ -278,7 +278,7 @@ public sealed partial class GameEngine
 				if (ability.TargetScope == TargetScope.SameRank)
 				{
 					CardInstance? cardInstance = FindBoardCard(state, characterDefeatedEvent.DefeatedInstanceId);
-					if (!cardInstance.HasValue || (cardInstance.Value.Rank ?? 1) != num)
+					if (!cardInstance.HasValue || (cardInstance.Value.Rank ?? 1) != performerRank)
 					{
 						failureReason = "Dying character is not in the same rank.";
 						return false;
@@ -321,8 +321,8 @@ public sealed partial class GameEngine
 				failureReason = "Ability triggers after your wizard casts a spell.";
 				return false;
 			}
-			CardInstance? cardInstance8 = FindBoardCard(state, abilityActivatedEvent.SourceInstanceId);
-			CardDefinition cardDefinition = (cardInstance8.HasValue ? _cardDb.GetDefinition(cardInstance8.Value.DefinitionId) : null);
+			CardInstance? casterCard = FindBoardCard(state, abilityActivatedEvent.SourceInstanceId);
+			CardDefinition cardDefinition = (casterCard.HasValue ? _cardDb.GetDefinition(casterCard.Value.DefinitionId) : null);
 			if (!(cardDefinition != null) || (cardDefinition.Class != CharacterClass.Wizard && !cardDefinition.Traits.Any((string t) => t.Contains("Wizard", StringComparison.OrdinalIgnoreCase))) || sourceCard.ReadyState == ReadyState.Ready)
 			{
 				failureReason = "Source is not a wizard casting a spell, or this character is already Ready.";
@@ -359,31 +359,31 @@ public sealed partial class GameEngine
 		}
 		if (targetInstanceIds != null && targetInstanceIds.Length != 0)
 		{
-			foreach (int num5 in targetInstanceIds)
+			foreach (int targetId in targetInstanceIds)
 			{
-				CardInstance? cardInstance11 = FindBoardCard(state, num5);
-				if (!cardInstance11.HasValue)
+				CardInstance? targetCard = FindBoardCard(state, targetId);
+				if (!targetCard.HasValue)
 				{
-					failureReason = $"Target {num5} not found.";
+					failureReason = $"Target {targetId} not found.";
 					return false;
 				}
-				int num6 = cardInstance11.Value.Rank ?? 1;
-				if (ability.TargetScope == TargetScope.SameRank && (num6 != num || cardInstance11.Value.OwnerPlayerIndex != sourceCard.OwnerPlayerIndex))
+				int targetRank = targetCard.Value.Rank ?? 1;
+				if (ability.TargetScope == TargetScope.SameRank && (targetRank != performerRank || targetCard.Value.OwnerPlayerIndex != sourceCard.OwnerPlayerIndex))
 				{
 					failureReason = "Target must be in the same rank as this card.";
 					return false;
 				}
-				if (ability.TargetScope == TargetScope.OtherInSameRank && (num6 != num || cardInstance11.Value.InstanceId == sourceCard.InstanceId || cardInstance11.Value.OwnerPlayerIndex != sourceCard.OwnerPlayerIndex))
+				if (ability.TargetScope == TargetScope.OtherInSameRank && (targetRank != performerRank || targetCard.Value.InstanceId == sourceCard.InstanceId || targetCard.Value.OwnerPlayerIndex != sourceCard.OwnerPlayerIndex))
 				{
 					failureReason = "Target must be another character in the same rank.";
 					return false;
 				}
-				if (ability.TargetScope == TargetScope.WithinRankDistance && ability.MaxRankDistance.HasValue && Math.Abs(num6 - num) > ability.MaxRankDistance.Value)
+				if (ability.TargetScope == TargetScope.WithinRankDistance && ability.MaxRankDistance.HasValue && Math.Abs(targetRank - performerRank) > ability.MaxRankDistance.Value)
 				{
 					failureReason = $"Target is not within {ability.MaxRankDistance.Value} ranks.";
 					return false;
 				}
-				if (ability.TargetScope == TargetScope.Self && !ability.Effects.Any((IEffect e) => (e is PerformStrikeEffect || e is DealDamageEffect || e is ResolveAttackEffect) ? true : false) && cardInstance11.Value.InstanceId != sourceCard.InstanceId)
+				if (ability.TargetScope == TargetScope.Self && !ability.Effects.Any((IEffect e) => (e is PerformStrikeEffect || e is DealDamageEffect || e is ResolveAttackEffect) ? true : false) && targetCard.Value.InstanceId != sourceCard.InstanceId)
 				{
 					failureReason = "Target must be this card.";
 					return false;
@@ -402,22 +402,22 @@ public sealed partial class GameEngine
 		}
 		if (definition.Name.Equals("Albrecht Novice", StringComparison.OrdinalIgnoreCase))
 		{
-			if (!_state.Players[playerIndex].Ranks.TryGetValue(rank, out List<CardInstance> value))
+			if (!_state.Players[playerIndex].Ranks.TryGetValue(rank, out List<CardInstance> rankCards))
 			{
 				return;
 			}
-			int num = value.FindIndex((CardInstance c) => c.InstanceId == card.InstanceId);
-			if (num >= 0)
+			int cardIdx = rankCards.FindIndex((CardInstance c) => c.InstanceId == card.InstanceId);
+			if (cardIdx >= 0)
 			{
-				if (num > 0)
+				if (cardIdx > 0)
 				{
-					AddTurnBuff(_state, value[num - 1].InstanceId, "ATK", 2);
-					AddTurnBuff(_state, value[num - 1].InstanceId, "AC", 2);
+					AddTurnBuff(_state, rankCards[cardIdx - 1].InstanceId, "ATK", 2);
+					AddTurnBuff(_state, rankCards[cardIdx - 1].InstanceId, "AC", 2);
 				}
-				if (num + 1 < value.Count)
+				if (cardIdx + 1 < rankCards.Count)
 				{
-					AddTurnBuff(_state, value[num + 1].InstanceId, "ATK", 2);
-					AddTurnBuff(_state, value[num + 1].InstanceId, "AC", 2);
+					AddTurnBuff(_state, rankCards[cardIdx + 1].InstanceId, "ATK", 2);
+					AddTurnBuff(_state, rankCards[cardIdx + 1].InstanceId, "AC", 2);
 				}
 			}
 		}
@@ -427,18 +427,18 @@ public sealed partial class GameEngine
 		}
 		else
 		{
-			if (!definition.Name.Equals("Shannon the Daring", StringComparison.OrdinalIgnoreCase) || !_state.Players[playerIndex].Ranks.TryGetValue(1, out List<CardInstance> value2))
+			if (!definition.Name.Equals("Shannon the Daring", StringComparison.OrdinalIgnoreCase) || !_state.Players[playerIndex].Ranks.TryGetValue(1, out List<CardInstance> rank1Cards))
 			{
 				return;
 			}
-			foreach (CardInstance item in value2)
+			foreach (CardInstance ally in rank1Cards)
 			{
-				CardDefinition? definition2 = _cardDb.GetDefinition(item.DefinitionId);
-				int effectiveLevel = GetEffectiveLevel(_state, item, _cardDb);
+				CardDefinition? definition2 = _cardDb.GetDefinition(ally.DefinitionId);
+				int effectiveLevel = GetEffectiveLevel(_state, ally, _cardDb);
 				if (IsFreeKingdoms(definition2) && effectiveLevel <= 2)
 				{
-					AddTurnBuff(_state, item.InstanceId, "ATK", 2);
-					AddTurnBuff(_state, item.InstanceId, "AC", 2);
+					AddTurnBuff(_state, ally.InstanceId, "ATK", 2);
+					AddTurnBuff(_state, ally.InstanceId, "AC", 2);
 				}
 			}
 		}

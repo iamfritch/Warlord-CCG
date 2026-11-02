@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -96,12 +96,12 @@ public sealed partial class GameEngine
 		Random rng = new Random(seed);
 		_diceRoller = (int count, int sides) =>
 		{
-			int num = 0;
+			int total = 0;
 			for (int i = 0; i < count; i++)
 			{
-				num += rng.Next(1, sides + 1);
+				total += rng.Next(1, sides + 1);
 			}
-			return num;
+			return total;
 		};
 	}
 
@@ -256,17 +256,10 @@ public sealed partial class GameEngine
 		{
 			List<CardInstance> deck = _state.Players[playerIndex].Deck;
 			Random random = rng ?? new Random();
-			for (int num = deck.Count - 1; num > 0; num--)
+			for (int i = deck.Count - 1; i > 0; i--)
 			{
-				int num2 = random.Next(num + 1);
-				List<CardInstance> list = deck;
-				int index = num;
-				List<CardInstance> list2 = deck;
-				int index2 = num2;
-				CardInstance value = deck[num2];
-				CardInstance value2 = deck[num];
-				list[index] = value;
-				list2[index2] = value2;
+				int j = random.Next(i + 1);
+				(deck[i], deck[j]) = (deck[j], deck[i]);
 			}
 		}
 	}
@@ -301,15 +294,14 @@ public sealed partial class GameEngine
 			return actionResult;
 		}
 		bool isReactWindowOpen = _state.Priority.IsReactWindowOpen;
-		bool flag = action is PassAction;
-		bool flag2 = flag;
+		bool isPass = action is PassAction;
 		PushEventsForAction(action);
 		if (isReactWindowOpen)
 		{
-			if (flag2)
+			if (isPass)
 			{
-				int num = Math.Max(2, _state.Players.Count);
-				if (_state.Priority.ConsecutivePasses >= num)
+				int requiredPasses = Math.Max(2, _state.Players.Count);
+				if (_state.Priority.ConsecutivePasses >= requiredPasses)
 				{
 					ResolveReactWindowStack();
 				}
@@ -329,14 +321,14 @@ public sealed partial class GameEngine
 		SyncPendingEvents();
 		if (!_state.Priority.IsReactWindowOpen)
 		{
-			if (!flag2 && !(action is DeployStartingArmyAction))
+			if (!isPass && !(action is DeployStartingArmyAction))
 			{
 				if (_state.CurrentPhase == TurnPhase.Order)
 				{
 					_state.TurnState.RecordAction();
 				}
 			}
-			else if (flag2 && _state.CurrentPhase == TurnPhase.Main && _state.Priority.ConsecutivePasses >= 2)
+			else if (isPass && _state.CurrentPhase == TurnPhase.Main && _state.Priority.ConsecutivePasses >= 2)
 			{
 				PerformTurnEndSurvivalChecks();
 				_state.CurrentPhase = TurnPhase.Ready;
@@ -407,33 +399,33 @@ public sealed partial class GameEngine
 			return 0;
 		}
 		PlayerState playerState = _state.Players[playerIndex];
-		int num = 0;
-		foreach (List<CardInstance> value in playerState.Ranks.Values)
+		int totalInitiative = 0;
+		foreach (List<CardInstance> rankCards in playerState.Ranks.Values)
 		{
-			foreach (CardInstance item in value)
+			foreach (CardInstance item in rankCards)
 			{
-				num += GetTurnBuffValue(_state, item.InstanceId, "INITIATIVE");
+				totalInitiative += GetTurnBuffValue(_state, item.InstanceId, "INITIATIVE");
 				if (item.SkillRatings.TryGetValue("Initiative", out int initVal))
 				{
-					num += initVal;
+					totalInitiative += initVal;
 				}
 				if (item.SkillRatings.TryGetValue("BonusInitiative", out int bonusInit))
 				{
-					num += bonusInit;
+					totalInitiative += bonusInit;
 				}
 				CardDefinition definition = _cardDb.GetDefinition(item.DefinitionId);
 				if (definition != null)
 				{
 					if (definition.SkillRatings.TryGetValue("Initiative", out int defInit) && !item.SkillRatings.ContainsKey("Initiative"))
 					{
-						num += defInit;
+						totalInitiative += defInit;
 					}
 					foreach (string trait in definition.Traits)
 					{
 						Match match = Regex.Match(trait, @"^\+(\d+)\s+Initiative", RegexOptions.IgnoreCase);
 						if (match.Success && int.TryParse(match.Groups[1].Value, out int traitVal))
 						{
-							num += traitVal;
+							totalInitiative += traitVal;
 						}
 					}
 				}
@@ -441,23 +433,23 @@ public sealed partial class GameEngine
 		}
 		foreach (CardInstance attached in playerState.AttachedItems)
 		{
-			num += GetTurnBuffValue(_state, attached.InstanceId, "INITIATIVE");
+			totalInitiative += GetTurnBuffValue(_state, attached.InstanceId, "INITIATIVE");
 			if (attached.SkillRatings.TryGetValue("Initiative", out int initVal2))
 			{
-				num += initVal2;
+				totalInitiative += initVal2;
 			}
 			if (attached.SkillRatings.TryGetValue("BonusInitiative", out int bonusInit2))
 			{
-				num += bonusInit2;
+				totalInitiative += bonusInit2;
 			}
 		}
-		return num;
+		return totalInitiative;
 	}
 
 	public (int WinnerIndex, int Roll0, int Roll1) RollInitiative()
 	{
 		InitiativeTieHistory.Clear();
-		int num = 0;
+		int attempts = 0;
 		int raw0;
 		int raw1;
 		int winner = 0;
@@ -465,7 +457,7 @@ public sealed partial class GameEngine
 		{
 			raw0 = _diceRoller(1, 20);
 			raw1 = _diceRoller(1, 20);
-			num++;
+			attempts++;
 
 			int mod0 = GetInitiativeModifier(0);
 			int mod1 = GetInitiativeModifier(1);
@@ -489,7 +481,7 @@ public sealed partial class GameEngine
 
 			if (total0 == total1)
 			{
-				if (num < 100)
+				if (attempts < 100)
 				{
 					InitiativeTieHistory.Add((raw0, raw1));
 				}
@@ -499,7 +491,7 @@ public sealed partial class GameEngine
 			winner = (total0 > total1) ? 0 : 1;
 			break;
 		}
-		while (num < 100);
+		while (attempts < 100);
 
 		_state.InitiativeWinnerIndex = winner;
 		_state.ActivePlayerIndex = winner;
@@ -550,8 +542,8 @@ public sealed partial class GameEngine
 		{
 			foreach (PlayerState player in _state.Players)
 			{
-				int num = 5 - player.Hand.Count;
-				for (int i = 0; i < num && i < player.Deck.Count; i++)
+				int cardsToDraw = 5 - player.Hand.Count;
+				for (int i = 0; i < cardsToDraw && i < player.Deck.Count; i++)
 				{
 					_resolver.Push(new DrawCardEvent
 					{

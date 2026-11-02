@@ -8,9 +8,4 @@ public sealed record CharacterMovedEvent : MarchEvent
 	{
 	}
 
-	[SetsRequiredMembers]
-	private CharacterMovedEvent(CharacterMovedEvent original)
-		: base(original)
-	{
-	}
 }

@@ -22,14 +22,4 @@ public sealed record DeclareAttackEvent : GameEvent
 		return state;
 	}
 
-	[CompilerGenerated]
-	[SetsRequiredMembers]
-	private DeclareAttackEvent(DeclareAttackEvent original)
-		: base(original)
-	{
-		AttackerInstanceId = original.AttackerInstanceId;
-		DefenderInstanceId = original.DefenderInstanceId;
-		DefenderInstanceIds = original.DefenderInstanceIds;
-		AdditionalWounds = original.AdditionalWounds;
-	}
 }

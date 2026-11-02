@@ -18,12 +18,4 @@ public sealed record PreventWoundsEvent : GameEvent
 		return state;
 	}
 
-	[CompilerGenerated]
-	[SetsRequiredMembers]
-	private PreventWoundsEvent(PreventWoundsEvent original)
-		: base(original)
-	{
-		TargetInstanceId = original.TargetInstanceId;
-		Amount = original.Amount;
-	}
 }

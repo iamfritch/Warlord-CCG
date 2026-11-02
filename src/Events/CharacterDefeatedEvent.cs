@@ -75,14 +75,4 @@ public sealed record CharacterDefeatedEvent : GameEvent
 		return state;
 	}
 
-	[CompilerGenerated]
-	[SetsRequiredMembers]
-	private CharacterDefeatedEvent(CharacterDefeatedEvent original)
-		: base(original)
-	{
-		DefeatedInstanceId = original.DefeatedInstanceId;
-		OwnerPlayerIndex = original.OwnerPlayerIndex;
-		BanishInsteadOfDiscard = original.BanishInsteadOfDiscard;
-		KillerInstanceId = original.KillerInstanceId;
-	}
 }

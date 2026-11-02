@@ -30,22 +30,4 @@ public sealed record AttackResolutionDetails
 	public required int DamageDealt { get; init; }
 
 	public string DamageType { get; init; } = "melee";
-
-	[CompilerGenerated]
-	[SetsRequiredMembers]
-	private AttackResolutionDetails(AttackResolutionDetails original)
-	{
-		AttackerInstanceId = original.AttackerInstanceId;
-		DefenderInstanceId = original.DefenderInstanceId;
-		AttackerName = original.AttackerName;
-		DefenderName = original.DefenderName;
-		Roll = original.Roll;
-		StrikeBonus = original.StrikeBonus;
-		DefenderArmorClass = original.DefenderArmorClass;
-		IsCritical = original.IsCritical;
-		IsCriticalFailure = original.IsCriticalFailure;
-		IsHit = original.IsHit;
-		DamageDealt = original.DamageDealt;
-		DamageType = original.DamageType;
-	}
 }

@@ -68,16 +68,4 @@ public sealed record AbilityActivatedEvent : GameEvent
 		return state;
 	}
 
-	[CompilerGenerated]
-	[SetsRequiredMembers]
-	private AbilityActivatedEvent(AbilityActivatedEvent original)
-		: base(original)
-	{
-		SourceInstanceId = original.SourceInstanceId;
-		PerformerInstanceId = original.PerformerInstanceId;
-		AbilityIndex = original.AbilityIndex;
-		TargetInstanceIds = original.TargetInstanceIds;
-		Ability = original.Ability;
-		OwnerPlayerIndex = original.OwnerPlayerIndex;
-	}
 }

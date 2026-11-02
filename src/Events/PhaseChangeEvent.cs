@@ -15,12 +15,4 @@ public sealed record PhaseChangeEvent : GameEvent
 		return state;
 	}
 
-	[CompilerGenerated]
-	[SetsRequiredMembers]
-	private PhaseChangeEvent(PhaseChangeEvent original)
-		: base(original)
-	{
-		FromPhase = original.FromPhase;
-		ToPhase = original.ToPhase;
-	}
 }

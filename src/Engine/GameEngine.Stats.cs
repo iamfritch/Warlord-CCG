@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -23,9 +23,9 @@ public sealed partial class GameEngine
 		{
 			return (Atk: 0, Ac: 0, Hp: 0);
 		}
-		int num = 0;
-		int num2 = 0;
-		int num3 = 0;
+		int atk = 0;
+		int ac = 0;
+		int hp = 0;
 		string rulesText = itemDef.RulesText;
 		if (!string.IsNullOrWhiteSpace(rulesText))
 		{
@@ -40,38 +40,38 @@ public sealed partial class GameEngine
 				{
 					if (int.TryParse(item.Groups[1].Value, out var result))
 					{
-						num += result;
+						atk += result;
 					}
 				}
 				foreach (Match item2 in Regex.Matches(input, "(?:^|[^\\w])\\+(\\d+)\\s+AC", RegexOptions.IgnoreCase))
 				{
 					if (int.TryParse(item2.Groups[1].Value, out var result2))
 					{
-						num2 += result2;
+						ac += result2;
 					}
 				}
 				foreach (Match item3 in Regex.Matches(input, "(?:^|[^\\w])\\+(\\d+)\\s+HP", RegexOptions.IgnoreCase))
 				{
 					if (int.TryParse(item3.Groups[1].Value, out var result3))
 					{
-						num3 += result3;
+						hp += result3;
 					}
 				}
 			}
 		}
 		if (itemDef.ArmorClass.HasValue)
 		{
-			num2 += itemDef.ArmorClass.Value;
+			ac += itemDef.ArmorClass.Value;
 		}
 		if (itemDef.Attack?.Strikes.Count > 0)
 		{
-			num += itemDef.Attack.Strikes[0].Modifier;
+			atk += itemDef.Attack.Strikes[0].Modifier;
 		}
 		if (itemDef.BaseHitPoints.HasValue)
 		{
-			num3 += itemDef.BaseHitPoints.Value;
+			hp += itemDef.BaseHitPoints.Value;
 		}
-		return (Atk: num, Ac: num2, Hp: num3);
+		return (Atk: atk, Ac: ac, Hp: hp);
 	}
 
 	public static void AddTurnBuff(GameState state, int instanceId, string buffType, int value = 0)
@@ -88,15 +88,15 @@ public sealed partial class GameEngine
 	public static int GetTurnBuffValue(GameState state, int instanceId, string buffType)
 	{
 		string text = $"BUFF:{instanceId}:{buffType.ToUpperInvariant()}:";
-		int num = 0;
+		int totalBuff = 0;
 		foreach (string item in state.TurnState.UsedLimitedAbilityKeysThisTurn)
 		{
 			if (item.StartsWith(text, StringComparison.OrdinalIgnoreCase) && int.TryParse(item.Substring(text.Length), out var result))
 			{
-				num += result;
+				totalBuff += result;
 			}
 		}
-		return num;
+		return totalBuff;
 	}
 
 	public static bool IsDeverenian(CardDefinition? def)
@@ -270,7 +270,7 @@ public sealed partial class GameEngine
 		{
 			return true;
 		}
-		int num = def?.BaseHitPoints ?? card.CurrentHitPoints;
+		int maxHp = def?.BaseHitPoints ?? card.CurrentHitPoints;
 		if (cardDb != null)
 		{
 			foreach (int attachedItemId in card.AttachedItemIds)
@@ -281,12 +281,12 @@ public sealed partial class GameEngine
 					CardDefinition definition = cardDb.GetDefinition(cardInstance.Value.DefinitionId);
 					if (definition != null)
 					{
-						num += GetItemPassiveStats(definition).Hp;
+						maxHp += GetItemPassiveStats(definition).Hp;
 					}
 				}
 			}
 		}
-		return card.CurrentHitPoints < num;
+		return card.CurrentHitPoints < maxHp;
 	}
 
 	public static int GetWounds(GameState state, CardInstance card, CardDatabase? cardDb = null)
@@ -315,95 +315,91 @@ public sealed partial class GameEngine
 			cardDb = _lastActiveCardDb ?? GetActiveCardDb();
 		}
 		CardDefinition definition = cardDb.GetDefinition(character.DefinitionId);
-		int num = (definition?.Level ?? 0) + (character.SkillRatings.TryGetValue("BonusLevel", out var value) ? value : 0);
-		bool flag = IsCharacterWounded(character, definition, state, cardDb);
-		int num2 = 0;
-		int num3 = 0;
-		int num4 = 0;
-		int num5 = 0;
-		int num6 = 0;
+		int charLevel = (definition?.Level ?? 0) + (character.SkillRatings.TryGetValue("BonusLevel", out var bonusLevel) ? bonusLevel : 0);
+		bool isWounded = IsCharacterWounded(character, definition, state, cardDb);
+		int atkBonus = 0;
+		int acBonus = 0;
+		int hpBonus = 0;
+		int skillBonus = 0;
+		int extraWounds = 0;
 		bool trueStrike = false;
 		bool hasReach = false;
 		List<StrikeDescriptor> list = new List<StrikeDescriptor>();
-		(int, int, int)? tuple = FindCharacterPosition(state, character.InstanceId);
-		if (tuple.HasValue)
+		(int, int, int)? position = FindCharacterPosition(state, character.InstanceId);
+		if (position.HasValue)
 		{
-			(int, int, int) value2 = tuple.Value;
-			int item = value2.Item1;
-			int item2 = value2.Item2;
-			int item3 = value2.Item3;
-			List<CardInstance> list2 = state.Players[item].Ranks[item2];
-			CardInstance? cardInstance = ((item3 > 0) ? new CardInstance?(list2[item3 - 1]) : ((CardInstance?)null));
-			CardInstance? cardInstance2 = ((item3 + 1 < list2.Count) ? new CardInstance?(list2[item3 + 1]) : ((CardInstance?)null));
-			int i;
-			CardInstance?[] array;
+			(int playerIdx, int rank, int slotIndex) = position.Value;
+			List<CardInstance> rankCards = state.Players[playerIdx].Ranks[rank];
+			CardInstance? leftNeighbor = ((slotIndex > 0) ? new CardInstance?(rankCards[slotIndex - 1]) : ((CardInstance?)null));
+			CardInstance? rightNeighbor = ((slotIndex + 1 < rankCards.Count) ? new CardInstance?(rankCards[slotIndex + 1]) : ((CardInstance?)null));
+			CardInstance?[] adjacentNeighbors;
 			if (definition != null && definition.Name.Equals("Ambitious Squire", StringComparison.OrdinalIgnoreCase))
 			{
-				array = new CardInstance?[2] { cardInstance, cardInstance2 };
-				for (i = 0; i < array.Length; i++)
+				adjacentNeighbors = new CardInstance?[2] { leftNeighbor, rightNeighbor };
+				for (int i = 0; i < adjacentNeighbors.Length; i++)
 				{
-					CardInstance? cardInstance3 = array[i];
-					if (cardInstance3.HasValue)
+					CardInstance? neighbor = adjacentNeighbors[i];
+					if (neighbor.HasValue)
 					{
-						CardDefinition? definition2 = cardDb.GetDefinition(cardInstance3.Value.DefinitionId);
-						int num7 = (definition2?.Level ?? 0) + (cardInstance3.Value.SkillRatings.TryGetValue("BonusLevel", out var value3) ? value3 : 0);
-						if (IsDeverenian(definition2) && num7 > num)
-							{
-								num2 += 2;
-							num3 += 2;
+						CardDefinition? neighborDef = cardDb.GetDefinition(neighbor.Value.DefinitionId);
+						int neighborLevel = (neighborDef?.Level ?? 0) + (neighbor.Value.SkillRatings.TryGetValue("BonusLevel", out var neighborBonusLevel) ? neighborBonusLevel : 0);
+						if (IsDeverenian(neighborDef) && neighborLevel > charLevel)
+						{
+							atkBonus += 2;
+							acBonus += 2;
 						}
 					}
 				}
 			}
 			if (IsMercenary(definition))
 			{
-				array = new CardInstance?[2] { cardInstance, cardInstance2 };
-				for (i = 0; i < array.Length; i++)
+				adjacentNeighbors = new CardInstance?[2] { leftNeighbor, rightNeighbor };
+				for (int i = 0; i < adjacentNeighbors.Length; i++)
 				{
-					CardInstance? cardInstance4 = array[i];
-					if (cardInstance4.HasValue)
+					CardInstance? neighbor = adjacentNeighbors[i];
+					if (neighbor.HasValue)
 					{
-						CardDefinition definition3 = cardDb.GetDefinition(cardInstance4.Value.DefinitionId);
-						if (definition3 != null && definition3.Name.Equals("Balian", StringComparison.OrdinalIgnoreCase))
+						CardDefinition neighborDef = cardDb.GetDefinition(neighbor.Value.DefinitionId);
+						if (neighborDef != null && neighborDef.Name.Equals("Balian", StringComparison.OrdinalIgnoreCase))
 						{
-							num3 += 2;
+							acBonus += 2;
 							break;
 						}
 					}
 				}
 			}
-			bool flag2 = definition != null && definition.Name.Equals("Hazahk of Shadow", StringComparison.OrdinalIgnoreCase);
-			bool flag3 = false;
-			array = new CardInstance?[2] { cardInstance, cardInstance2 };
-			for (i = 0; i < array.Length; i++)
+			bool isSelfHazahk = definition != null && definition.Name.Equals("Hazahk of Shadow", StringComparison.OrdinalIgnoreCase);
+			bool hasAdjacentHazahk = false;
+			adjacentNeighbors = new CardInstance?[2] { leftNeighbor, rightNeighbor };
+			for (int i = 0; i < adjacentNeighbors.Length; i++)
 			{
-				CardInstance? cardInstance6 = array[i];
-				if (cardInstance6.HasValue)
+				CardInstance? neighbor = adjacentNeighbors[i];
+				if (neighbor.HasValue)
 				{
-					CardDefinition definition4 = cardDb.GetDefinition(cardInstance6.Value.DefinitionId);
-					if (definition4 != null && definition4.Name.Equals("Hazahk of Shadow", StringComparison.OrdinalIgnoreCase))
+					CardDefinition neighborDef = cardDb.GetDefinition(neighbor.Value.DefinitionId);
+					if (neighborDef != null && neighborDef.Name.Equals("Hazahk of Shadow", StringComparison.OrdinalIgnoreCase))
 					{
-						flag3 = true;
+						hasAdjacentHazahk = true;
 						break;
 					}
 				}
 			}
-			if ((flag2 || flag3) && (character.Wounds > 0 || flag))
+			if ((isSelfHazahk || hasAdjacentHazahk) && (character.Wounds > 0 || isWounded))
 			{
-				num2 += 5;
+				atkBonus += 5;
 			}
 			if (IsNothrog(definition))
 			{
-				array = new CardInstance?[2] { cardInstance, cardInstance2 };
-				for (i = 0; i < array.Length; i++)
+				adjacentNeighbors = new CardInstance?[2] { leftNeighbor, rightNeighbor };
+				for (int i = 0; i < adjacentNeighbors.Length; i++)
 				{
-					CardInstance? cardInstance7 = array[i];
-					if (cardInstance7.HasValue)
+					CardInstance? neighbor = adjacentNeighbors[i];
+					if (neighbor.HasValue)
 					{
-						CardDefinition definition5 = cardDb.GetDefinition(cardInstance7.Value.DefinitionId);
-						if (definition5 != null && definition5.Name.Equals("Joleg", StringComparison.OrdinalIgnoreCase))
-							{
-								num2 += 2;
+						CardDefinition neighborDef = cardDb.GetDefinition(neighbor.Value.DefinitionId);
+						if (neighborDef != null && neighborDef.Name.Equals("Joleg", StringComparison.OrdinalIgnoreCase))
+						{
+							atkBonus += 2;
 							break;
 						}
 					}
@@ -411,33 +407,33 @@ public sealed partial class GameEngine
 			}
 			if (IsSiege(definition))
 			{
-				array = new CardInstance?[2] { cardInstance, cardInstance2 };
-				for (i = 0; i < array.Length; i++)
+				adjacentNeighbors = new CardInstance?[2] { leftNeighbor, rightNeighbor };
+				for (int i = 0; i < adjacentNeighbors.Length; i++)
 				{
-					CardInstance? cardInstance8 = array[i];
-					if (cardInstance8.HasValue)
+					CardInstance? neighbor = adjacentNeighbors[i];
+					if (neighbor.HasValue)
 					{
-						CardDefinition definition6 = cardDb.GetDefinition(cardInstance8.Value.DefinitionId);
-						if (definition6 != null && definition6.Name.Equals("Makusog Steelhorn", StringComparison.OrdinalIgnoreCase))
-							{
-								num2 += 2;
+						CardDefinition neighborDef = cardDb.GetDefinition(neighbor.Value.DefinitionId);
+						if (neighborDef != null && neighborDef.Name.Equals("Makusog Steelhorn", StringComparison.OrdinalIgnoreCase))
+						{
+							atkBonus += 2;
 							break;
 						}
 					}
 				}
 			}
-			if (num <= 2)
+			if (charLevel <= 2)
 			{
-				array = new CardInstance?[2] { cardInstance, cardInstance2 };
-				for (i = 0; i < array.Length; i++)
+				adjacentNeighbors = new CardInstance?[2] { leftNeighbor, rightNeighbor };
+				for (int i = 0; i < adjacentNeighbors.Length; i++)
 				{
-					CardInstance? cardInstance9 = array[i];
-					if (cardInstance9.HasValue)
+					CardInstance? neighbor = adjacentNeighbors[i];
+					if (neighbor.HasValue)
 					{
-						CardDefinition definition7 = cardDb.GetDefinition(cardInstance9.Value.DefinitionId);
-						if (definition7 != null && definition7.Name.Equals("Shannon the Daring", StringComparison.OrdinalIgnoreCase))
-							{
-								num2 += 2;
+						CardDefinition neighborDef = cardDb.GetDefinition(neighbor.Value.DefinitionId);
+						if (neighborDef != null && neighborDef.Name.Equals("Shannon the Daring", StringComparison.OrdinalIgnoreCase))
+						{
+							atkBonus += 2;
 							break;
 						}
 					}
@@ -445,116 +441,113 @@ public sealed partial class GameEngine
 			}
 			if (IsDwarf(definition))
 			{
-				array = new CardInstance?[2] { cardInstance, cardInstance2 };
-				for (i = 0; i < array.Length; i++)
+				adjacentNeighbors = new CardInstance?[2] { leftNeighbor, rightNeighbor };
+				for (int i = 0; i < adjacentNeighbors.Length; i++)
 				{
-					CardInstance? cardInstance10 = array[i];
-					if (cardInstance10.HasValue)
+					CardInstance? neighbor = adjacentNeighbors[i];
+					if (neighbor.HasValue)
 					{
-						CardDefinition definition8 = cardDb.GetDefinition(cardInstance10.Value.DefinitionId);
-						if (definition8 != null && definition8.Name.Equals("Tunnel Vanguard", StringComparison.OrdinalIgnoreCase))
+						CardDefinition neighborDef = cardDb.GetDefinition(neighbor.Value.DefinitionId);
+						if (neighborDef != null && neighborDef.Name.Equals("Tunnel Vanguard", StringComparison.OrdinalIgnoreCase))
 						{
-							num4++;
+							hpBonus++;
 						}
 					}
 				}
 			}
-			for (int j = 0; j < list2.Count; j++)
+			for (int j = 0; j < rankCards.Count; j++)
 			{
-				if (j == item3)
+				if (j == slotIndex)
 				{
 					continue;
 				}
-				foreach (int attachedItemId in list2[j].AttachedItemIds)
+				foreach (int attachedItemId in rankCards[j].AttachedItemIds)
 				{
-					CardInstance? cardInstance11 = CardLocator.FindCard(state, attachedItemId);
-					if (cardInstance11.HasValue)
+					CardInstance? equippedItem = CardLocator.FindCard(state, attachedItemId);
+					if (equippedItem.HasValue)
 					{
-						CardDefinition definition9 = cardDb.GetDefinition(cardInstance11.Value.DefinitionId);
-						if (definition9 != null && definition9.Name.Equals("Breastplate of Power", StringComparison.OrdinalIgnoreCase))
-							{
-								num2 += 2;
-							num3 += 2;
+						CardDefinition itemDef = cardDb.GetDefinition(equippedItem.Value.DefinitionId);
+						if (itemDef != null && itemDef.Name.Equals("Breastplate of Power", StringComparison.OrdinalIgnoreCase))
+						{
+							atkBonus += 2;
+							acBonus += 2;
 						}
 					}
 				}
 			}
-			if ((IsDwarf(definition) & flag) && list2.Any((CardInstance c) =>
+			if ((IsDwarf(definition) & isWounded) && rankCards.Any((CardInstance c) =>
 			{
-				CardDefinition definition13 = cardDb.GetDefinition(c.DefinitionId);
-				return definition13 != null && definition13.Name.Equals("Dress", StringComparison.OrdinalIgnoreCase);
+				CardDefinition def = cardDb.GetDefinition(c.DefinitionId);
+				return def != null && def.Name.Equals("Dress", StringComparison.OrdinalIgnoreCase);
 			}))
 			{
-				num3 += 3;
+				acBonus += 3;
 			}
 			if (IsFreeKingdoms(definition))
 			{
-				for (int num8 = 0; num8 < list2.Count; num8++)
+				for (int squireIdx = 0; squireIdx < rankCards.Count; squireIdx++)
 				{
-					if (num8 == item3)
+					if (squireIdx == slotIndex)
 					{
 						continue;
 					}
-					CardInstance cardInstance12 = list2[num8];
-					CardDefinition definition10 = cardDb.GetDefinition(cardInstance12.DefinitionId);
-					if (definition10 != null && definition10.Name.Equals("Squire Argos", StringComparison.OrdinalIgnoreCase))
+					CardInstance otherChar = rankCards[squireIdx];
+					CardDefinition otherDef = cardDb.GetDefinition(otherChar.DefinitionId);
+					if (otherDef != null && otherDef.Name.Equals("Squire Argos", StringComparison.OrdinalIgnoreCase))
 					{
-						int num9 = definition10.Level + (cardInstance12.SkillRatings.TryGetValue("BonusLevel", out var value4) ? value4 : 0);
-						if (num <= num9)
-							{
-								num2 += 2;
-							num3++;
+						int argosLevel = otherDef.Level + (otherChar.SkillRatings.TryGetValue("BonusLevel", out var argosBonusLevel) ? argosBonusLevel : 0);
+						if (charLevel <= argosLevel)
+						{
+							atkBonus += 2;
+							acBonus++;
 						}
 					}
 				}
 			}
 			if (IsDeverenian(definition) && IsFighter(definition))
 			{
-				int key = item2 + 1;
-				if (state.Players[item].Ranks.TryGetValue(key, out List<CardInstance> value5) && value5.Any((CardInstance c) =>
+				int rearRank = rank + 1;
+				if (state.Players[playerIdx].Ranks.TryGetValue(rearRank, out List<CardInstance> rearRankCards) && rearRankCards.Any((CardInstance c) =>
 				{
-					CardDefinition definition13 = cardDb.GetDefinition(c.DefinitionId);
-					return definition13 != null && definition13.Name.Equals("Taumar the Protector", StringComparison.OrdinalIgnoreCase);
+					CardDefinition def = cardDb.GetDefinition(c.DefinitionId);
+					return def != null && def.Name.Equals("Taumar the Protector", StringComparison.OrdinalIgnoreCase);
 				}))
 				{
-					num3 += 2;
-					num5 += 2;
+					acBonus += 2;
+					skillBonus += 2;
 				}
 			}
-			for (int num10 = 0; num10 < state.Players.Count; num10++)
+			for (int oppIdx = 0; oppIdx < state.Players.Count; oppIdx++)
 			{
-				if (num10 == item)
+				if (oppIdx == playerIdx)
 				{
 					continue;
 				}
-				foreach (KeyValuePair<int, List<CardInstance>> rank in state.Players[num10].Ranks)
+				foreach (var (oppRank, oppRankCards) in state.Players[oppIdx].Ranks)
 				{
-					rank.Deconstruct(out i, out var value6);
-					int num11 = i;
-					List<CardInstance> list3 = value6;
-					if (BoardGeometry.GetCrossBoardDistance(item2, num11) > 1)
+					if (BoardGeometry.GetCrossBoardDistance(rank, oppRank) > 1)
 					{
 						continue;
 					}
-					foreach (CardInstance item4 in list3)
+					foreach (CardInstance enemy in oppRankCards)
 					{
-						CardDefinition definition11 = cardDb.GetDefinition(item4.DefinitionId);
-						if (definition11 != null && definition11.Name.Equals("Ghed Bane", StringComparison.OrdinalIgnoreCase))
+						CardDefinition enemyDef = cardDb.GetDefinition(enemy.DefinitionId);
+						if (enemyDef != null && enemyDef.Name.Equals("Ghed Bane", StringComparison.OrdinalIgnoreCase))
 						{
 							int targetLevel = GetEffectiveLevel(state, character, cardDb);
-							int ghedLevel = GetEffectiveLevel(state, item4, cardDb);
+							int ghedLevel = GetEffectiveLevel(state, enemy, cardDb);
 							if (targetLevel < ghedLevel)
 							{
-								num2 -= 2;
-							num3 -= 2;
+								atkBonus -= 2;
+								acBonus -= 2;
 							}
-					}
+						}
 					}
 				}
 			}
 		}
-		int num13 = 0;
-		bool flag5 = false;
+		int equippedWeaponCount = 0;
+		bool hasDualWieldItem = false;
 		var attachedItemIds = new HashSet<int>(character.AttachedItemIds);
 		var charOwner = state.Players.ElementAtOrDefault(character.OwnerPlayerIndex);
 		if (charOwner != null)
@@ -569,80 +562,80 @@ public sealed partial class GameEngine
 		}
 		foreach (int attachedItemId2 in attachedItemIds)
 		{
-			CardInstance? cardInstance13 = CardLocator.FindCard(state, attachedItemId2);
-			if (!cardInstance13.HasValue)
+			CardInstance? itemCard = CardLocator.FindCard(state, attachedItemId2);
+			if (!itemCard.HasValue)
 			{
 				continue;
 			}
-			int? actualAttachedTo = cardInstance13.Value.AttachedToInstanceId ?? cardInstance13.Value.AttachedToId;
+			int? actualAttachedTo = itemCard.Value.AttachedToInstanceId ?? itemCard.Value.AttachedToId;
 			if (actualAttachedTo.HasValue && actualAttachedTo.Value != character.InstanceId)
 			{
 				continue;
 			}
-			CardDefinition definition12 = cardDb.GetDefinition(cardInstance13.Value.DefinitionId);
+			CardDefinition definition12 = cardDb.GetDefinition(itemCard.Value.DefinitionId);
 			if (!(definition12 != null))
 			{
 				continue;
 			}
 			if (IsWeapon(definition12) || HasDualWield(definition12))
 			{
-				num13++;
+				equippedWeaponCount++;
 			}
 			if (HasDualWield(definition12))
 			{
-				flag5 = true;
+				hasDualWieldItem = true;
 			}
 			if (definition12.Name.Equals("Shillelagh", StringComparison.OrdinalIgnoreCase))
 			{
-				int num14 = character.CurrentSkill + num5;
-				int num15 = Math.Max(0, (num14 + 1) / 2);
-				num2 += num15;
+				int currentEffectiveSkill = character.CurrentSkill + skillBonus;
+				int shillelaghBonus = Math.Max(0, (currentEffectiveSkill + 1) / 2);
+				atkBonus += shillelaghBonus;
 			}
 			if (definition12.Name.Equals("Gapfinder", StringComparison.OrdinalIgnoreCase) && (object)combatCtx != null && combatCtx.IsAttacking && (object)combatCtx != null && combatCtx.IsMelee && (object)combatCtx != null && combatCtx.OpponentCard?.ReadyState == ReadyState.Spent)
 			{
-				num2 += 5;
+				atkBonus += 5;
 			}
 			if (definition12.Name.Equals("Scale Mail", StringComparison.OrdinalIgnoreCase) && combatCtx != null && combatCtx.IsDefending && combatCtx.IsRanged)
 			{
-				num3 += 2;
+				acBonus += 2;
 			}
 			if (definition12.Name.Equals("Ardian Greathawk", StringComparison.OrdinalIgnoreCase))
 			{
-				num5 += 3;
+				skillBonus += 3;
 				continue;
 			}
 			if (definition12.Name.Equals("Unicorn of Thun", StringComparison.OrdinalIgnoreCase))
 			{
-				num5 += 2;
+				skillBonus += 2;
 				continue;
 			}
 			Match match = Regex.Match(definition12.RulesText, "\\+(\\d+)\\s+Skill", RegexOptions.IgnoreCase);
 			if (match.Success && int.TryParse(match.Groups[1].Value, out var result))
 			{
-				num5 += result;
+				skillBonus += result;
 			}
 		}
-		if ((flag5 || HasDualWield(definition)) && (object)combatCtx != null && combatCtx.IsMelee && num13 >= 2)
+		if ((hasDualWieldItem || HasDualWield(definition)) && (object)combatCtx != null && combatCtx.IsMelee && equippedWeaponCount >= 2)
 		{
-			num6++;
+			extraWounds++;
 		}
 		if (definition != null)
 		{
 			if (definition.Name.Equals("'Mad' Pat Carrik", StringComparison.OrdinalIgnoreCase) && (object)combatCtx != null && combatCtx.IsAttacking && (object)combatCtx != null && combatCtx.IsMelee)
 			{
-				num6++;
+				extraWounds++;
 			}
 			if (definition.Name.Equals("Blitzer", StringComparison.OrdinalIgnoreCase) && (object)combatCtx != null && combatCtx.IsAttacking && (object)combatCtx != null && combatCtx.IsMelee)
 			{
-				num6++;
+				extraWounds++;
 			}
 			if (definition.Name.Equals("TFK Brigand", StringComparison.OrdinalIgnoreCase) && (object)combatCtx != null && combatCtx.IsDefending)
 			{
-				num6++;
+				extraWounds++;
 			}
 			if (definition.Name.Equals("Grimfey Prowler", StringComparison.OrdinalIgnoreCase) && (object)combatCtx != null && combatCtx.IsAttacking && (object)combatCtx != null && combatCtx.IsMelee && (object)combatCtx != null && combatCtx.OpponentCard?.ReadyState == ReadyState.Spent)
 			{
-				num2 += character.CurrentSkill + num5;
+				atkBonus += character.CurrentSkill + skillBonus;
 			}
 		}
 		string text = $"BUFF:{character.InstanceId}:";
@@ -660,16 +653,16 @@ public sealed partial class GameEngine
 			switch (array2[0].ToUpperInvariant())
 			{
 			case "ATK":
-				num2 += result2;
+				atkBonus += result2;
 				break;
 			case "AC":
-				num3 += result2;
+				acBonus += result2;
 				break;
 			case "SKILL":
-				num5 += result2;
+				skillBonus += result2;
 				break;
 			case "HP":
-				num4 += result2;
+				hpBonus += result2;
 				break;
 			case "TRUE_STRIKE":
 				trueStrike = true;
@@ -687,25 +680,25 @@ public sealed partial class GameEngine
 			case "MELEE_WOUND_BONUS":
 				if ((object)combatCtx != null && combatCtx.IsMelee)
 				{
-					num6 += result2;
+					extraWounds += result2;
 				}
 				break;
 			case "WOUND_BONUS":
-				num6 += result2;
+				extraWounds += result2;
 				break;
 			}
 		}
-		if (character.SkillRatings.TryGetValue("BonusAtk", out var value8))
+		if (character.SkillRatings.TryGetValue("BonusAtk", out var bonusAtkRating))
 		{
-			num2 += value8;
+			atkBonus += bonusAtkRating;
 		}
 		return new PassiveBonuses
 		{
-			Atk = num2,
-			Ac = num3,
-			Hp = num4,
-			Skill = num5,
-			AdditionalWounds = num6,
+			Atk = atkBonus,
+			Ac = acBonus,
+			Hp = hpBonus,
+			Skill = skillBonus,
+			AdditionalWounds = extraWounds,
 			TrueStrike = trueStrike,
 			HasReach = hasReach,
 			AdditionalStrikes = list
@@ -719,19 +712,19 @@ public sealed partial class GameEngine
 			cardDb = _lastActiveCardDb ?? GetActiveCardDb();
 		}
 		CardDefinition definition = cardDb.GetDefinition(character.DefinitionId);
-		int num = (((object)definition != null && definition.Attack?.Strikes.Count > 0) ? definition.Attack.Strikes[0].Modifier : 0);
-		int num2 = 0;
+		int baseAtk = (((object)definition != null && definition.Attack?.Strikes.Count > 0) ? definition.Attack.Strikes[0].Modifier : 0);
+		int itemAtk = 0;
 		foreach (int attachedItemId in character.AttachedItemIds)
 		{
-			CardInstance? cardInstance = CardLocator.FindCard(state, attachedItemId);
-			if (cardInstance.HasValue)
+			CardInstance? itemCard = CardLocator.FindCard(state, attachedItemId);
+			if (itemCard.HasValue)
 			{
-				CardDefinition itemDef = cardDb?.GetDefinition(cardInstance.Value.DefinitionId);
-				num2 += GetItemPassiveStats(itemDef).Atk;
+				CardDefinition itemDef = cardDb?.GetDefinition(itemCard.Value.DefinitionId);
+				itemAtk += GetItemPassiveStats(itemDef).Atk;
 			}
 		}
 		PassiveBonuses continuousPassiveBonuses = GetContinuousPassiveBonuses(state, character, combatCtx, cardDb);
-		return num + num2 + continuousPassiveBonuses.Atk;
+		return baseAtk + itemAtk + continuousPassiveBonuses.Atk;
 	}
 
 	public static int GetEffectiveArmorClass(GameState state, CardInstance character, CombatContext? combatCtx = null, CardDatabase? cardDb = null)
@@ -760,19 +753,19 @@ public sealed partial class GameEngine
 		{
 			cardDb = _lastActiveCardDb ?? GetActiveCardDb();
 		}
-		int num = (cardDb?.GetDefinition(character.DefinitionId))?.BaseHitPoints ?? character.CurrentHitPoints;
-		int num2 = 0;
+		int baseHp = (cardDb?.GetDefinition(character.DefinitionId))?.BaseHitPoints ?? character.CurrentHitPoints;
+		int itemHp = 0;
 		foreach (int attachedItemId in character.AttachedItemIds)
 		{
-			CardInstance? cardInstance = CardLocator.FindCard(state, attachedItemId);
-			if (cardInstance.HasValue)
+			CardInstance? itemCard = CardLocator.FindCard(state, attachedItemId);
+			if (itemCard.HasValue)
 			{
-				CardDefinition itemDef = cardDb?.GetDefinition(cardInstance.Value.DefinitionId);
-				num2 += GetItemPassiveStats(itemDef).Hp;
+				CardDefinition itemDef = cardDb?.GetDefinition(itemCard.Value.DefinitionId);
+				itemHp += GetItemPassiveStats(itemDef).Hp;
 			}
 		}
 		PassiveBonuses continuousPassiveBonuses = GetContinuousPassiveBonuses(state, character, null, cardDb);
-		return num + num2 + continuousPassiveBonuses.Hp;
+		return baseHp + itemHp + continuousPassiveBonuses.Hp;
 	}
 
 	public static int GetEffectiveSkill(GameState state, CardInstance character, CardDatabase? cardDb = null)
@@ -791,8 +784,7 @@ public sealed partial class GameEngine
 		{
 			cardDb = _lastActiveCardDb ?? GetActiveCardDb();
 		}
-		int value;
-		return (cardDb.GetDefinition(character.DefinitionId)?.Level ?? 0) + character.BonusLevel + (character.SkillRatings.TryGetValue("BonusLevel", out value) ? value : 0);
+		return (cardDb.GetDefinition(character.DefinitionId)?.Level ?? 0) + character.BonusLevel + (character.SkillRatings.TryGetValue("BonusLevel", out var bonusLevel) ? bonusLevel : 0);
 	}
 
 	public static IReadOnlyList<StrikeDescriptor> GetEffectiveStrikes(GameState state, CardInstance character, CardDatabase? cardDb = null)

@@ -43,13 +43,4 @@ public sealed record ModifyStatEvent : GameEvent
 		return state;
 	}
 
-	[CompilerGenerated]
-	[SetsRequiredMembers]
-	private ModifyStatEvent(ModifyStatEvent original)
-		: base(original)
-	{
-		TargetInstanceId = original.TargetInstanceId;
-		StatName = original.StatName;
-		Amount = original.Amount;
-	}
 }

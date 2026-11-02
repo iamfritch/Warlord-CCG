@@ -152,18 +152,4 @@ public sealed record ResolveAttackEffect : IEffect
 		}
 	}
 
-	[CompilerGenerated]
-	[SetsRequiredMembers]
-	private ResolveAttackEffect(ResolveAttackEffect original)
-	{
-		InstanceOnAttackResolved = original.InstanceOnAttackResolved;
-		StrikeBonus = original.StrikeBonus;
-		DamageType = original.DamageType;
-		Damage = original.Damage;
-		AdditionalWounds = original.AdditionalWounds;
-		EnableCriticals = original.EnableCriticals;
-		CannotReduceWounds = original.CannotReduceWounds;
-		BanishOnKill = original.BanishOnKill;
-		TrueStrike = original.TrueStrike;
-	}
 }

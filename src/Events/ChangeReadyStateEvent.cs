@@ -18,12 +18,4 @@ public sealed record ChangeReadyStateEvent : GameEvent
 		return state;
 	}
 
-	[CompilerGenerated]
-	[SetsRequiredMembers]
-	private ChangeReadyStateEvent(ChangeReadyStateEvent original)
-		: base(original)
-	{
-		TargetInstanceId = original.TargetInstanceId;
-		NewReadyState = original.NewReadyState;
-	}
 }

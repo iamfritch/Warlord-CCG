@@ -13,13 +13,4 @@ public sealed record ResolveResult
 
 	public required bool WasApplied { get; init; }
 
-	[CompilerGenerated]
-	[SetsRequiredMembers]
-	private ResolveResult(ResolveResult original)
-	{
-		OriginalEvent = original.OriginalEvent;
-		FinalEvent = original.FinalEvent;
-		Status = original.Status;
-		WasApplied = original.WasApplied;
-	}
 }

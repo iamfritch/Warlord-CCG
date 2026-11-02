@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
@@ -327,12 +326,7 @@ public static class DatabaseLoader
 		{
 			if (!Enum.TryParse<CharacterClass>(raw, ignoreCase: true, out var result))
 			{
-				CharacterClass? item = CharacterClass.Classless;
-				int num = 1;
-				List<string> list = new List<string>(num);
-				CollectionsMarshal.SetCount(list, num);
-				CollectionsMarshal.AsSpan(list)[0] = "UnknownClass:" + raw;
-				return (Primary: item, MultiClassTags: list);
+				return (Primary: CharacterClass.Classless, MultiClassTags: new List<string> { "UnknownClass:" + raw });
 			}
 			return (Primary: result, MultiClassTags: new List<string>());
 		}

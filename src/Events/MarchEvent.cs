@@ -20,16 +20,6 @@ public record MarchEvent : GameEvent
 	{
 	}
 
-	[SetsRequiredMembers]
-	protected MarchEvent(MarchEvent original)
-		: base(original)
-	{
-		PlayerIndex = original.PlayerIndex;
-		CardInstanceId = original.CardInstanceId;
-		SourceRank = original.SourceRank;
-		DestinationRank = original.DestinationRank;
-		TargetSlotIndex = original.TargetSlotIndex;
-	}
 
 	public override GameState ApplyToState(GameState state)
 	{

@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using WarlordEngine.Abilities;
 using WarlordEngine.Effects;
@@ -107,8 +106,8 @@ public static class RulesParser
 			return null;
 		}
 		string count = match.Groups["count"].Value.ToLowerInvariant();
-		int num = (count == "two" || count == "2") ? 2 : 3;
-		return (num, match.Groups["own"].Success);
+		int rankDistance = (count == "two" || count == "2") ? 2 : 3;
+		return (rankDistance, match.Groups["own"].Success);
 	}
 
 	public static List<AbilityDefinition> Parse(string rulesText)
@@ -147,25 +146,7 @@ public static class RulesParser
 			}
 		}
 		List<string> list3 = new List<string>();
-		List<string> list4;
-		if (list2.Count <= 1)
-		{
-			if (list2.Count != 1)
-			{
-				int i = 1;
-				list4 = new List<string>(i);
-				CollectionsMarshal.SetCount(list4, i);
-				CollectionsMarshal.AsSpan(list4)[0] = rulesText;
-			}
-			else
-			{
-				list4 = list2;
-			}
-		}
-		else
-		{
-			list4 = list2;
-		}
+		List<string> list4 = (list2.Count > 0) ? list2 : new List<string> { rulesText };
 		bool flag = Regex.IsMatch(rulesText, "wounds (?:from this (?:action|strike) )?may not be (?:reduced|prevented)|prevented or reduced", RegexOptions.IgnoreCase);
 		foreach (string item3 in list4)
 		{
@@ -564,11 +545,8 @@ public static class RulesParser
 
 	static RulesParser()
 	{
-		int num = 39;
-		List<EffectMatcher> list = new List<EffectMatcher>(num);
-		CollectionsMarshal.SetCount(list, num);
-		Span<EffectMatcher> span = CollectionsMarshal.AsSpan(list);
-		span[0] = (string text) =>
+		EffectMatcher[] matchers = new EffectMatcher[39];
+		matchers[0] = (string text) =>
 		{
 			if (Regex.IsMatch(text, "Each\\s+player\\s+(?:may\\s+)?draws?\\s+a\\s+card", RegexOptions.IgnoreCase))
 			{
@@ -582,7 +560,7 @@ public static class RulesParser
 			string value = match.Groups[1].Value;
 			return new DrawCardEffect(value.Equals("a", StringComparison.OrdinalIgnoreCase) ? 1 : int.Parse(value));
 		};
-		span[1] = (string text) =>
+		matchers[1] = (string text) =>
 		{
 			if (Regex.IsMatch(text, "for\\s+each|permanently\\s+gains\\s+\\+1\\s+level", RegexOptions.IgnoreCase))
 			{
@@ -596,7 +574,7 @@ public static class RulesParser
 			Match match2 = Regex.Match(text, "The\\s+strike\\s+gets\\s+([+-]?\\d+)", RegexOptions.IgnoreCase);
 			return match2.Success ? new ModifyStatEffect("ATK", int.Parse(match2.Groups[1].Value)) : null;
 		};
-		span[2] = (string text) =>
+		matchers[2] = (string text) =>
 		{
 			if (Regex.IsMatch(text, "for\\s+each|permanently\\s+gains\\s+\\+1\\s+level", RegexOptions.IgnoreCase))
 			{
@@ -605,7 +583,7 @@ public static class RulesParser
 			Match match = Regex.Match(text, "([+-]?\\d+)\\s+AC", RegexOptions.IgnoreCase);
 			return (!match.Success) ? null : new ModifyStatEffect("CurrentArmorClass", int.Parse(match.Groups[1].Value));
 		};
-		span[3] = (string text) =>
+		matchers[3] = (string text) =>
 		{
 			if (Regex.IsMatch(text, "for\\s+each|permanently\\s+gains\\s+\\+1\\s+level", RegexOptions.IgnoreCase))
 			{
@@ -614,7 +592,7 @@ public static class RulesParser
 			Match match = Regex.Match(text, "([+-]?\\d+)\\s+HP", RegexOptions.IgnoreCase);
 			return (!match.Success) ? null : new ModifyStatEffect("CurrentHitPoints", int.Parse(match.Groups[1].Value));
 		};
-		span[4] = (string text) =>
+		matchers[4] = (string text) =>
 		{
 			if (Regex.IsMatch(text, "bonus to ATK and AC equal to this (?:character's|wizard's) level", RegexOptions.IgnoreCase))
 			{
@@ -630,7 +608,7 @@ public static class RulesParser
 			}
 			return Regex.IsMatch(text, "for each opposing character within one rank", RegexOptions.IgnoreCase) ? new ModifyStatEffect("EVEN_THE_ODDS", 1) : null;
 		};
-		span[5] = (string text) =>
+		matchers[5] = (string text) =>
 		{
 			if (Regex.IsMatch(text, "\\bTrue Strike\\b", RegexOptions.IgnoreCase) && !text.Contains("ATK", StringComparison.OrdinalIgnoreCase))
 			{
@@ -670,7 +648,7 @@ public static class RulesParser
 			}
 			return Regex.IsMatch(text, "Push the attacker one rank backward", RegexOptions.IgnoreCase) ? new GrantTraitEffect("SHIELD_OF_SPURNING_PUSH") : null;
 		};
-		span[6] = (string text) =>
+		matchers[6] = (string text) =>
 		{
 			Match match = Regex.Match(text, "additional\\s+(?:melee\\s+)?strike\\s*(?:\\(base\\s*([+-]?\\d+)\\))?", RegexOptions.IgnoreCase);
 			if (!match.Success)
@@ -684,8 +662,8 @@ public static class RulesParser
 			}
 			return new GrantAdditionalStrikeEffect(modifier);
 		};
-		span[7] = (string text) => Regex.IsMatch(text, "permanently gains \\+1 level", RegexOptions.IgnoreCase) ? new PermanentLevelUpEffect() : null;
-		span[8] = (string text) =>
+		matchers[7] = (string text) => Regex.IsMatch(text, "permanently gains \\+1 level", RegexOptions.IgnoreCase) ? new PermanentLevelUpEffect() : null;
+		matchers[8] = (string text) =>
 		{
 			if (Regex.IsMatch(text, "Move the target forward up to two ranks|If (?:this|the) strike hits", RegexOptions.IgnoreCase))
 			{
@@ -716,7 +694,7 @@ public static class RulesParser
 			}
 			return (IEffect?)null;
 		};
-		span[9] = (string text) =>
+		matchers[9] = (string text) =>
 		{
 			Match match = Regex.Match(text, "Deal\\s+(\\d+)\\s+damage", RegexOptions.IgnoreCase);
 			if (match.Success)
@@ -731,7 +709,7 @@ public static class RulesParser
 			int result;
 			return match2.Success ? new DealDamageEffect((!match2.Groups[1].Success || !int.TryParse(match2.Groups[1].Value, out result)) ? 1 : result, "physical") : null;
 		};
-		span[10] = (string text) =>
+		matchers[10] = (string text) =>
 		{
 			if (Regex.IsMatch(text, "\\bBefore\\b.*?\\b(?:strike roll|performs a melee strike):", RegexOptions.IgnoreCase))
 			{
@@ -805,7 +783,7 @@ public static class RulesParser
 			bool ignoreRange = Regex.IsMatch(text, "against the target|target character", RegexOptions.IgnoreCase);
 			return new PerformStrikeEffect(strikeBonus, isRanged, additionalWounds ? 1 : 0, stunOnHit, spendOnHit, PushOnHit: false, pullOnHit, destroyItemOnHit, zeroDamage, bonusFromLevel, flag && !flag3, flag2 && !flag3, flag3, targetLowerLevelOnly, bonusWoundAgainstHigherLevel, hasReach, TrueStrike: false, hasAdvantage, NoRollBonuses: false, cannotReduceWounds, banishOnKill, maxRange, IgnoreRange: ignoreRange);
 		};
-		span[11] = (string text) =>
+		matchers[11] = (string text) =>
 		{
 			Match match = Regex.Match(text, "Reduce the wounds.*?by\\s+(\\d+|one)", RegexOptions.IgnoreCase);
 			if (!match.Success)
@@ -816,8 +794,8 @@ public static class RulesParser
 			bool woundSelf = Regex.IsMatch(text, "wound\\s+(?:Tyren|this character|himself|herself|itself)", RegexOptions.IgnoreCase);
 			return new PreventWoundsEffect(amount, woundSelf);
 		};
-		span[12] = (string text) => Regex.IsMatch(text, "\\bHeal\\b", RegexOptions.IgnoreCase) ? new HealEffect() : null;
-		span[13] = (string text) =>
+		matchers[12] = (string text) => Regex.IsMatch(text, "\\bHeal\\b", RegexOptions.IgnoreCase) ? new HealEffect() : null;
+		matchers[13] = (string text) =>
 		{
 			if (Regex.IsMatch(text, "\\bUnstun\\b", RegexOptions.IgnoreCase))
 			{
@@ -829,7 +807,7 @@ public static class RulesParser
 			}
 			return Regex.IsMatch(text, "\\bJourney\\b", RegexOptions.IgnoreCase) ? new JourneyEffect() : null;
 		};
-		span[14] = (string text) =>
+		matchers[14] = (string text) =>
 		{
 			if (!Regex.IsMatch(text, "Destroy\\s+(?:the|an|one|target)\\s+item", RegexOptions.IgnoreCase))
 			{
@@ -856,16 +834,16 @@ public static class RulesParser
 			}
 			return new DestroyTargetItemEffect(maxRank, levelOffset);
 		};
-		span[15] = (string text) => Regex.IsMatch(text, "Return\\s+an?\\s+(?:Armor|Shield|Weapon).*?equipped.*?to\\s+(?:its\\s+owner's\\s+hand|hand)", RegexOptions.IgnoreCase) ? new SalvageEquippedItemEffect() : null;
-		span[16] = (string text) => Regex.IsMatch(text, "Banish\\s+the\\s+targets.*?\\+3\\s+ranged\\s+strike", RegexOptions.IgnoreCase) ? new BanishFromDiscardAndStrikeEffect() : null;
-		span[17] = (string text) => Regex.IsMatch(text, "Reveal\\s+the\\s+top\\s+10\\s+cards", RegexOptions.IgnoreCase) ? new WellSuppliedEffect() : null;
-		span[18] = (string text) => Regex.IsMatch(text, "Each\\s+player\\s+draws\\s+a\\s+card.*?gains\\s+\\+2\\s+ATK\\s+and\\s+\\+1\\s+HP", RegexOptions.IgnoreCase) ? new StrongarmStoutEffect() : null;
-		span[19] = (string text) =>
+		matchers[15] = (string text) => Regex.IsMatch(text, "Return\\s+an?\\s+(?:Armor|Shield|Weapon).*?equipped.*?to\\s+(?:its\\s+owner's\\s+hand|hand)", RegexOptions.IgnoreCase) ? new SalvageEquippedItemEffect() : null;
+		matchers[16] = (string text) => Regex.IsMatch(text, "Banish\\s+the\\s+targets.*?\\+3\\s+ranged\\s+strike", RegexOptions.IgnoreCase) ? new BanishFromDiscardAndStrikeEffect() : null;
+		matchers[17] = (string text) => Regex.IsMatch(text, "Reveal\\s+the\\s+top\\s+10\\s+cards", RegexOptions.IgnoreCase) ? new WellSuppliedEffect() : null;
+		matchers[18] = (string text) => Regex.IsMatch(text, "Each\\s+player\\s+draws\\s+a\\s+card.*?gains\\s+\\+2\\s+ATK\\s+and\\s+\\+1\\s+HP", RegexOptions.IgnoreCase) ? new StrongarmStoutEffect() : null;
+		matchers[19] = (string text) =>
 		{
 			Match match = Regex.Match(text, "fortitude save\\s*\\(DC\\s*(\\d+)\\)\\s*or\\s+suffer\\s+a\\s+wound", RegexOptions.IgnoreCase);
 			return match.Success ? new FortitudeSaveEffect(int.Parse(match.Groups[1].Value), PerEquippedItem: text.Contains("each item", StringComparison.OrdinalIgnoreCase), FailureEffects: [new DealDamageEffect(1, "physical")]) : null;
 		};
-		span[20] = (string text) =>
+		matchers[20] = (string text) =>
 		{
 			Match match = Regex.Match(text, "will save\\s*\\(DC\\s*(\\d+)(?:\\s*\\+\\s*([a-zA-Z\\s']+))?\\)\\s*or\\s+suffer\\s+a\\s+wound", RegexOptions.IgnoreCase);
 			if (!match.Success)
@@ -876,7 +854,7 @@ public static class RulesParser
 			bool success = match.Groups[2].Success;
 			return new WillSaveEffect(dC, [new DealDamageEffect(1, "magic")], success);
 		};
-		span[21] = (string text) =>
+		matchers[21] = (string text) =>
 		{
 			Match match = Regex.Match(text, "dexterity save\\s*\\(DC\\s*(\\d+)(?:\\s*\\+\\s*([a-zA-Z\\s']+))?\\)\\s*or\\s+be\\s+unable\\s+to\\s+perform\\s+melee\\s+strikes", RegexOptions.IgnoreCase);
 			if (!match.Success)
@@ -887,27 +865,27 @@ public static class RulesParser
 			bool success = match.Groups[2].Success;
 			return new ReflexSaveEffect(dC, [new GrantTraitEffect("NO_MELEE_STRIKES")], success);
 		};
-		span[22] = (string text) => Regex.IsMatch(text, "reveal the top card of your deck.*?bonus to AC", RegexOptions.IgnoreCase) ? new FateshiftEffect() : null;
-		span[23] = (string text) => Regex.IsMatch(text, "number of \\+0 ranged strikes equal to this wizard's Level", RegexOptions.IgnoreCase) ? new MagicMissilesEffect() : null;
-		span[24] = (string text) => Regex.IsMatch(text, "target performs a melee strike.*?performs a melee strike with advantage", RegexOptions.IgnoreCase) ? new HrunInstigatorEffect() : null;
-		span[25] = (string text) => Regex.IsMatch(text, "Move the target forward up to two ranks", RegexOptions.IgnoreCase) ? new TheMightyMuggEffect() : null;
-		span[26] = (string text) => Regex.IsMatch(text, "higher level Deverenian Empire character Journeys", RegexOptions.IgnoreCase) ? new TargetHigherLevelDeverenianJourneyEffect() : null;
-		span[27] = (string text) => Regex.IsMatch(text, "Move your target character in this rank to a different position in this rank", RegexOptions.IgnoreCase) ? new RepositionInRankEffect() : null;
-		span[28] = (string text) => Regex.IsMatch(text, "Put a character into play.*?reduce the character's entering rank by one", RegexOptions.IgnoreCase) ? new PutCharacterIntoPlayEffect() : null;
-		span[29] = (string text) => Regex.IsMatch(text, "Redirect the strike to this character", RegexOptions.IgnoreCase) ? new RedirectStrikeEffect() : null;
-		span[30] = (string text) => Regex.IsMatch(text, "\\bSurvey\\b", RegexOptions.IgnoreCase) ? new SurveyEffect() : null;
-		span[31] = (string text) => Regex.IsMatch(text, "If that character's ATK is lower than.*?stun the target", RegexOptions.IgnoreCase) ? new ChangeReadyStateEffect(ReadyState.Stunned) : null;
-		span[32] = (string text) => Regex.IsMatch(text, "Perform a \\+4 ranged strike.*?If\\s+(?:the\\s+performer|this\\s+character)\\s+is\\s+a\\s+rogue", RegexOptions.IgnoreCase) ? new ShadowBoltsEffect() : null;
-		span[33] = (string text) => Regex.IsMatch(text, "Target\\s+(?:opposing\\s+player|opponent)\\s+chooses.*?melee\\s+strike", RegexOptions.IgnoreCase) ? new AnotherTavernBrawlEffect() : null;
-		span[34] = (string text) => Regex.IsMatch(text, "Your target character performs a melee strike that inflicts an additional wound against characters that are equal or lower level", RegexOptions.IgnoreCase) ? new TargetPerformsStrikeEffect(0, IsRanged: false, BonusWoundAgainstEqualOrLowerLevel: true) : null;
-		span[35] = (string text) =>
+		matchers[22] = (string text) => Regex.IsMatch(text, "reveal the top card of your deck.*?bonus to AC", RegexOptions.IgnoreCase) ? new FateshiftEffect() : null;
+		matchers[23] = (string text) => Regex.IsMatch(text, "number of \\+0 ranged strikes equal to this wizard's Level", RegexOptions.IgnoreCase) ? new MagicMissilesEffect() : null;
+		matchers[24] = (string text) => Regex.IsMatch(text, "target performs a melee strike.*?performs a melee strike with advantage", RegexOptions.IgnoreCase) ? new HrunInstigatorEffect() : null;
+		matchers[25] = (string text) => Regex.IsMatch(text, "Move the target forward up to two ranks", RegexOptions.IgnoreCase) ? new TheMightyMuggEffect() : null;
+		matchers[26] = (string text) => Regex.IsMatch(text, "higher level Deverenian Empire character Journeys", RegexOptions.IgnoreCase) ? new TargetHigherLevelDeverenianJourneyEffect() : null;
+		matchers[27] = (string text) => Regex.IsMatch(text, "Move your target character in this rank to a different position in this rank", RegexOptions.IgnoreCase) ? new RepositionInRankEffect() : null;
+		matchers[28] = (string text) => Regex.IsMatch(text, "Put a character into play.*?reduce the character's entering rank by one", RegexOptions.IgnoreCase) ? new PutCharacterIntoPlayEffect() : null;
+		matchers[29] = (string text) => Regex.IsMatch(text, "Redirect the strike to this character", RegexOptions.IgnoreCase) ? new RedirectStrikeEffect() : null;
+		matchers[30] = (string text) => Regex.IsMatch(text, "\\bSurvey\\b", RegexOptions.IgnoreCase) ? new SurveyEffect() : null;
+		matchers[31] = (string text) => Regex.IsMatch(text, "If that character's ATK is lower than.*?stun the target", RegexOptions.IgnoreCase) ? new ChangeReadyStateEffect(ReadyState.Stunned) : null;
+		matchers[32] = (string text) => Regex.IsMatch(text, "Perform a \\+4 ranged strike.*?If\\s+(?:the\\s+performer|this\\s+character)\\s+is\\s+a\\s+rogue", RegexOptions.IgnoreCase) ? new ShadowBoltsEffect() : null;
+		matchers[33] = (string text) => Regex.IsMatch(text, "Target\\s+(?:opposing\\s+player|opponent)\\s+chooses.*?melee\\s+strike", RegexOptions.IgnoreCase) ? new AnotherTavernBrawlEffect() : null;
+		matchers[34] = (string text) => Regex.IsMatch(text, "Your target character performs a melee strike that inflicts an additional wound against characters that are equal or lower level", RegexOptions.IgnoreCase) ? new TargetPerformsStrikeEffect(0, IsRanged: false, BonusWoundAgainstEqualOrLowerLevel: true) : null;
+		matchers[35] = (string text) =>
 		{
 			Match match = Regex.Match(text, "target performs a \\+?(\\d+) melee strike", RegexOptions.IgnoreCase);
 			return match.Success ? new TargetPerformsStrikeEffect(int.Parse(match.Groups[1].Value)) : null;
 		};
-		span[36] = (string text) => Regex.IsMatch(text, "Your two target characters attack", RegexOptions.IgnoreCase) ? new PackTacticsEffect() : null;
-		span[37] = (string text) => Regex.IsMatch(text, "Each player may draw a card.*?draw an additional card", RegexOptions.IgnoreCase) ? new MeetAtTheInnEffect() : null;
-		span[38] = (string text) =>
+		matchers[36] = (string text) => Regex.IsMatch(text, "Your two target characters attack", RegexOptions.IgnoreCase) ? new PackTacticsEffect() : null;
+		matchers[37] = (string text) => Regex.IsMatch(text, "Each player may draw a card.*?draw an additional card", RegexOptions.IgnoreCase) ? new MeetAtTheInnEffect() : null;
+		matchers[38] = (string text) =>
 		{
 			Match match = Regex.Match(text, "Perform a \\+?(\\d+) ranged strike\\.\\s*After the strike,\\s*any characters who were adjacent to the target must succeed with a magic save\\s*\\(DC\\s*(\\d+)\\)\\s*or suffer a wound", RegexOptions.IgnoreCase);
 			if (match.Success)
@@ -916,6 +894,6 @@ public static class RulesParser
 			}
 			return Regex.IsMatch(text, "Fire Resistance", RegexOptions.IgnoreCase) ? new GrantTraitEffect("FIRE_RESISTANCE") : null;
 		};
-		EffectMatchers = list;
+		EffectMatchers = new List<EffectMatcher>(matchers);
 	}
 }

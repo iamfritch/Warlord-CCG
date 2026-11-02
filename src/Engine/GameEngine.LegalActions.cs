@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -32,9 +32,9 @@ public sealed partial class GameEngine
 			{
 				return Array.Empty<IPlayerAction>();
 			}
-			foreach (List<CardInstance> value2 in playerState.Ranks.Values)
+			foreach (List<CardInstance> rankCards in playerState.Ranks.Values)
 			{
-				foreach (CardInstance item in value2)
+				foreach (CardInstance item in rankCards)
 				{
 					if (item.ReadyState == ReadyState.Stunned)
 					{
@@ -119,28 +119,28 @@ public sealed partial class GameEngine
 					{
 						continue;
 					}
-					List<CardInstance> list2 = new List<CardInstance>();
-					foreach (List<CardInstance> value3 in playerState.Ranks.Values)
+					List<CardInstance> performers = new List<CardInstance>();
+					foreach (List<CardInstance> rankCards in playerState.Ranks.Values)
 					{
-						foreach (CardInstance item5 in value3)
+						foreach (CardInstance candidate in rankCards)
 						{
-							CardDefinition definition4 = _cardDb.GetDefinition(item5.DefinitionId);
-							if (definition4 != null && PlayCardAction.ValidatePerformerRequirements(definition3, definition4, item5).IsSuccess && (reactAbility.RequiredPerformerClass == null || (definition4.Class.HasValue && definition4.Class.Value.ToString().Contains(reactAbility.RequiredPerformerClass, StringComparison.OrdinalIgnoreCase)) || definition4.Traits.Any((string t) => t.Contains(reactAbility.RequiredPerformerClass, StringComparison.OrdinalIgnoreCase))))
+							CardDefinition def = _cardDb.GetDefinition(candidate.DefinitionId);
+							if (def != null && PlayCardAction.ValidatePerformerRequirements(definition3, def, candidate).IsSuccess && (reactAbility.RequiredPerformerClass == null || (def.Class.HasValue && def.Class.Value.ToString().Contains(reactAbility.RequiredPerformerClass, StringComparison.OrdinalIgnoreCase)) || def.Traits.Any((string t) => t.Contains(reactAbility.RequiredPerformerClass, StringComparison.OrdinalIgnoreCase))))
 							{
-								list2.Add(item5);
+								performers.Add(candidate);
 							}
 						}
 					}
-					foreach (CardInstance item6 in list2)
+					foreach (CardInstance performer in performers)
 					{
-						foreach (int? item7 in EnumerateActionCardTargets(state, playerId, reactAbility, item6))
+						foreach (int? targetId in EnumerateActionCardTargets(state, playerId, reactAbility, performer))
 						{
 							PlayCardAction playCardAction = new PlayCardAction
 							{
 								PlayerIndex = playerId,
 								CardInstanceId = item4.InstanceId,
-								PerformerInstanceId = item6.InstanceId,
-								TargetCharacterId = item7,
+								PerformerInstanceId = performer.InstanceId,
+								TargetCharacterId = targetId,
 								AbilityIndex = k,
 								ChoiceIndex = k
 							};
@@ -183,14 +183,14 @@ public sealed partial class GameEngine
 					{
 						break;
 					}
-					int num2 = ((definition5.Level <= 0) ? 1 : definition5.Level);
-					if (validDeployRanks.Contains(num2))
+					int deployRank = ((definition5.Level <= 0) ? 1 : definition5.Level);
+					if (validDeployRanks.Contains(deployRank))
 					{
 						PlayCardAction playCardAction5 = new PlayCardAction
 						{
 							PlayerIndex = playerId,
 							CardInstanceId = item8.InstanceId,
-							TargetRank = num2
+							TargetRank = deployRank
 						};
 						if (CanExecute(playCardAction5, state).IsSuccess)
 						{
@@ -220,27 +220,27 @@ public sealed partial class GameEngine
 					{
 						break;
 					}
-					List<CardInstance> list3 = new List<CardInstance>();
-					foreach (List<CardInstance> value4 in playerState.Ranks.Values)
+					List<CardInstance> actionPerformers = new List<CardInstance>();
+					foreach (List<CardInstance> rankCards in playerState.Ranks.Values)
 					{
-						foreach (CardInstance item10 in value4)
+						foreach (CardInstance candidate in rankCards)
 						{
-							CardDefinition definition6 = _cardDb.GetDefinition(item10.DefinitionId);
-							if (definition6 != null && PlayCardAction.ValidatePerformerRequirements(definition5, definition6, item10).IsSuccess)
+							CardDefinition candidateDef = _cardDb.GetDefinition(candidate.DefinitionId);
+							if (candidateDef != null && PlayCardAction.ValidatePerformerRequirements(definition5, candidateDef, candidate).IsSuccess)
 							{
-								list3.Add(item10);
+								actionPerformers.Add(candidate);
 							}
 						}
 					}
 					if (definition5.Abilities.Count == 0)
 					{
-						foreach (CardInstance item11 in list3)
+						foreach (CardInstance performer in actionPerformers)
 						{
 							PlayCardAction playCardAction2 = new PlayCardAction
 							{
 								PlayerIndex = playerId,
 								CardInstanceId = item8.InstanceId,
-								PerformerInstanceId = item11.InstanceId,
+								PerformerInstanceId = performer.InstanceId,
 								TargetCharacterId = null
 							};
 							if (CanExecute(playCardAction2, state).IsSuccess)
@@ -250,30 +250,30 @@ public sealed partial class GameEngine
 						}
 						break;
 					}
-					for (int num = 0; num < definition5.Abilities.Count; num++)
+					for (int abilityIdx = 0; abilityIdx < definition5.Abilities.Count; abilityIdx++)
 					{
-						AbilityDefinition ability = definition5.Abilities[num];
+						AbilityDefinition ability = definition5.Abilities[abilityIdx];
 						if (!ability.IsActive)
 						{
 							continue;
 						}
-						foreach (CardInstance item12 in list3)
+						foreach (CardInstance performer in actionPerformers)
 						{
-							CardDefinition definition7 = _cardDb.GetDefinition(item12.DefinitionId);
-							if (ability.RequiredPerformerClass != null && definition7 != null && (!definition7.Class.HasValue || !definition7.Class.Value.ToString().Contains(ability.RequiredPerformerClass, StringComparison.OrdinalIgnoreCase)) && !definition7.Traits.Any((string t) => t.Contains(ability.RequiredPerformerClass, StringComparison.OrdinalIgnoreCase)))
+							CardDefinition performerDef = _cardDb.GetDefinition(performer.DefinitionId);
+							if (ability.RequiredPerformerClass != null && performerDef != null && (!performerDef.Class.HasValue || !performerDef.Class.Value.ToString().Contains(ability.RequiredPerformerClass, StringComparison.OrdinalIgnoreCase)) && !performerDef.Traits.Any((string t) => t.Contains(ability.RequiredPerformerClass, StringComparison.OrdinalIgnoreCase)))
 							{
 								continue;
 							}
-							foreach (int? item13 in EnumerateActionCardTargets(state, playerId, ability, item12))
+							foreach (int? targetId in EnumerateActionCardTargets(state, playerId, ability, performer))
 							{
 								PlayCardAction playCardAction3 = new PlayCardAction
 								{
 									PlayerIndex = playerId,
 									CardInstanceId = item8.InstanceId,
-									PerformerInstanceId = item12.InstanceId,
-									TargetCharacterId = item13,
-									AbilityIndex = num,
-									ChoiceIndex = num
+									PerformerInstanceId = performer.InstanceId,
+									TargetCharacterId = targetId,
+									AbilityIndex = abilityIdx,
+									ChoiceIndex = abilityIdx
 								};
 								if (CanExecute(playCardAction3, state).IsSuccess)
 								{
@@ -290,51 +290,44 @@ public sealed partial class GameEngine
 		TurnPhase currentPhase = state.CurrentPhase;
 		if (currentPhase == TurnPhase.Order || currentPhase == TurnPhase.Combat)
 		{
-			int key;
-			List<CardInstance> value;
-			foreach (KeyValuePair<int, List<CardInstance>> rank in playerState.Ranks)
+			foreach (var (attackerRank, rankAttackers) in playerState.Ranks)
 			{
-				rank.Deconstruct(out key, out value);
-				int num3 = key;
-				foreach (CardInstance item14 in value)
+				foreach (CardInstance attacker in rankAttackers)
 				{
-					if (item14.ReadyState != ReadyState.Ready)
+					if (attacker.ReadyState != ReadyState.Ready)
 					{
 						continue;
 					}
-					CardDefinition? definition8 = _cardDb.GetDefinition(item14.DefinitionId);
-					bool flag = (object)definition8 != null && definition8.Attack?.Strikes.Any((StrikeDescriptor s) => s.IsRanged) == true;
-					int num4 = (CharacterHasReach(item14, state, _cardDb) ? 3 : 2);
-					foreach (PlayerState player in state.Players)
+					CardDefinition? attackerDef = _cardDb.GetDefinition(attacker.DefinitionId);
+					bool isRanged = (object)attackerDef != null && attackerDef.Attack?.Strikes.Any((StrikeDescriptor s) => s.IsRanged) == true;
+					int maxMeleeReach = (CharacterHasReach(attacker, state, _cardDb) ? 3 : 2);
+					foreach (PlayerState defendingPlayer in state.Players)
 					{
-						if (player.PlayerIndex == playerId)
+						if (defendingPlayer.PlayerIndex == playerId)
 						{
 							continue;
 						}
-						foreach (KeyValuePair<int, List<CardInstance>> rank2 in player.Ranks)
+						foreach (var (defenderRank, rankDefenders) in defendingPlayer.Ranks)
 						{
-							rank2.Deconstruct(out key, out value);
-							int num5 = key;
-							List<CardInstance> list4 = value;
-							int crossDist = BoardGeometry.GetCrossBoardDistance(num3, num5);
-							if (flag)
+							int crossDist = BoardGeometry.GetCrossBoardDistance(attackerRank, defenderRank);
+							if (isRanged)
 							{
-								if (!BoardGeometry.IsRangedValid(num3, num5, 2))
+								if (!BoardGeometry.IsRangedValid(attackerRank, defenderRank, 2))
 								{
 									continue;
 								}
 							}
-							else if (crossDist > num4 - 1)
+							else if (crossDist > maxMeleeReach - 1)
 							{
 								continue;
 							}
-							foreach (CardInstance item15 in list4)
+							foreach (CardInstance target in rankDefenders)
 							{
 								AttackAction attackAction = new AttackAction
 								{
 									PlayerIndex = playerId,
-									AttackerInstanceId = item14.InstanceId,
-									TargetInstanceId = item15.InstanceId
+									AttackerInstanceId = attacker.InstanceId,
+									TargetInstanceId = target.InstanceId
 								};
 								if (CanExecute(attackAction, state).IsSuccess)
 								{
@@ -345,20 +338,18 @@ public sealed partial class GameEngine
 					}
 				}
 			}
-			foreach (KeyValuePair<int, List<CardInstance>> rank3 in playerState.Ranks)
+			foreach (var (currentRank, rankCharacters) in playerState.Ranks)
 			{
-				rank3.Deconstruct(out key, out value);
-				int num6 = key;
-				foreach (CardInstance item16 in value)
+				foreach (CardInstance item16 in rankCharacters)
 				{
 					if (item16.ReadyState != ReadyState.Ready)
 					{
 						continue;
 					}
-					if (value.Count > 1)
+					if (rankCharacters.Count > 1)
 					{
-						int currentSlot = value.FindIndex((CardInstance c) => c.InstanceId == item16.InstanceId);
-						for (int slot = 0; slot < value.Count; slot++)
+						int currentSlot = rankCharacters.FindIndex((CardInstance c) => c.InstanceId == item16.InstanceId);
+						for (int slot = 0; slot < rankCharacters.Count; slot++)
 						{
 							if (slot != currentSlot)
 							{
@@ -366,8 +357,8 @@ public sealed partial class GameEngine
 								{
 									PlayerIndex = playerId,
 									CardInstanceId = item16.InstanceId,
-									SourceRank = num6,
-									DestinationRank = num6,
+									SourceRank = currentRank,
+									DestinationRank = currentRank,
 									TargetSlotIndex = slot
 								};
 								if (CanExecute(marchWithin, state).IsSuccess)
@@ -377,9 +368,9 @@ public sealed partial class GameEngine
 							}
 						}
 					}
-					if (num6 > 1)
+					if (currentRank > 1)
 					{
-						int destRank = num6 - 1;
+						int destRank = currentRank - 1;
 						int destCount = playerState.Ranks.TryGetValue(destRank, out var destCards) ? destCards.Count : 0;
 						if (destCount == 0)
 						{
@@ -387,7 +378,7 @@ public sealed partial class GameEngine
 							{
 								PlayerIndex = playerId,
 								CardInstanceId = item16.InstanceId,
-								SourceRank = num6,
+								SourceRank = currentRank,
 								DestinationRank = destRank,
 								TargetSlotIndex = 0
 							};
@@ -404,7 +395,7 @@ public sealed partial class GameEngine
 								{
 									PlayerIndex = playerId,
 									CardInstanceId = item16.InstanceId,
-									SourceRank = num6,
+									SourceRank = currentRank,
 									DestinationRank = destRank,
 									TargetSlotIndex = slot
 								};
@@ -415,7 +406,7 @@ public sealed partial class GameEngine
 							}
 						}
 					}
-					int fRank = num6 + 1;
+					int fRank = currentRank + 1;
 					int fCount = playerState.Ranks.TryGetValue(fRank, out var fCards) ? fCards.Count : 0;
 					if (fCount == 0)
 					{
@@ -423,7 +414,7 @@ public sealed partial class GameEngine
 						{
 							PlayerIndex = playerId,
 							CardInstanceId = item16.InstanceId,
-							SourceRank = num6,
+							SourceRank = currentRank,
 							DestinationRank = fRank,
 							TargetSlotIndex = 0
 						};
@@ -440,7 +431,7 @@ public sealed partial class GameEngine
 							{
 								PlayerIndex = playerId,
 								CardInstanceId = item16.InstanceId,
-								SourceRank = num6,
+								SourceRank = currentRank,
 								DestinationRank = fRank,
 								TargetSlotIndex = slot
 							};
@@ -452,33 +443,33 @@ public sealed partial class GameEngine
 					}
 				}
 			}
-			foreach (List<CardInstance> value5 in playerState.Ranks.Values)
+			foreach (List<CardInstance> rankCards in playerState.Ranks.Values)
 			{
-				foreach (CardInstance item17 in value5)
+				foreach (CardInstance character in rankCards)
 				{
-					if (item17.ReadyState == ReadyState.Stunned)
+					if (character.ReadyState == ReadyState.Stunned)
 					{
 						continue;
 					}
-					CardDefinition definition9 = _cardDb.GetDefinition(item17.DefinitionId);
-					if ((object)definition9 != null)
+					CardDefinition charDef = _cardDb.GetDefinition(character.DefinitionId);
+					if ((object)charDef != null)
 					{
-						for (int num7 = 0; num7 < definition9.Abilities.Count; num7++)
+						for (int abilityIdx = 0; abilityIdx < charDef.Abilities.Count; abilityIdx++)
 						{
-							AbilityDefinition abilityDefinition3 = definition9.Abilities[num7];
-							if (!abilityDefinition3.IsActive || (abilityDefinition3.RequiresSpend && item17.ReadyState != ReadyState.Ready) || (abilityDefinition3.IsLimited && (state.TurnState.UsedLimitedAbilityKeysThisTurn.Contains($"{item17.InstanceId}_{num7}") || state.TurnState.UsedLimitedAbilityKeysThisTurn.Contains($"{item17.InstanceId}_Limited") || item17.AbilitiesUsedThisTurn.Contains(num7))))
+							AbilityDefinition abilityDef = charDef.Abilities[abilityIdx];
+							if (!abilityDef.IsActive || (abilityDef.RequiresSpend && character.ReadyState != ReadyState.Ready) || (abilityDef.IsLimited && (state.TurnState.UsedLimitedAbilityKeysThisTurn.Contains($"{character.InstanceId}_{abilityIdx}") || state.TurnState.UsedLimitedAbilityKeysThisTurn.Contains($"{character.InstanceId}_Limited") || character.AbilitiesUsedThisTurn.Contains(abilityIdx))))
 							{
 								continue;
 							}
-							foreach (int[] item18 in EnumerateAbilityTargets(state, playerId, item17.InstanceId, abilityDefinition3))
+							foreach (int[] targets in EnumerateAbilityTargets(state, playerId, character.InstanceId, abilityDef))
 							{
 								UseAbilityAction useAbilityAction3 = new UseAbilityAction
 								{
 									PlayerIndex = playerId,
-									SourceInstanceId = item17.InstanceId,
-									AbilityIndex = num7,
-									ChoiceIndex = num7,
-									TargetInstanceIds = item18
+									SourceInstanceId = character.InstanceId,
+									AbilityIndex = abilityIdx,
+									ChoiceIndex = abilityIdx,
+									TargetInstanceIds = targets
 								};
 								if (CanExecute(useAbilityAction3, state).IsSuccess)
 								{
@@ -487,34 +478,34 @@ public sealed partial class GameEngine
 							}
 						}
 					}
-					foreach (int attachedItemId2 in item17.AttachedItemIds)
+					foreach (int attachedItemId2 in character.AttachedItemIds)
 					{
-						CardInstance? cardInstance2 = FindBoardCard(state, attachedItemId2) ?? CardLocator.FindCard(state, attachedItemId2);
-						if (!cardInstance2.HasValue || cardInstance2.Value.ReadyState == ReadyState.Stunned)
+						CardInstance? attachedItemCard = FindBoardCard(state, attachedItemId2) ?? CardLocator.FindCard(state, attachedItemId2);
+						if (!attachedItemCard.HasValue || attachedItemCard.Value.ReadyState == ReadyState.Stunned)
 						{
 							continue;
 						}
-						CardDefinition definition10 = _cardDb.GetDefinition(cardInstance2.Value.DefinitionId);
-						if ((object)definition10 == null)
+						CardDefinition attachedItemDef = _cardDb.GetDefinition(attachedItemCard.Value.DefinitionId);
+						if ((object)attachedItemDef == null)
 						{
 							continue;
 						}
-						for (int num8 = 0; num8 < definition10.Abilities.Count; num8++)
+						for (int itemAbilityIdx = 0; itemAbilityIdx < attachedItemDef.Abilities.Count; itemAbilityIdx++)
 						{
-							AbilityDefinition abilityDefinition4 = definition10.Abilities[num8];
-							if (!abilityDefinition4.IsActive || (abilityDefinition4.RequiresSpend && cardInstance2.Value.ReadyState != ReadyState.Ready) || (abilityDefinition4.IsLimited && (state.TurnState.UsedLimitedAbilityKeysThisTurn.Contains($"{cardInstance2.Value.InstanceId}_{num8}") || state.TurnState.UsedLimitedAbilityKeysThisTurn.Contains($"{cardInstance2.Value.InstanceId}_Limited") || cardInstance2.Value.AbilitiesUsedThisTurn.Contains(num8))))
+							AbilityDefinition itemAbilityDef = attachedItemDef.Abilities[itemAbilityIdx];
+							if (!itemAbilityDef.IsActive || (itemAbilityDef.RequiresSpend && attachedItemCard.Value.ReadyState != ReadyState.Ready) || (itemAbilityDef.IsLimited && (state.TurnState.UsedLimitedAbilityKeysThisTurn.Contains($"{attachedItemCard.Value.InstanceId}_{itemAbilityIdx}") || state.TurnState.UsedLimitedAbilityKeysThisTurn.Contains($"{attachedItemCard.Value.InstanceId}_Limited") || attachedItemCard.Value.AbilitiesUsedThisTurn.Contains(itemAbilityIdx))))
 							{
 								continue;
 							}
-							foreach (int[] item19 in EnumerateAbilityTargets(state, playerId, item17.InstanceId, abilityDefinition4))
+							foreach (int[] itemTargets in EnumerateAbilityTargets(state, playerId, character.InstanceId, itemAbilityDef))
 							{
 								UseAbilityAction useAbilityAction4 = new UseAbilityAction
 								{
 									PlayerIndex = playerId,
-									SourceInstanceId = cardInstance2.Value.InstanceId,
-									AbilityIndex = num8,
-									ChoiceIndex = num8,
-									TargetInstanceIds = item19
+									SourceInstanceId = attachedItemCard.Value.InstanceId,
+									AbilityIndex = itemAbilityIdx,
+									ChoiceIndex = itemAbilityIdx,
+									TargetInstanceIds = itemTargets
 								};
 								if (CanExecute(useAbilityAction4, state).IsSuccess)
 								{
@@ -539,16 +530,16 @@ public sealed partial class GameEngine
 
 	private static List<int> GetValidDeployRanks(PlayerState player)
 	{
-		List<int> list = new List<int> { 1 };
-		int num = player.Ranks.Keys.DefaultIfEmpty(0).Max();
-		for (int i = 2; i <= num + 1; i++)
+		List<int> validRanks = new List<int> { 1 };
+		int maxRank = player.Ranks.Keys.DefaultIfEmpty(0).Max();
+		for (int r = 2; r <= maxRank + 1; r++)
 		{
-			if (player.Ranks.TryGetValue(i - 1, out List<CardInstance> value) && value.Count > 0 && (player.Ranks.TryGetValue(i, out List<CardInstance> value2) ? value2.Count : 0) + 1 <= value.Count)
+			if (player.Ranks.TryGetValue(r - 1, out List<CardInstance> prevRankCards) && prevRankCards.Count > 0 && (player.Ranks.TryGetValue(r, out List<CardInstance> currRankCards) ? currRankCards.Count : 0) + 1 <= prevRankCards.Count)
 			{
-				list.Add(i);
+				validRanks.Add(r);
 			}
 		}
-		return list;
+		return validRanks;
 	}
 
 	private IEnumerable<int[]> EnumerateAbilityTargets(GameState state, int playerId, int sourceInstanceId, AbilityDefinition ability)
@@ -763,9 +754,9 @@ public sealed partial class GameEngine
 		if (ability.Description?.Contains("wounded Dwarven Forges character", StringComparison.OrdinalIgnoreCase) ?? false)
 		{
 			PlayerState playerState = state.Players[playerId];
-			foreach (List<CardInstance> value5 in playerState.Ranks.Values)
+			foreach (List<CardInstance> rankCards in playerState.Ranks.Values)
 			{
-				foreach (CardInstance item in value5)
+				foreach (CardInstance item in rankCards)
 				{
 					CardDefinition definition = _cardDb.GetDefinition(item.DefinitionId);
 					if (IsDwarf(definition) && IsCharacterWounded(item, definition, state, _cardDb))
@@ -778,11 +769,11 @@ public sealed partial class GameEngine
 		}
 		if (ability.Description?.Contains("non-stunned Dwarven Forges character in a front rank", StringComparison.OrdinalIgnoreCase) ?? false)
 		{
-			if (!state.Players[playerId].Ranks.TryGetValue(1, out List<CardInstance> value))
+			if (!state.Players[playerId].Ranks.TryGetValue(1, out List<CardInstance> frontRankCards))
 			{
 				yield break;
 			}
-			foreach (CardInstance item2 in value)
+			foreach (CardInstance item2 in frontRankCards)
 			{
 				if (item2.ReadyState != ReadyState.Stunned && IsDwarf(_cardDb.GetDefinition(item2.DefinitionId)))
 				{
@@ -812,11 +803,11 @@ public sealed partial class GameEngine
 		}
 		if (ability.TargetScope == TargetScope.SameRank)
 		{
-			if (!state.Players[playerId].Ranks.TryGetValue(sourceRank, out List<CardInstance> value2))
+			if (!state.Players[playerId].Ranks.TryGetValue(sourceRank, out List<CardInstance> sameRankCards))
 			{
 				yield break;
 			}
-			foreach (CardInstance item3 in value2)
+			foreach (CardInstance item3 in sameRankCards)
 			{
 				yield return new int[1] { item3.InstanceId };
 			}
@@ -824,11 +815,11 @@ public sealed partial class GameEngine
 		}
 		if (ability.TargetScope == TargetScope.OtherInSameRank)
 		{
-			if (!state.Players[playerId].Ranks.TryGetValue(sourceRank, out List<CardInstance> value3))
+			if (!state.Players[playerId].Ranks.TryGetValue(sourceRank, out List<CardInstance> sameRankCards))
 			{
 				yield break;
 			}
-			foreach (CardInstance item4 in value3)
+			foreach (CardInstance item4 in sameRankCards)
 			{
 				if (item4.InstanceId != sourceInstanceId)
 				{
@@ -837,23 +828,18 @@ public sealed partial class GameEngine
 			}
 			yield break;
 		}
-		int key;
-		List<CardInstance> value4;
 		if (ability.TargetScope == TargetScope.WithinRankDistance && ability.MaxRankDistance.HasValue)
 		{
 			int maxDist = ability.MaxRankDistance.Value;
 			foreach (PlayerState player in state.Players)
 			{
-				foreach (KeyValuePair<int, List<CardInstance>> rank in player.Ranks)
+				foreach (var (targetRank, rankCards) in player.Ranks)
 				{
-					rank.Deconstruct(out key, out value4);
-					int num = key;
-					List<CardInstance> list2 = value4;
-					if (Math.Abs(num - sourceRank) > maxDist)
+					if (Math.Abs(targetRank - sourceRank) > maxDist)
 					{
 						continue;
 					}
-					foreach (CardInstance item5 in list2)
+					foreach (CardInstance item5 in rankCards)
 					{
 						yield return new int[1] { item5.InstanceId };
 					}
@@ -861,23 +847,20 @@ public sealed partial class GameEngine
 			}
 			yield break;
 		}
-		bool flag = ability.Effects.Any((IEffect e) => (e is DealDamageEffect || e is ResolveAttackEffect || e is PerformStrikeEffect || e is FireballEffect || e is ShadowBoltsEffect) ? true : false);
-		bool flag2 = ability.Effects.Any((IEffect e) => e is ModifyStatEffect || e.GetType().Name.Contains("Heal", StringComparison.OrdinalIgnoreCase));
-		if (flag)
+		bool isDamageOrAttack = ability.Effects.Any((IEffect e) => (e is DealDamageEffect || e is ResolveAttackEffect || e is PerformStrikeEffect || e is FireballEffect || e is ShadowBoltsEffect) ? true : false);
+		bool isStatOrHeal = ability.Effects.Any((IEffect e) => e is ModifyStatEffect || e.GetType().Name.Contains("Heal", StringComparison.OrdinalIgnoreCase));
+		if (isDamageOrAttack)
 		{
 			bool yielded = false;
-			foreach (PlayerState player2 in state.Players)
+			foreach (PlayerState defendingPlayer in state.Players)
 			{
-				if (player2.PlayerIndex == playerId)
+				if (defendingPlayer.PlayerIndex == playerId)
 				{
 					continue;
 				}
-				foreach (KeyValuePair<int, List<CardInstance>> rank2 in player2.Ranks)
+				foreach (var (defenderRank, defenderRankCards) in defendingPlayer.Ranks)
 				{
-					rank2.Deconstruct(out key, out value4);
-					int num2 = key;
-					List<CardInstance> list3 = value4;
-					int crossDist = BoardGeometry.GetCrossBoardDistance(sourceRank, num2);
+					int crossDist = BoardGeometry.GetCrossBoardDistance(sourceRank, defenderRank);
 					PerformStrikeEffect? strikeEff = ability.Effects.OfType<PerformStrikeEffect>().FirstOrDefault();
 					if (strikeEff != null)
 					{
@@ -905,7 +888,7 @@ public sealed partial class GameEngine
 							continue;
 						}
 					}
-					foreach (CardInstance item6 in list3)
+					foreach (CardInstance item6 in defenderRankCards)
 					{
 						if (strikeEff != null && cardInstance.HasValue && IsTargetProtectedByStealth(state, cardInstance.Value, item6, strikeEff.IsRanged, _cardDb))
 						{
@@ -942,13 +925,13 @@ public sealed partial class GameEngine
 				}
 			}
 		}
-		else if (flag2)
+		else if (isStatOrHeal)
 		{
-			PlayerState playerState2 = state.Players[playerId];
+			PlayerState friendlyPlayer = state.Players[playerId];
 			bool yielded = false;
-			foreach (List<CardInstance> value6 in playerState2.Ranks.Values)
+			foreach (List<CardInstance> rankCards in friendlyPlayer.Ranks.Values)
 			{
-				foreach (CardInstance item7 in value6)
+				foreach (CardInstance item7 in rankCards)
 				{
 					yielded = true;
 					yield return new int[1] { item7.InstanceId };
@@ -988,8 +971,8 @@ public sealed partial class GameEngine
 						yield break;
 					}
 				}
-				CardInstance? cardInstance2 = FindBoardCard(state, declareAttackEvent.DefenderInstanceId);
-				if ((!ability.Effects.OfType<PerformStrikeEffect>().Any((PerformStrikeEffect s) => s.TargetSpentOrStunnedOnly) && !Regex.IsMatch(ability.Description ?? "", "\\b(?:spent\\s+or\\s+stunned|against\\s+a\\s+spent|target\\s+a\\s+spent)\\b", RegexOptions.IgnoreCase)) || !cardInstance2.HasValue || cardInstance2.Value.ReadyState != ReadyState.Ready)
+				CardInstance? defenderCard = FindBoardCard(state, declareAttackEvent.DefenderInstanceId);
+				if ((!ability.Effects.OfType<PerformStrikeEffect>().Any((PerformStrikeEffect s) => s.TargetSpentOrStunnedOnly) && !Regex.IsMatch(ability.Description ?? "", "\\b(?:spent\\s+or\\s+stunned|against\\s+a\\s+spent|target\\s+a\\s+spent)\\b", RegexOptions.IgnoreCase)) || !defenderCard.HasValue || defenderCard.Value.ReadyState != ReadyState.Ready)
 				{
 					yield return declareAttackEvent.AttackerInstanceId;
 				}
@@ -1019,16 +1002,16 @@ public sealed partial class GameEngine
 				}
 				if (performer.HasValue && ability.TargetScope == TargetScope.OtherInSameRank)
 				{
-					CardInstance? cardInstance3 = FindBoardCard(state, declareAttackEvent2.DefenderInstanceId);
-					if (!cardInstance3.HasValue || cardInstance3.Value.OwnerPlayerIndex != performer.Value.OwnerPlayerIndex || cardInstance3.Value.Rank != performer.Value.Rank || cardInstance3.Value.InstanceId == performer.Value.InstanceId)
+					CardInstance? sameRankTarget = FindBoardCard(state, declareAttackEvent2.DefenderInstanceId);
+					if (!sameRankTarget.HasValue || sameRankTarget.Value.OwnerPlayerIndex != performer.Value.OwnerPlayerIndex || sameRankTarget.Value.Rank != performer.Value.Rank || sameRankTarget.Value.InstanceId == performer.Value.InstanceId)
 					{
 						yield break;
 					}
 				}
 				if (performer.HasValue && ability.TargetScope == TargetScope.WithinRankDistance && ability.MaxRankDistance.HasValue)
 				{
-					CardInstance? cardInstance4 = FindBoardCard(state, declareAttackEvent2.DefenderInstanceId);
-					if (!cardInstance4.HasValue || Math.Abs((cardInstance4.Value.Rank ?? 1) - (performer.Value.Rank ?? 1)) > ability.MaxRankDistance.Value)
+					CardInstance? rankDistTarget = FindBoardCard(state, declareAttackEvent2.DefenderInstanceId);
+					if (!rankDistTarget.HasValue || Math.Abs((rankDistTarget.Value.Rank ?? 1) - (performer.Value.Rank ?? 1)) > ability.MaxRankDistance.Value)
 					{
 						yield break;
 					}
@@ -1044,8 +1027,8 @@ public sealed partial class GameEngine
 				}
 				if (performer.HasValue && ability.TargetScope == TargetScope.SameRank)
 				{
-					CardInstance? cardInstance5 = FindBoardCard(state, declareAttackEvent3.DefenderInstanceId);
-					if (!cardInstance5.HasValue || cardInstance5.Value.OwnerPlayerIndex != performer.Value.OwnerPlayerIndex || cardInstance5.Value.Rank != performer.Value.Rank)
+					CardInstance? sameRankDefender = FindBoardCard(state, declareAttackEvent3.DefenderInstanceId);
+					if (!sameRankDefender.HasValue || sameRankDefender.Value.OwnerPlayerIndex != performer.Value.OwnerPlayerIndex || sameRankDefender.Value.Rank != performer.Value.Rank)
 					{
 						yield break;
 					}
@@ -1057,8 +1040,8 @@ public sealed partial class GameEngine
 			{
 				if (topPendingEvent is CharacterDefeatedEvent characterDefeatedEvent && characterDefeatedEvent.OwnerPlayerIndex == playerId)
 				{
-					CardInstance? cardInstance6 = FindBoardCard(state, characterDefeatedEvent.DefeatedInstanceId);
-					if (cardInstance6.HasValue && (!(ability.Description?.Contains("Dwarven Forges", StringComparison.OrdinalIgnoreCase) ?? false) || (IsDwarf(_cardDb.GetDefinition(cardInstance6.Value.DefinitionId)) && cardInstance6.Value.AttachedItemIds.Count != 0)))
+					CardInstance? defeatedCard = FindBoardCard(state, characterDefeatedEvent.DefeatedInstanceId);
+					if (defeatedCard.HasValue && (!(ability.Description?.Contains("Dwarven Forges", StringComparison.OrdinalIgnoreCase) ?? false) || (IsDwarf(_cardDb.GetDefinition(defeatedCard.Value.DefinitionId)) && defeatedCard.Value.AttachedItemIds.Count != 0)))
 					{
 						yield return characterDefeatedEvent.DefeatedInstanceId;
 					}
@@ -1117,9 +1100,9 @@ public sealed partial class GameEngine
 		{
 			foreach (PlayerState player in state.Players)
 			{
-				if (player.PlayerIndex != playerId && player.Ranks.TryGetValue(1, out List<CardInstance> value) && value.Count > 0)
+				if (player.PlayerIndex != playerId && player.Ranks.TryGetValue(1, out List<CardInstance> frontCards) && frontCards.Count > 0)
 				{
-					yield return value[0].InstanceId;
+					yield return frontCards[0].InstanceId;
 				}
 			}
 			yield break;
@@ -1142,29 +1125,24 @@ public sealed partial class GameEngine
 			}
 			yield break;
 		}
-		int key;
-		List<CardInstance> value2;
 		if ((ability.Description?.Contains("within one rank", StringComparison.OrdinalIgnoreCase) ?? false) && ability.Effects.Any((IEffect e) => (e is ChangeReadyStateEffect || e is GrantTraitEffect) ? true : false))
 		{
 			int pRank = performer?.Rank ?? 1;
 			PlayerState playerState = state.Players[playerId];
-			foreach (KeyValuePair<int, List<CardInstance>> rank in playerState.Ranks)
+			foreach (var (rankNum, rankCards) in playerState.Ranks)
 			{
-				rank.Deconstruct(out key, out value2);
-				int num = key;
-				List<CardInstance> list2 = value2;
-				if (Math.Abs(num - pRank) > 1)
+				if (Math.Abs(rankNum - pRank) > 1)
 				{
 					continue;
 				}
-				foreach (CardInstance item in list2)
+				foreach (CardInstance item in rankCards)
 				{
 					yield return item.InstanceId;
 				}
 			}
 			yield break;
 		}
-		bool flag = ability.Effects.Any((IEffect e) => (e is DealDamageEffect || e is ResolveAttackEffect || e is PerformStrikeEffect || e is FireballEffect || e is ShadowBoltsEffect) ? true : false);
+		bool isDamageOrAttack = ability.Effects.Any((IEffect e) => (e is DealDamageEffect || e is ResolveAttackEffect || e is PerformStrikeEffect || e is FireballEffect || e is ShadowBoltsEffect) ? true : false);
 		if (ability.Effects.OfType<DestroyTargetItemEffect>().Any())
 		{
 			DestroyTargetItemEffect destroyEff = ability.Effects.OfType<DestroyTargetItemEffect>().First();
@@ -1210,8 +1188,8 @@ public sealed partial class GameEngine
 			}
 			yield break;
 		}
-		bool flag2 = ability.Effects.Any((IEffect e) => ((e is ModifyStatEffect || e is HealEffect) ? true : false) || e.GetType().Name.Contains("Heal", StringComparison.OrdinalIgnoreCase));
-		if (flag)
+		bool isStatOrHeal = ability.Effects.Any((IEffect e) => ((e is ModifyStatEffect || e is HealEffect) ? true : false) || e.GetType().Name.Contains("Heal", StringComparison.OrdinalIgnoreCase));
+		if (isDamageOrAttack)
 		{
 			PerformStrikeEffect performStrikeEffect = ability.Effects.OfType<PerformStrikeEffect>().FirstOrDefault();
 			bool targetSpentOnly = performStrikeEffect?.TargetSpentOnly ?? false;
@@ -1223,23 +1201,20 @@ public sealed partial class GameEngine
 			int effectiveMaxRanged = (performStrikeEffect != null && performStrikeEffect.HasReach) ? Math.Max(performStrikeEffect.MaxRange, 3) : (performStrikeEffect?.MaxRange ?? 2);
 			int maxRange = isRanged ? effectiveMaxRanged : ((performer.HasValue && CharacterHasReach(performer.Value, state, _cardDb)) ? 2 : 1);
 			bool yielded = false;
-			foreach (PlayerState player2 in state.Players)
+			foreach (PlayerState defendingPlayer in state.Players)
 			{
-				if (player2.PlayerIndex == playerId)
+				if (defendingPlayer.PlayerIndex == playerId)
 				{
 					continue;
 				}
-				foreach (KeyValuePair<int, List<CardInstance>> rank2 in player2.Ranks)
+				foreach (var (defenderRank, defenderRankCards) in defendingPlayer.Ranks)
 				{
-					rank2.Deconstruct(out key, out value2);
-					int num2 = key;
-					List<CardInstance> list3 = value2;
-					int crossDist = BoardGeometry.GetCrossBoardDistance(performerRank, num2);
+					int crossDist = BoardGeometry.GetCrossBoardDistance(performerRank, defenderRank);
 					if (crossDist > maxRange)
 					{
 						continue;
 					}
-					foreach (CardInstance item2 in list3)
+					foreach (CardInstance item2 in defenderRankCards)
 					{
 						if (performer.HasValue && IsTargetProtectedByStealth(state, performer.Value, item2, isRanged, _cardDb))
 						{
@@ -1278,13 +1253,13 @@ public sealed partial class GameEngine
 				}
 			}
 		}
-		else if (flag2)
+		else if (isStatOrHeal)
 		{
-			PlayerState playerState2 = state.Players[playerId];
+			PlayerState friendlyPlayer = state.Players[playerId];
 			bool yielded = false;
-			foreach (List<CardInstance> value3 in playerState2.Ranks.Values)
+			foreach (List<CardInstance> rankCards in friendlyPlayer.Ranks.Values)
 			{
-				foreach (CardInstance item3 in value3)
+				foreach (CardInstance item3 in rankCards)
 				{
 					yielded = true;
 					yield return item3.InstanceId;

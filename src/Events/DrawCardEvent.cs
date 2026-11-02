@@ -24,11 +24,4 @@ public sealed record DrawCardEvent : GameEvent
 		return state;
 	}
 
-	[CompilerGenerated]
-	[SetsRequiredMembers]
-	private DrawCardEvent(DrawCardEvent original)
-		: base(original)
-	{
-		PlayerIndex = original.PlayerIndex;
-	}
 }

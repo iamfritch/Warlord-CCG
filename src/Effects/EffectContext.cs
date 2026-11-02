@@ -99,18 +99,4 @@ public sealed record EffectContext
 		return null;
 	}
 
-	[CompilerGenerated]
-	[SetsRequiredMembers]
-	private EffectContext(EffectContext original)
-	{
-		SourceInstanceId = original.SourceInstanceId;
-		PerformerInstanceId = original.PerformerInstanceId;
-		PerformerSourceId = original.PerformerSourceId;
-		TargetInstanceId = original.TargetInstanceId;
-		TargetInstanceIds = original.TargetInstanceIds;
-		State = original.State;
-		CardDb = original.CardDb;
-		RollDice = original.RollDice;
-		OnAttackResolved = original.OnAttackResolved;
-	}
 }

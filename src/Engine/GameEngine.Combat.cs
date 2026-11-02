@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -24,9 +24,9 @@ public sealed partial class GameEngine
 			CardInstance? attackerCard = null;
 			foreach (PlayerState player in state.Players)
 			{
-				foreach (List<CardInstance> value7 in player.Ranks.Values)
+				foreach (List<CardInstance> rankCards in player.Ranks.Values)
 				{
-					foreach (CardInstance item2 in value7)
+					foreach (CardInstance item2 in rankCards)
 					{
 						if (item2.InstanceId == declareAttack.AttackerInstanceId)
 						{
@@ -47,9 +47,9 @@ public sealed partial class GameEngine
 			CardInstance? defenderCard = null;
 			foreach (PlayerState player2 in state.Players)
 			{
-				foreach (List<CardInstance> value8 in player2.Ranks.Values)
+				foreach (List<CardInstance> rankCards in player2.Ranks.Values)
 				{
-					foreach (CardInstance item3 in value8)
+					foreach (CardInstance item3 in rankCards)
 					{
 						if (item3.InstanceId == declareAttack.DefenderInstanceId)
 						{
@@ -95,10 +95,10 @@ public sealed partial class GameEngine
 			{
 				int baseDefSkill = (engine._cardDb.GetDefinition(defenderCard.Value.DefinitionId)?.Skill).GetValueOrDefault();
 				int defSkill = (defenderCard.Value.CurrentSkill > 0 ? defenderCard.Value.CurrentSkill : baseDefSkill) + GetTurnBuffValue(state, defenderCard.Value.InstanceId, "SKILL");
-				int num = 8 + defSkill;
+				int targetDC = 8 + defSkill;
 				int baseAtkSkill = (engine._cardDb.GetDefinition(attackerCard.Value.DefinitionId)?.Skill).GetValueOrDefault();
 				int atkSkill = (attackerCard.Value.CurrentSkill > 0 ? attackerCard.Value.CurrentSkill : baseAtkSkill) + GetTurnBuffValue(state, attackerCard.Value.InstanceId, "SKILL");
-				if (engine._diceRoller(1, 20) + atkSkill < num)
+				if (engine._diceRoller(1, 20) + atkSkill < targetDC)
 				{
 					AddTurnBuff(state, attackerCard.Value.InstanceId, "NO_MELEE_STRIKES", 1);
 				}
@@ -127,10 +127,10 @@ public sealed partial class GameEngine
 			{
 				strikes.AddRange(continuousPassiveBonuses.AdditionalStrikes);
 			}
-			bool flag = HasTurnBuff(state, declareAttack.AttackerInstanceId, "ADVANTAGE");
+			bool hasAdvantage = HasTurnBuff(state, declareAttack.AttackerInstanceId, "ADVANTAGE");
 			bool flagDis = HasTurnBuff(state, declareAttack.AttackerInstanceId, "DISADVANTAGE");
 			DiceRoller diceRoller = engine._diceRoller;
-			if (flag && !flagDis)
+			if (hasAdvantage && !flagDis)
 			{
 				diceRoller = (int count, int sides) =>
 				{
@@ -143,7 +143,7 @@ public sealed partial class GameEngine
 					return engine._diceRoller(count, sides);
 				};
 			}
-			else if (flagDis && !flag)
+			else if (flagDis && !hasAdvantage)
 			{
 				diceRoller = (int count, int sides) =>
 				{
@@ -168,63 +168,60 @@ public sealed partial class GameEngine
 			}
 			Dictionary<int, int> strikeWounds = new Dictionary<int, int>();
 			int previousDefId = declareAttack.DefenderInstanceId;
-			int strikeIdx = 0;
-			while (true)
+			for (int strikeIdx = 0; strikeIdx < strikes.Count; strikeIdx++)
 			{
-				if (strikeIdx < strikes.Count)
+				StrikeDescriptor strikeDescriptor = strikes[strikeIdx];
+				CardInstance? currentAttacker = CardLocator.FindCard(state, declareAttack.AttackerInstanceId);
+				if (!currentAttacker.HasValue || currentAttacker.Value.ReadyState == ReadyState.Stunned || currentAttacker.Value.CurrentHitPoints <= 0 || currentAttacker.Value.Wounds >= GetEffectiveMaxHitPoints(state, currentAttacker.Value, engine._cardDb))
 				{
-					StrikeDescriptor strikeDescriptor = strikes[strikeIdx];
-					CardInstance? cardInstance2 = CardLocator.FindCard(state, declareAttack.AttackerInstanceId);
-					if (!cardInstance2.HasValue || cardInstance2.Value.ReadyState == ReadyState.Stunned || cardInstance2.Value.CurrentHitPoints <= 0 || cardInstance2.Value.Wounds >= GetEffectiveMaxHitPoints(state, cardInstance2.Value, engine._cardDb))
+					yield break;
+				}
+				attackerCard = currentAttacker;
+				int currentDefId;
+				if (strikeIdx == 0)
+				{
+					currentDefId = declareAttack.DefenderInstanceId;
+					CardInstance? initialDefender = CardLocator.FindCard(state, currentDefId);
+					if (!initialDefender.HasValue || initialDefender.Value.CurrentHitPoints <= 0 || initialDefender.Value.Wounds >= GetEffectiveMaxHitPoints(state, initialDefender.Value, engine._cardDb))
 					{
-						break;
+						yield break;
 					}
-					attackerCard = cardInstance2;
-					int currentDefId;
-					if (strikeIdx == 0)
+				}
+				else
+				{
+					List<CardInstance> legalDefendersForStrike = GetLegalDefendersForStrike(state, attackerCard.Value, strikeDescriptor, engine._cardDb, strikeWounds);
+					if (legalDefendersForStrike.Count == 0)
 					{
-						currentDefId = declareAttack.DefenderInstanceId;
-						CardInstance? cardInstance3 = CardLocator.FindCard(state, currentDefId);
-						if (!cardInstance3.HasValue || cardInstance3.Value.CurrentHitPoints <= 0 || cardInstance3.Value.Wounds >= GetEffectiveMaxHitPoints(state, cardInstance3.Value, engine._cardDb))
+						yield break;
+					}
+					if (engine.SelectStrikeTarget != null)
+					{
+						StrikeTargetPrompt arg = new StrikeTargetPrompt(state, attackerCard.Value, strikeIdx, strikes.Count, strikeDescriptor, legalDefendersForStrike, previousDefId);
+						int? chosen = engine.SelectStrikeTarget(arg);
+						if (!chosen.HasValue || !legalDefendersForStrike.Any((CardInstance c) => c.InstanceId == chosen.Value))
 						{
-							break;
+							yield break;
 						}
+						currentDefId = chosen.Value;
+					}
+					else if (declareAttack.DefenderInstanceIds != null && strikeIdx < declareAttack.DefenderInstanceIds.Length)
+					{
+						int targetId = declareAttack.DefenderInstanceIds[strikeIdx];
+						if (!legalDefendersForStrike.Any((CardInstance c) => c.InstanceId == targetId))
+						{
+							continue;
+						}
+						currentDefId = targetId;
 					}
 					else
 					{
-						List<CardInstance> legalDefendersForStrike = GetLegalDefendersForStrike(state, attackerCard.Value, strikeDescriptor, engine._cardDb, strikeWounds);
-						if (legalDefendersForStrike.Count == 0)
+						if (!legalDefendersForStrike.Any((CardInstance c) => c.InstanceId == previousDefId))
 						{
-							break;
+							continue;
 						}
-						if (engine.SelectStrikeTarget != null)
-						{
-							StrikeTargetPrompt arg = new StrikeTargetPrompt(state, attackerCard.Value, strikeIdx, strikes.Count, strikeDescriptor, legalDefendersForStrike, previousDefId);
-							int? chosen = engine.SelectStrikeTarget(arg);
-							if (!chosen.HasValue || !legalDefendersForStrike.Any((CardInstance c) => c.InstanceId == chosen.Value))
-							{
-								break;
-							}
-							currentDefId = chosen.Value;
-						}
-						else if (declareAttack.DefenderInstanceIds != null && strikeIdx < declareAttack.DefenderInstanceIds.Length)
-						{
-							int targetId = declareAttack.DefenderInstanceIds[strikeIdx];
-							if (!legalDefendersForStrike.Any((CardInstance c) => c.InstanceId == targetId))
-							{
-								goto IL_0d35;
-							}
-							currentDefId = targetId;
-						}
-						else
-						{
-							if (!legalDefendersForStrike.Any((CardInstance c) => c.InstanceId == previousDefId))
-							{
-								goto IL_0d35;
-							}
-							currentDefId = previousDefId;
-						}
+						currentDefId = previousDefId;
 					}
+				}
 					previousDefId = currentDefId;
 					CardInstance? currentDefCard = CardLocator.FindCard(state, currentDefId);
 					if (currentDefCard.HasValue)
@@ -254,20 +251,20 @@ public sealed partial class GameEngine
 						PassiveBonuses continuousPassiveBonuses2 = GetContinuousPassiveBonuses(state, attackerCard.Value, combatCtx, engine._cardDb);
 						PassiveBonuses continuousPassiveBonuses3 = GetContinuousPassiveBonuses(state, currentDefCard.Value, combatCtx2, engine._cardDb);
 						int strikeBonus = strikeDescriptor.Modifier + attackerItemBonus + continuousPassiveBonuses2.Atk;
-						int num2 = declareAttack.AdditionalWounds + continuousPassiveBonuses2.AdditionalWounds + continuousPassiveBonuses3.AdditionalWounds;
+						int strikeAdditionalWounds = declareAttack.AdditionalWounds + continuousPassiveBonuses2.AdditionalWounds + continuousPassiveBonuses3.AdditionalWounds;
 						if (!strikeDescriptor.IsRanged && HasTurnBuff(state, declareAttack.AttackerInstanceId, "CLEAVE_HIGHER_LEVEL_WOUND"))
 						{
 							int effectiveLevel = GetEffectiveLevel(state, attackerCard.Value, engine._cardDb);
 							if (GetEffectiveLevel(state, currentDefCard.Value, engine._cardDb) > effectiveLevel)
 							{
-								num2++;
+								strikeAdditionalWounds++;
 							}
 						}
 						ResolveAttackEffect resolveAttackEffect = new ResolveAttackEffect
 						{
 							StrikeBonus = strikeBonus,
 							Damage = 1,
-							AdditionalWounds = num2,
+							AdditionalWounds = strikeAdditionalWounds,
 							DamageType = (strikeDescriptor.IsRanged ? "ranged" : "melee"),
 							EnableCriticals = true,
 							TrueStrike = continuousPassiveBonuses2.TrueStrike,
@@ -293,23 +290,23 @@ public sealed partial class GameEngine
 										CardInstance? targetCard = CardLocator.FindCard(state, currentDefId);
 										if (targetCard.HasValue && targetCard.Value.Rank.HasValue && targetCard.Value.Rank.Value > 1)
 										{
-											int value2 = targetCard.Value.Rank.Value;
-											int num3 = value2 - 1;
-											PlayerState playerState2 = state.Players[targetCard.Value.OwnerPlayerIndex];
-											playerState2.Ranks[value2].RemoveAll((CardInstance c) => c.InstanceId == targetCard.Value.InstanceId);
-											if (!playerState2.Ranks.TryGetValue(num3, out List<CardInstance> value3))
+											int defenderRank = targetCard.Value.Rank.Value;
+											int forwardRank = defenderRank - 1;
+											PlayerState defenderOwnerState = state.Players[targetCard.Value.OwnerPlayerIndex];
+											defenderOwnerState.Ranks[defenderRank].RemoveAll((CardInstance c) => c.InstanceId == targetCard.Value.InstanceId);
+											if (!defenderOwnerState.Ranks.TryGetValue(forwardRank, out List<CardInstance> forwardRankCards))
 											{
-												value3 = new List<CardInstance>();
-												playerState2.Ranks[num3] = value3;
+												forwardRankCards = new List<CardInstance>();
+												defenderOwnerState.Ranks[forwardRank] = forwardRankCards;
 											}
-											value3.Add(targetCard.Value with
+											forwardRankCards.Add(targetCard.Value with
 											{
-												Rank = num3
+												Rank = forwardRank
 											});
 										}
 									}
-									CardInstance? cardInstance4 = CardLocator.FindCard(state, currentDefId);
-									if (cardInstance4.HasValue && cardInstance4.Value.CurrentHitPoints <= 0)
+									CardInstance? defenderStatusCheck = CardLocator.FindCard(state, currentDefId);
+									if (defenderStatusCheck.HasValue && defenderStatusCheck.Value.CurrentHitPoints <= 0)
 									{
 										if (def != null && def.Name.Equals("Mistress Allandra", StringComparison.OrdinalIgnoreCase))
 										{
@@ -341,10 +338,10 @@ public sealed partial class GameEngine
 									}
 									if (HasTurnBuff(state, declareAttack.AttackerInstanceId, "CRUSH_DESTROY_ITEM"))
 									{
-										CardInstance? cardInstance5 = CardLocator.FindCard(state, currentDefId);
-										if (cardInstance5.HasValue && cardInstance5.Value.AttachedItemIds.Count > 0)
+										CardInstance? defenderWithItem = CardLocator.FindCard(state, currentDefId);
+										if (defenderWithItem.HasValue && defenderWithItem.Value.AttachedItemIds.Count > 0)
 										{
-											int itemToDestroy = cardInstance5.Value.AttachedItemIds[0];
+											int itemToDestroy = defenderWithItem.Value.AttachedItemIds[0];
 											CardLocator.FindAndMutate(state, currentDefId, delegate(ref CardInstance c)
 											{
 												c.AttachedItemIds.Remove(itemToDestroy);
@@ -354,15 +351,15 @@ public sealed partial class GameEngine
 												c.Zone = CardZone.Discard;
 												c.AttachedToInstanceId = null;
 											});
-											PlayerState playerState3 = state.Players[cardInstance5.Value.OwnerPlayerIndex];
+											PlayerState defenderOwnerState = state.Players[defenderWithItem.Value.OwnerPlayerIndex];
 											foreach (PlayerState p in state.Players)
 											{
 												p.AttachedItems.RemoveAll((CardInstance c) => c.InstanceId == itemToDestroy);
 											}
-											CardInstance? cardInstance6 = CardLocator.FindCard(state, itemToDestroy);
-											if (cardInstance6.HasValue && !playerState3.DiscardPile.Any((CardInstance c) => c.InstanceId == itemToDestroy))
+											CardInstance? itemCardToDiscard = CardLocator.FindCard(state, itemToDestroy);
+											if (itemCardToDiscard.HasValue && !defenderOwnerState.DiscardPile.Any((CardInstance c) => c.InstanceId == itemToDestroy))
 											{
-												playerState3.DiscardPile.Add(cardInstance6.Value with
+												defenderOwnerState.DiscardPile.Add(itemCardToDiscard.Value with
 												{
 													Zone = CardZone.Discard,
 													AttachedToInstanceId = null
@@ -373,20 +370,20 @@ public sealed partial class GameEngine
 								}
 								else
 								{
-									bool flag2 = false;
-									PlayerState playerState4 = state.Players[currentDefCard.Value.OwnerPlayerIndex];
-									if (currentDefCard.Value.Rank.HasValue && playerState4.Ranks.TryGetValue(currentDefCard.Value.Rank.Value, out List<CardInstance> value4))
+									bool hasPounceAlly = false;
+									PlayerState defenderOwnerState = state.Players[currentDefCard.Value.OwnerPlayerIndex];
+									if (currentDefCard.Value.Rank.HasValue && defenderOwnerState.Ranks.TryGetValue(currentDefCard.Value.Rank.Value, out List<CardInstance> defenderRankCards))
 									{
-										foreach (CardInstance item5 in value4)
+										foreach (CardInstance item5 in defenderRankCards)
 										{
 											if (HasTurnBuff(state, item5.InstanceId, "POUNCE_MISS_WOUND"))
 											{
-												flag2 = true;
+												hasPounceAlly = true;
 												break;
 											}
 										}
 									}
-									if (flag2)
+									if (hasPounceAlly)
 									{
 										CardLocator.FindAndMutate(state, declareAttack.AttackerInstanceId, delegate(ref CardInstance c)
 										{
@@ -428,40 +425,40 @@ public sealed partial class GameEngine
 										}
 									}
 								}
-								bool flag3 = HasTurnBuff(state, currentDefId, "SHIELD_OF_SPURNING_PUSH");
-								if (!flag3 && currentDefCard.HasValue)
+								bool shouldSpurnPush = HasTurnBuff(state, currentDefId, "SHIELD_OF_SPURNING_PUSH");
+								if (!shouldSpurnPush && currentDefCard.HasValue)
 								{
 									foreach (int attachedItemId2 in currentDefCard.Value.AttachedItemIds)
 									{
-										CardInstance? cardInstance7 = CardLocator.FindCard(state, attachedItemId2);
-										if (cardInstance7.HasValue)
+										CardInstance? attachedItemCard = CardLocator.FindCard(state, attachedItemId2);
+										if (attachedItemCard.HasValue)
 										{
-											CardDefinition definition2 = engine._cardDb.GetDefinition(cardInstance7.Value.DefinitionId);
+											CardDefinition definition2 = engine._cardDb.GetDefinition(attachedItemCard.Value.DefinitionId);
 											if (definition2 != null && definition2.RulesText.Contains("Push the attacker one rank backward", StringComparison.OrdinalIgnoreCase))
 											{
-												flag3 = true;
+												shouldSpurnPush = true;
 												break;
 											}
 										}
 									}
 								}
-								if (flag3)
+								if (shouldSpurnPush)
 								{
 									CardInstance? atkTarget = CardLocator.FindCard(state, declareAttack.AttackerInstanceId);
 									if (atkTarget.HasValue && atkTarget.Value.Rank.HasValue && atkTarget.Value.Rank.Value < 5)
 									{
-										int value5 = atkTarget.Value.Rank.Value;
-										int num4 = value5 + 1;
-										PlayerState playerState5 = state.Players[atkTarget.Value.OwnerPlayerIndex];
-										playerState5.Ranks[value5].RemoveAll((CardInstance c) => c.InstanceId == atkTarget.Value.InstanceId);
-										if (!playerState5.Ranks.TryGetValue(num4, out List<CardInstance> value6))
+										int attackerRank = atkTarget.Value.Rank.Value;
+										int pushedRank = attackerRank + 1;
+										PlayerState attackerOwnerState = state.Players[atkTarget.Value.OwnerPlayerIndex];
+										attackerOwnerState.Ranks[attackerRank].RemoveAll((CardInstance c) => c.InstanceId == atkTarget.Value.InstanceId);
+										if (!attackerOwnerState.Ranks.TryGetValue(pushedRank, out List<CardInstance> pushedRankCards))
 										{
-											value6 = new List<CardInstance>();
-											playerState5.Ranks[num4] = value6;
+											pushedRankCards = new List<CardInstance>();
+											attackerOwnerState.Ranks[pushedRank] = pushedRankCards;
 										}
-										value6.Add(atkTarget.Value with
+										pushedRankCards.Add(atkTarget.Value with
 										{
-											Rank = num4
+											Rank = pushedRank
 										});
 									}
 								}
@@ -472,9 +469,8 @@ public sealed partial class GameEngine
 							yield return item6;
 						}
 					}
-					goto IL_0d35;
-				}
-				if (HasTurnBuff(state, declareAttack.AttackerInstanceId, "STIRGES_BONUS_STRIKE"))
+			}
+			if (HasTurnBuff(state, declareAttack.AttackerInstanceId, "STIRGES_BONUS_STRIKE"))
 				{
 					CombatContext combatCtx3 = new CombatContext
 					{
@@ -530,53 +526,49 @@ public sealed partial class GameEngine
 						DamageType = "physical"
 					};
 				}
-				break;
-				IL_0d35:
-				strikeIdx++;
-			}
 		}
 
 		public static List<CardInstance> GetLegalDefendersForStrike(GameState state, CardInstance attacker, StrikeDescriptor strike, CardDatabase cardDb, Dictionary<int, int>? pendingWounds = null)
 		{
 			List<CardInstance> list = new List<CardInstance>();
-			int num = attacker.Rank ?? 1;
-			int num2 = (CharacterHasReach(attacker, state, cardDb) ? 3 : 2);
+			int attackerRank = attacker.Rank ?? 1;
+			int maxMeleeReach = (CharacterHasReach(attacker, state, cardDb) ? 3 : 2);
 			foreach (PlayerState player in state.Players)
 			{
 				if (player.PlayerIndex == attacker.OwnerPlayerIndex)
 				{
 					continue;
 				}
-				foreach (var (num4, list3) in player.Ranks)
+				foreach (var (defenderRank, rankCharacters) in player.Ranks)
 				{
-					int crossDist = BoardGeometry.GetCrossBoardDistance(num, num4);
+					int crossDist = BoardGeometry.GetCrossBoardDistance(attackerRank, defenderRank);
 					if (strike.IsRanged)
 					{
-						if (!BoardGeometry.IsRangedValid(num, num4, 2))
+						if (!BoardGeometry.IsRangedValid(attackerRank, defenderRank, 2))
 						{
 							continue;
 						}
 					}
-					else if (crossDist > num2 - 1)
+					else if (crossDist > maxMeleeReach - 1)
 					{
 						continue;
 					}
-					foreach (CardInstance item in list3)
+					foreach (CardInstance item in rankCharacters)
 					{
 						if (IsTargetProtectedByStealth(state, attacker, item, strike.IsRanged, cardDb))
 						{
 							continue;
 						}
-						int num5 = pendingWounds?.GetValueOrDefault(item.InstanceId, 0) ?? 0;
-						int num6 = GetEffectiveCurrentHitPoints(state, item, cardDb) - num5;
+						int pendingWoundCount = pendingWounds?.GetValueOrDefault(item.InstanceId, 0) ?? 0;
+						int effectiveHp = GetEffectiveCurrentHitPoints(state, item, cardDb) - pendingWoundCount;
 						int effectiveMaxHitPoints = GetEffectiveMaxHitPoints(state, item, cardDb);
-						int num7 = item.Wounds + num5;
-						if (num6 > 0 && num7 < effectiveMaxHitPoints)
+						int effectiveWounds = item.Wounds + pendingWoundCount;
+						if (effectiveHp > 0 && effectiveWounds < effectiveMaxHitPoints)
 						{
 							list.Add(item with
 							{
-								Wounds = num7,
-								CurrentHitPoints = num6
+								Wounds = effectiveWounds,
+								CurrentHitPoints = effectiveHp
 							});
 						}
 					}
@@ -639,8 +631,8 @@ public sealed partial class GameEngine
 				}
 				foreach (int item in attachedItemIds)
 				{
-					CardInstance? cardInstance2 = CardLocator.FindCard(state, item);
-					int itemOwnerIdx = cardInstance2?.OwnerPlayerIndex ?? characterDefeatedEvent.OwnerPlayerIndex;
+					CardInstance? attachedItem = CardLocator.FindCard(state, item);
+					int itemOwnerIdx = attachedItem?.OwnerPlayerIndex ?? characterDefeatedEvent.OwnerPlayerIndex;
 					PlayerState itemOwnerState = (itemOwnerIdx >= 0 && itemOwnerIdx < state.Players.Count)
 						? state.Players[itemOwnerIdx]
 						: playerState;
@@ -649,9 +641,9 @@ public sealed partial class GameEngine
 						p.AttachedItems.RemoveAll((CardInstance c) => c.InstanceId == item);
 					}
 					itemOwnerState.DiscardPile.RemoveAll((CardInstance c) => c.InstanceId == item);
-					if (cardInstance2.HasValue)
+					if (attachedItem.HasValue)
 					{
-						itemOwnerState.DiscardPile.Add(cardInstance2.Value with
+						itemOwnerState.DiscardPile.Add(attachedItem.Value with
 						{
 							Zone = CardZone.Discard,
 							AttachedToInstanceId = null

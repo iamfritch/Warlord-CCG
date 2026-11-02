@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -20,40 +20,32 @@ public sealed partial class GameEngine
 		{
 			return ActionResult.Failure("Game is over. No further actions can be executed.");
 		}
-		if (action is MarchAction march)
+		switch (action)
 		{
-			return ValidateMarch(march, state);
-		}
-		if (action is PassAction)
-		{
-			return ValidatePassPriority(action, state);
-		}
-		if (action is UseAbilityAction useAbility)
-		{
-			return ValidateUseAbility(useAbility, state);
-		}
-		if (action is PlayCardAction playCard)
-		{
-			return ValidatePlayCard(playCard, state);
-		}
-		if (action is AttackAction attack)
-		{
-			return ValidateAttackAction(attack, state);
-		}
-		if (action is DeployStartingArmyAction deployArmy)
-		{
-			return ValidateDeployStartingArmy(deployArmy, state);
-		}
-		if (action is DiscardCardAction discardAction)
-		{
-			PlayerState p = state.Players[discardAction.PlayerIndex];
-			if (!p.Hand.Any((CardInstance c) => c.InstanceId == discardAction.CardInstanceId))
+			case MarchAction march:
+				return ValidateMarch(march, state);
+			case PassAction:
+				return ValidatePassPriority(action, state);
+			case UseAbilityAction useAbility:
+				return ValidateUseAbility(useAbility, state);
+			case PlayCardAction playCard:
+				return ValidatePlayCard(playCard, state);
+			case AttackAction attack:
+				return ValidateAttackAction(attack, state);
+			case DeployStartingArmyAction deployArmy:
+				return ValidateDeployStartingArmy(deployArmy, state);
+			case DiscardCardAction discardAction:
 			{
-				return ActionResult.Failure("Card is not in hand.");
+				PlayerState p = state.Players[discardAction.PlayerIndex];
+				if (!p.Hand.Any((CardInstance c) => c.InstanceId == discardAction.CardInstanceId))
+				{
+					return ActionResult.Failure("Card is not in hand.");
+				}
+				return ActionResult.Success();
 			}
-			return ActionResult.Success();
+			default:
+				return ActionResult.Failure("Unknown action type: " + action.GetType().Name);
 		}
-		return ActionResult.Failure("Unknown action type: " + action.GetType().Name);
 	}
 
 	public ActionResult CanExecute(IPlayerAction action)
@@ -237,7 +229,7 @@ public sealed partial class GameEngine
 		}
 		else
 		{
-			bool flag = false;
+			bool isPresentInRank = false;
 			foreach (CardInstance item in playerState.Ranks[march.SourceRank])
 			{
 				if (item.InstanceId == march.CardInstanceId)
@@ -246,11 +238,11 @@ public sealed partial class GameEngine
 					{
 						list.Add("Cannot march a spent or stunned character.");
 					}
-					flag = true;
+					isPresentInRank = true;
 					break;
 				}
 			}
-			if (!flag)
+			if (!isPresentInRank)
 			{
 				list.Add($"Card {march.CardInstanceId} not found at Rank {march.SourceRank}.");
 			}
@@ -264,22 +256,22 @@ public sealed partial class GameEngine
 			}
 			dictionary[march.SourceRank] = dictionary.GetValueOrDefault(march.SourceRank) - 1;
 			dictionary[march.DestinationRank] = dictionary.GetValueOrDefault(march.DestinationRank) + 1;
-			int num2 = (from kvp in dictionary
+			int maxOccupiedRank = (from kvp in dictionary
 				where kvp.Value > 0
 				select kvp.Key).DefaultIfEmpty(0).Max();
-			if (dictionary.GetValueOrDefault(1, 0) == 0 && num2 >= 2)
+			if (dictionary.GetValueOrDefault(1, 0) == 0 && maxOccupiedRank >= 2)
 			{
 				list.Add($"Cannot march to Rank {march.DestinationRank}: cannot leave Rank 1 empty when Rank 2 or higher exists.");
 			}
 			else
 			{
-				for (int num3 = 2; num3 <= num2; num3++)
+				for (int checkRank = 2; checkRank <= maxOccupiedRank; checkRank++)
 				{
-					int valueOrDefault = dictionary.GetValueOrDefault(num3 - 1, 0);
-					int valueOrDefault2 = dictionary.GetValueOrDefault(num3, 0);
-					if (valueOrDefault2 > valueOrDefault)
+					int prevRankCount = dictionary.GetValueOrDefault(checkRank - 1, 0);
+					int currRankCount = dictionary.GetValueOrDefault(checkRank, 0);
+					if (currRankCount > prevRankCount)
 					{
-						list.Add($"Cannot march to Rank {march.DestinationRank}: formation rule violated (Rank {num3} would have {valueOrDefault2} characters, exceeding Rank {num3 - 1} with {valueOrDefault}).");
+						list.Add($"Cannot march to Rank {march.DestinationRank}: formation rule violated (Rank {checkRank} would have {currRankCount} characters, exceeding Rank {checkRank - 1} with {prevRankCount}).");
 						break;
 					}
 				}
@@ -330,19 +322,15 @@ public sealed partial class GameEngine
 			return ActionResult.Failure(list);
 		}
 		CardInstance? cardInstance = null;
-		int? num = null;
-		int key;
-		List<CardInstance> value;
-		foreach (KeyValuePair<int, List<CardInstance>> rank in state.Players[attack.PlayerIndex].Ranks)
+		int? attackerRank = null;
+		foreach (var (rankKey, rankCards) in state.Players[attack.PlayerIndex].Ranks)
 		{
-			rank.Deconstruct(out key, out value);
-			int value2 = key;
-			foreach (CardInstance item in value)
+			foreach (CardInstance item in rankCards)
 			{
 				if (item.InstanceId == attack.AttackerInstanceId)
 				{
 					cardInstance = item;
-					num = value2;
+					attackerRank = rankKey;
 					break;
 				}
 			}
@@ -370,65 +358,63 @@ public sealed partial class GameEngine
 				list.Add("Cannot attack with an opponent's character.");
 			}
 		}
-		CardInstance? cardInstance2 = null;
-		int? num2 = null;
-		int num3 = -1;
+		CardInstance? defenderCard = null;
+		int? defenderRank = null;
+		int defenderOwnerIndex = -1;
 		foreach (PlayerState player in state.Players)
 		{
-			foreach (KeyValuePair<int, List<CardInstance>> rank2 in player.Ranks)
+			foreach (var (rankKey, rankCards) in player.Ranks)
 			{
-				rank2.Deconstruct(out key, out value);
-				int value3 = key;
-				foreach (CardInstance item2 in value)
+				foreach (CardInstance item2 in rankCards)
 				{
 					if (item2.InstanceId == attack.TargetInstanceId)
 					{
-						cardInstance2 = item2;
-						num2 = value3;
-						num3 = player.PlayerIndex;
+						defenderCard = item2;
+						defenderRank = rankKey;
+						defenderOwnerIndex = player.PlayerIndex;
 						break;
 					}
 				}
-				if (cardInstance2.HasValue)
+				if (defenderCard.HasValue)
 				{
 					break;
 				}
 			}
-			if (cardInstance2.HasValue)
+			if (defenderCard.HasValue)
 			{
 				break;
 			}
 		}
-		if (!cardInstance2.HasValue)
+		if (!defenderCard.HasValue)
 		{
 			list.Add($"Target {attack.TargetInstanceId} not found on the board.");
 		}
-		else if (num3 == attack.PlayerIndex)
+		else if (defenderOwnerIndex == attack.PlayerIndex)
 		{
 			list.Add("Cannot attack your own character.");
 		}
-		if (cardInstance.HasValue && cardInstance2.HasValue && num.HasValue && num2.HasValue)
+		if (cardInstance.HasValue && defenderCard.HasValue && attackerRank.HasValue && defenderRank.HasValue)
 		{
 			CardDefinition? definition = _cardDb.GetDefinition(cardInstance.Value.DefinitionId);
-			bool num4 = (object)definition != null && definition.Attack?.Strikes.Any((StrikeDescriptor s) => s.IsRanged) == true;
-			if (IsTargetProtectedByStealth(state, cardInstance.Value, cardInstance2.Value, num4, _cardDb))
+			bool isRangedAttack = (object)definition != null && definition.Attack?.Strikes.Any((StrikeDescriptor s) => s.IsRanged) == true;
+			if (IsTargetProtectedByStealth(state, cardInstance.Value, defenderCard.Value, isRangedAttack, _cardDb))
 			{
-				list.Add($"Cannot target '{_cardDb.GetDefinition(cardInstance2.Value.DefinitionId)?.Name ?? cardInstance2.Value.DefinitionId}' due to Stealth.");
+				list.Add($"Cannot target '{_cardDb.GetDefinition(defenderCard.Value.DefinitionId)?.Name ?? defenderCard.Value.DefinitionId}' due to Stealth.");
 			}
-			int rankDistance = BoardGeometry.GetCrossBoardDistance(num.Value, num2.Value);
-			if (num4)
+			int rankDistance = BoardGeometry.GetCrossBoardDistance(attackerRank.Value, defenderRank.Value);
+			if (isRangedAttack)
 			{
-				if (!BoardGeometry.IsRangedValid(num.Value, num2.Value, 2))
+				if (!BoardGeometry.IsRangedValid(attackerRank.Value, defenderRank.Value, 2))
 				{
-					list.Add($"Ranged attacks reach 2 ranks away (distance is {rankDistance}). Attacker is at Rank {num.Value}, Target is at Rank {num2.Value}.");
+					list.Add($"Ranged attacks reach 2 ranks away (distance is {rankDistance}). Attacker is at Rank {attackerRank.Value}, Target is at Rank {defenderRank.Value}.");
 				}
 			}
 			else
 			{
-				int num5 = (CharacterHasReach(cardInstance.Value, state, _cardDb) ? 3 : 2);
-				if (num.Value + num2.Value > num5)
+				int maxMeleeRankSum = (CharacterHasReach(cardInstance.Value, state, _cardDb) ? 3 : 2);
+				if (attackerRank.Value + defenderRank.Value > maxMeleeRankSum)
 				{
-					list.Add($"Melee attacks require rank sum <= {num5}. Attacker is at Rank {num.Value}, Target is at Rank {num2.Value}.");
+					list.Add($"Melee attacks require rank sum <= {maxMeleeRankSum}. Attacker is at Rank {attackerRank.Value}, Target is at Rank {defenderRank.Value}.");
 				}
 			}
 		}
@@ -458,9 +444,9 @@ public sealed partial class GameEngine
 			return ActionResult.Failure(list);
 		}
 		PlayerState playerState = state.Players[deployArmy.PlayerIndex];
-		int num = 0;
-		int num2 = 0;
-		int num3 = 0;
+		int warlordCount = 0;
+		int level1Count = 0;
+		int level2Count = 0;
 		CardDefinition cardDefinition = null;
 		List<(StartingCharacterDeployment, CardDefinition)> list2 = new List<(StartingCharacterDeployment, CardDefinition)>();
 		foreach (StartingCharacterDeployment dep in deployArmy.Deployments)
@@ -489,7 +475,7 @@ public sealed partial class GameEngine
 			list2.Add((dep, definition));
 			if (definition.IsWarlord)
 			{
-				num++;
+				warlordCount++;
 				cardDefinition = definition;
 				if (dep.TargetRank != 3)
 				{
@@ -498,7 +484,7 @@ public sealed partial class GameEngine
 			}
 			else if (definition.Level == 1)
 			{
-				num2++;
+				level1Count++;
 				if (dep.TargetRank != 1)
 				{
 					list.Add($"Level 1 character '{definition.Name}' must be deployed in Rank 1 (found Rank {dep.TargetRank}).");
@@ -506,7 +492,7 @@ public sealed partial class GameEngine
 			}
 			else if (definition.Level == 2)
 			{
-				num3++;
+				level2Count++;
 				if (dep.TargetRank != 2)
 				{
 					list.Add($"Level 2 character '{definition.Name}' must be deployed in Rank 2 (found Rank {dep.TargetRank}).");
@@ -517,17 +503,17 @@ public sealed partial class GameEngine
 				list.Add($"Starting non-Warlord character '{definition.Name}' must be Level 1 or Level 2 (found Level {definition.Level}).");
 			}
 		}
-		if (num != 1)
+		if (warlordCount != 1)
 		{
-			list.Add($"Starting army must include exactly one Warlord character (found {num}).");
+			list.Add($"Starting army must include exactly one Warlord character (found {warlordCount}).");
 		}
-		if (num3 != 2)
+		if (level2Count != 2)
 		{
-			list.Add($"Starting army must include exactly 2 Level 2 characters in Rank 2 (found {num3}).");
+			list.Add($"Starting army must include exactly 2 Level 2 characters in Rank 2 (found {level2Count}).");
 		}
-		if (num2 != 3)
+		if (level1Count != 3)
 		{
-			list.Add($"Starting army must include exactly 3 Level 1 characters in Rank 1 (found {num2}).");
+			list.Add($"Starting army must include exactly 3 Level 1 characters in Rank 1 (found {level1Count}).");
 		}
 		HashSet<string> seenUniqueNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 		foreach (var item2 in list2)
@@ -576,7 +562,7 @@ public sealed partial class GameEngine
 			return ActionResult.Failure($"Player index {useAbility.PlayerIndex} is out of range.");
 		}
 		CardInstance? cardInstance = null;
-		int num = -1;
+		int ownerPlayerIndex = -1;
 		foreach (PlayerState player in state.Players)
 		{
 			foreach (List<CardInstance> value in player.Ranks.Values)
@@ -586,7 +572,7 @@ public sealed partial class GameEngine
 					if (item2.InstanceId == useAbility.SourceInstanceId)
 					{
 						cardInstance = item2;
-						num = player.PlayerIndex;
+						ownerPlayerIndex = player.PlayerIndex;
 						break;
 					}
 				}
@@ -600,7 +586,7 @@ public sealed partial class GameEngine
 				break;
 			}
 		}
-		CardInstance? cardInstance2 = null;
+		CardInstance? bearerCard = null;
 		if (!cardInstance.HasValue)
 		{
 			CardInstance? maybeItem = CardLocator.FindCard(state, useAbility.SourceInstanceId);
@@ -610,9 +596,9 @@ public sealed partial class GameEngine
 				CardInstance? bearer = FindBoardCard(state, bearerId);
 				if (bearer.HasValue)
 				{
-					cardInstance2 = bearer;
+					bearerCard = bearer;
 					cardInstance = maybeItem;
-					num = bearer.Value.OwnerPlayerIndex;
+					ownerPlayerIndex = bearer.Value.OwnerPlayerIndex;
 				}
 			}
 		}
@@ -620,32 +606,32 @@ public sealed partial class GameEngine
 		{
 			return ActionResult.Failure("Source card not found on the board.");
 		}
-		if (cardInstance2.HasValue && cardInstance2.Value.ReadyState == ReadyState.Stunned)
+		if (bearerCard.HasValue && bearerCard.Value.ReadyState == ReadyState.Stunned)
 		{
 			list.Add("Character equipping this item is Stunned and cannot activate abilities.");
 		}
 		if (state.Priority.IsReactWindowOpen)
 		{
-			if (num != useAbility.PlayerIndex)
+			if (ownerPlayerIndex != useAbility.PlayerIndex)
 			{
 				list.Add("You do not control this card.");
 			}
 		}
-		else if (num != state.ActivePlayerIndex || useAbility.PlayerIndex != state.ActivePlayerIndex)
+		else if (ownerPlayerIndex != state.ActivePlayerIndex || useAbility.PlayerIndex != state.ActivePlayerIndex)
 		{
 			list.Add("You do not control this card.");
 		}
 		CardDefinition definition = _cardDb.GetDefinition(cardInstance.Value.DefinitionId);
-		int num2 = useAbility.AbilityIndex;
+		int abilityIdx = useAbility.AbilityIndex;
 		if (useAbility.ChoiceIndex.HasValue && useAbility.ChoiceIndex.Value >= 0 && definition != null && useAbility.ChoiceIndex.Value < definition.Abilities.Count)
 		{
-			num2 = useAbility.ChoiceIndex.Value;
+			abilityIdx = useAbility.ChoiceIndex.Value;
 		}
-		if (definition == null || num2 < 0 || num2 >= definition.Abilities.Count)
+		if (definition == null || abilityIdx < 0 || abilityIdx >= definition.Abilities.Count)
 		{
 			return ActionResult.Failure("Invalid ability index.");
 		}
-		AbilityDefinition abilityDefinition = definition.Abilities[num2];
+		AbilityDefinition abilityDefinition = definition.Abilities[abilityIdx];
 		string description = abilityDefinition.Description;
 		if (description != null && description.Contains("wounded Dwarven Forges character", StringComparison.OrdinalIgnoreCase))
 		{
@@ -655,16 +641,16 @@ public sealed partial class GameEngine
 			}
 			else
 			{
-				CardInstance? cardInstance3 = null;
-				for (int targetIdx = 0; targetIdx < useAbility.TargetInstanceIds.Length && ((cardInstance3 = CardLocator.FindCard(state, useAbility.TargetInstanceIds[targetIdx])).HasValue || true); targetIdx++)
-				if (!cardInstance3.HasValue || cardInstance3.Value.OwnerPlayerIndex != useAbility.PlayerIndex)
+				CardInstance? targetDwarf = null;
+				for (int targetIdx = 0; targetIdx < useAbility.TargetInstanceIds.Length && ((targetDwarf = CardLocator.FindCard(state, useAbility.TargetInstanceIds[targetIdx])).HasValue || true); targetIdx++)
+				if (!targetDwarf.HasValue || targetDwarf.Value.OwnerPlayerIndex != useAbility.PlayerIndex)
 				{
 					list.Add("Target character must be controlled by you.");
 				}
 				else
 				{
-					CardDefinition definition2 = _cardDb.GetDefinition(cardInstance3.Value.DefinitionId);
-					if (!IsDwarf(definition2) || !IsCharacterWounded(cardInstance3.Value, definition2, state, _cardDb))
+					CardDefinition definition2 = _cardDb.GetDefinition(targetDwarf.Value.DefinitionId);
+					if (!IsDwarf(definition2) || !IsCharacterWounded(targetDwarf.Value, definition2, state, _cardDb))
 					{
 						list.Add("Target must be a wounded Dwarven character.");
 					}
@@ -680,23 +666,23 @@ public sealed partial class GameEngine
 			}
 			else
 			{
-				CardInstance? cardInstance4 = null;
-				for (int targetIdx = 0; targetIdx < useAbility.TargetInstanceIds.Length && ((cardInstance4 = CardLocator.FindCard(state, useAbility.TargetInstanceIds[targetIdx])).HasValue || true); targetIdx++)
-				if (!cardInstance4.HasValue || cardInstance4.Value.OwnerPlayerIndex != useAbility.PlayerIndex)
+				CardInstance? frontRankDwarf = null;
+				for (int targetIdx = 0; targetIdx < useAbility.TargetInstanceIds.Length && ((frontRankDwarf = CardLocator.FindCard(state, useAbility.TargetInstanceIds[targetIdx])).HasValue || true); targetIdx++)
+				if (!frontRankDwarf.HasValue || frontRankDwarf.Value.OwnerPlayerIndex != useAbility.PlayerIndex)
 				{
 					list.Add("Target character must be controlled by you.");
 				}
 				else
 				{
-					if (!IsDwarf(_cardDb.GetDefinition(cardInstance4.Value.DefinitionId)))
+					if (!IsDwarf(_cardDb.GetDefinition(frontRankDwarf.Value.DefinitionId)))
 					{
 						list.Add("Target must be a Dwarven character.");
 					}
-					if (cardInstance4.Value.ReadyState == ReadyState.Stunned)
+					if (frontRankDwarf.Value.ReadyState == ReadyState.Stunned)
 					{
 						list.Add("Target character cannot be stunned.");
 					}
-					if (cardInstance4.Value.Rank != 1)
+					if (frontRankDwarf.Value.Rank != 1)
 					{
 						list.Add("Target character must be in a front rank (Rank 1).");
 					}
@@ -726,14 +712,14 @@ public sealed partial class GameEngine
 				else
 				{
 					int performerId = ResolvePerformerCharacterId(state, useAbility.SourceInstanceId, _cardDb);
-					CardInstance? bearerCard = FindBoardCard(state, performerId);
-					int bearerLevel = bearerCard.HasValue ? GetEffectiveLevel(state, bearerCard.Value, _cardDb) : 0;
+					CardInstance? performerCard = FindBoardCard(state, performerId);
+					int bearerLevel = performerCard.HasValue ? GetEffectiveLevel(state, performerCard.Value, _cardDb) : 0;
 					int targetLevel = GetEffectiveLevel(state, targetCard.Value, _cardDb);
 					if (targetLevel >= bearerLevel)
 					{
 						list.Add("Target must be lower level than the bearer.");
 					}
-					CardDefinition? bearerDef = bearerCard.HasValue ? _cardDb.GetDefinition(bearerCard.Value.DefinitionId) : null;
+					CardDefinition? bearerDef = performerCard.HasValue ? _cardDb.GetDefinition(performerCard.Value.DefinitionId) : null;
 					CardDefinition? targetDef = _cardDb.GetDefinition(targetCard.Value.DefinitionId);
 					if (!ShareFaction(bearerDef, targetDef))
 					{
@@ -770,11 +756,11 @@ public sealed partial class GameEngine
 				else
 				{
 					int performerId = ResolvePerformerCharacterId(state, useAbility.SourceInstanceId, _cardDb);
-					CardInstance? bearerCard = FindBoardCard(state, performerId);
-					if (bearerCard.HasValue)
+					CardInstance? performerCard = FindBoardCard(state, performerId);
+					if (performerCard.HasValue)
 					{
-						PlayerState playerState = state.Players[bearerCard.Value.OwnerPlayerIndex];
-						if (!BoardGeometry.AreAdjacent(playerState, bearerCard.Value.InstanceId, targetCard.Value.InstanceId))
+						PlayerState playerState = state.Players[performerCard.Value.OwnerPlayerIndex];
+						if (!BoardGeometry.AreAdjacent(playerState, performerCard.Value.InstanceId, targetCard.Value.InstanceId))
 						{
 							list.Add("Target must be adjacent to the bearer.");
 						}
@@ -833,28 +819,28 @@ public sealed partial class GameEngine
 			else
 			{
 				List<CardInstance> list2 = state.Players[tuple.Value.Item1].Ranks[tuple.Value.Item2];
-				bool flag = false;
+				bool hasAdjacentCostAlly = false;
 				if (useAbility.CostCharacterInstanceId.HasValue)
 				{
 					int costId = useAbility.CostCharacterInstanceId.Value;
-					int num3 = list2.FindIndex((CardInstance c) => c.InstanceId == costId);
-					if (num3 >= 0 && Math.Abs(num3 - tuple.Value.Item3) == 1 && list2[num3].ReadyState == ReadyState.Ready)
+					int costIndex = list2.FindIndex((CardInstance c) => c.InstanceId == costId);
+					if (costIndex >= 0 && Math.Abs(costIndex - tuple.Value.Item3) == 1 && list2[costIndex].ReadyState == ReadyState.Ready)
 					{
-						flag = true;
+						hasAdjacentCostAlly = true;
 					}
 				}
 				else
 				{
-					for (int num4 = 0; num4 < list2.Count; num4++)
+					for (int allyIdx = 0; allyIdx < list2.Count; allyIdx++)
 					{
-						if (Math.Abs(num4 - tuple.Value.Item3) == 1 && list2[num4].ReadyState == ReadyState.Ready)
+						if (Math.Abs(allyIdx - tuple.Value.Item3) == 1 && list2[allyIdx].ReadyState == ReadyState.Ready)
 						{
-							flag = true;
+							hasAdjacentCostAlly = true;
 							break;
 						}
 					}
 				}
-				if (!flag)
+				if (!hasAdjacentCostAlly)
 				{
 					list.Add("Must have an adjacent ready ally to spend as cost.");
 				}
@@ -871,21 +857,21 @@ public sealed partial class GameEngine
 			else
 			{
 				List<CardInstance> list3 = state.Players[tuple2.Value.Item1].Ranks[tuple2.Value.Item2];
-				bool flag2 = false;
+				bool hasRankCostAlly = false;
 				if (useAbility.CostCharacterInstanceId.HasValue)
 				{
 					int costId2 = useAbility.CostCharacterInstanceId.Value;
-					int num5 = list3.FindIndex((CardInstance c) => c.InstanceId == costId2);
-					if (num5 >= 0 && list3[num5].InstanceId != performerId && list3[num5].ReadyState == ReadyState.Ready)
+					int costIndex = list3.FindIndex((CardInstance c) => c.InstanceId == costId2);
+					if (costIndex >= 0 && list3[costIndex].InstanceId != performerId && list3[costIndex].ReadyState == ReadyState.Ready)
 					{
-						flag2 = true;
+						hasRankCostAlly = true;
 					}
 				}
 				else
 				{
-					flag2 = list3.Any((CardInstance c) => c.InstanceId != performerId && c.ReadyState == ReadyState.Ready);
+					hasRankCostAlly = list3.Any((CardInstance c) => c.InstanceId != performerId && c.ReadyState == ReadyState.Ready);
 				}
-				if (!flag2)
+				if (!hasRankCostAlly)
 				{
 					list.Add("Must have a ready ally in this rank to spend as cost.");
 				}
@@ -901,8 +887,8 @@ public sealed partial class GameEngine
 		}
 		if (abilityDefinition.DiscardsOpponentTopDeck)
 		{
-			PlayerState playerState2 = state.Players.FirstOrDefault((PlayerState pl) => pl.PlayerIndex != useAbility.PlayerIndex);
-			if (playerState2 == null || playerState2.Deck.Count == 0)
+			PlayerState opponentState = state.Players.FirstOrDefault((PlayerState pl) => pl.PlayerIndex != useAbility.PlayerIndex);
+			if (opponentState == null || opponentState.Deck.Count == 0)
 			{
 				list.Add("Opponent has no cards in deck to discard.");
 			}
@@ -1124,15 +1110,15 @@ public sealed partial class GameEngine
 		case CardType.Character:
 		case CardType.Token:
 		{
-			int num2 = ((definition.Level <= 0) ? 1 : definition.Level);
+			int requiredRank = ((definition.Level <= 0) ? 1 : definition.Level);
 			int? targetRank = playCard.TargetRank;
 			if ((!targetRank.HasValue || targetRank.GetValueOrDefault() < 1) ? true : false)
 			{
 				list.Add($"Target rank {playCard.TargetRank} is invalid. Playing a Character card requires a valid TargetRank (1-based).");
 			}
-			else if (playCard.TargetRank.Value != num2)
+			else if (playCard.TargetRank.Value != requiredRank)
 			{
-				list.Add($"Character '{definition.Name}' (Level {definition.Level}) must be deployed into Rank {num2}.");
+				list.Add($"Character '{definition.Name}' (Level {definition.Level}) must be deployed into Rank {requiredRank}.");
 			}
 			else
 			{
@@ -1140,15 +1126,15 @@ public sealed partial class GameEngine
 				{
 					break;
 				}
-				if (!playerState.Ranks.TryGetValue(playCard.TargetRank.Value - 1, out List<CardInstance> value) || value.Count == 0)
+				if (!playerState.Ranks.TryGetValue(playCard.TargetRank.Value - 1, out List<CardInstance> prevRankCards) || prevRankCards.Count == 0)
 				{
 					list.Add($"Cannot deploy character to Rank {playCard.TargetRank}: Rank {playCard.TargetRank - 1} must be occupied first.");
 					break;
 				}
-				int num3 = (playerState.Ranks.TryGetValue(playCard.TargetRank.Value, out List<CardInstance> value2) ? value2.Count : 0);
-				if (num3 + 1 > value.Count)
+				int targetRankCharCount = (playerState.Ranks.TryGetValue(playCard.TargetRank.Value, out List<CardInstance> targetRankCards) ? targetRankCards.Count : 0);
+				if (targetRankCharCount + 1 > prevRankCards.Count)
 				{
-					list.Add($"Cannot deploy character to Rank {playCard.TargetRank}: Rank {playCard.TargetRank} cannot have more characters ({num3 + 1}) than Rank {playCard.TargetRank - 1} ({value.Count}).");
+					list.Add($"Cannot deploy character to Rank {playCard.TargetRank}: Rank {playCard.TargetRank} cannot have more characters ({targetRankCharCount + 1}) than Rank {playCard.TargetRank - 1} ({prevRankCards.Count}).");
 				}
 			}
 			break;
@@ -1160,57 +1146,57 @@ public sealed partial class GameEngine
 				list.Add("Playing an Item card requires a TargetCharacterId.");
 				break;
 			}
-			CardInstance? cardInstance6 = FindBoardCard(state, playCard.TargetCharacterId.Value);
-			if (!cardInstance6.HasValue)
+			CardInstance? bearerTarget = FindBoardCard(state, playCard.TargetCharacterId.Value);
+			if (!bearerTarget.HasValue)
 			{
 				list.Add($"Target character {playCard.TargetCharacterId.Value} not found on the board.");
 				break;
 			}
-			if (cardInstance6.Value.OwnerPlayerIndex != playCard.PlayerIndex)
+			if (bearerTarget.Value.OwnerPlayerIndex != playCard.PlayerIndex)
 			{
 				list.Add("Cannot attach items to an opponent's character.");
 				break;
 			}
-			CardDefinition definition4 = _cardDb.GetDefinition(cardInstance6.Value.DefinitionId);
-			if (!(definition4 != null))
+			CardDefinition bearerDef = _cardDb.GetDefinition(bearerTarget.Value.DefinitionId);
+			if (!(bearerDef != null))
 			{
 				break;
 			}
-			CardDefinition cardDefinition = definition4;
-			bool flag2 = definition4.Name.Equals("Tinker", StringComparison.OrdinalIgnoreCase);
-			if (flag2)
+			CardDefinition cardDefinition = bearerDef;
+			bool isTinker = bearerDef.Name.Equals("Tinker", StringComparison.OrdinalIgnoreCase);
+			if (isTinker)
 			{
-				cardDefinition = definition4 with
+				cardDefinition = bearerDef with
 				{
-					Level = definition4.Level + 1,
-					Class = (definition.Class ?? definition4.Class)
+					Level = bearerDef.Level + 1,
+					Class = (definition.Class ?? bearerDef.Class)
 				};
 			}
-			bool flag3 = HasDualWield(definition);
-			bool flag4 = HasDualWield(definition4) || cardInstance6.Value.AttachedItemIds.Any((int id) =>
+			bool cardHasDualWield = HasDualWield(definition);
+			bool bearerHasDualWield = HasDualWield(bearerDef) || bearerTarget.Value.AttachedItemIds.Any((int id) =>
 			{
-				CardInstance? cardInstance7 = CardLocator.FindCard(state, id);
-				CardDefinition cardDefinition2 = (cardInstance7.HasValue ? _cardDb.GetDefinition(cardInstance7.Value.DefinitionId) : null);
+				CardInstance? equippedItemCard = CardLocator.FindCard(state, id);
+				CardDefinition cardDefinition2 = (equippedItemCard.HasValue ? _cardDb.GetDefinition(equippedItemCard.Value.DefinitionId) : null);
 				return HasDualWield(cardDefinition2);
 			});
-			if (flag3 | flag4)
+			if (cardHasDualWield | bearerHasDualWield)
 			{
 				cardDefinition = cardDefinition with
 				{
 					Traits = new List<string>(cardDefinition.Traits) { "Dual Wield" }
 				};
 			}
-			ActionResult actionResult2 = PlayCardAction.ValidateItemEquip(definition, cardDefinition, cardInstance6.Value, state, _cardDb);
+			ActionResult actionResult2 = PlayCardAction.ValidateItemEquip(definition, cardDefinition, bearerTarget.Value, state, _cardDb);
 			if (actionResult2.IsSuccess)
 			{
 				break;
 			}
 			IEnumerable<string> enumerable = actionResult2.Errors.AsEnumerable();
-			if (flag2)
+			if (isTinker)
 			{
 				enumerable = enumerable.Where((string e) => !e.Contains("class", StringComparison.OrdinalIgnoreCase));
 			}
-			if (flag3 | flag4)
+			if (cardHasDualWield | bearerHasDualWield)
 			{
 				enumerable = enumerable.Where((string e) => !e.Contains("Weapon", StringComparison.OrdinalIgnoreCase) && !e.Contains("slot", StringComparison.OrdinalIgnoreCase));
 			}
@@ -1220,29 +1206,29 @@ public sealed partial class GameEngine
 		case CardType.Action:
 			if (playCard.PerformerInstanceId.HasValue)
 			{
-				CardInstance? cardInstance2 = FindBoardCard(state, playCard.PerformerInstanceId.Value);
-				if (!cardInstance2.HasValue)
+				CardInstance? performerCard = FindBoardCard(state, playCard.PerformerInstanceId.Value);
+				if (!performerCard.HasValue)
 				{
 					list.Add($"Performer character {playCard.PerformerInstanceId.Value} not found on the board.");
 				}
-				else if (cardInstance2.Value.OwnerPlayerIndex != playCard.PlayerIndex)
+				else if (performerCard.Value.OwnerPlayerIndex != playCard.PlayerIndex)
 				{
 					list.Add("Performer character does not belong to you.");
 				}
 				else
 				{
-					CardDefinition definition2 = _cardDb.GetDefinition(cardInstance2.Value.DefinitionId);
+					CardDefinition definition2 = _cardDb.GetDefinition(performerCard.Value.DefinitionId);
 					if (definition2 != null)
 					{
-						ActionResult actionResult = PlayCardAction.ValidatePerformerRequirements(definition, definition2, cardInstance2.Value);
+						ActionResult actionResult = PlayCardAction.ValidatePerformerRequirements(definition, definition2, performerCard.Value);
 						if (!actionResult.IsSuccess)
 						{
 							list.AddRange(actionResult.Errors);
 						}
-						int num = playCard.AbilityIndex ?? playCard.ChoiceIndex.GetValueOrDefault();
-						if (num >= 0 && num < definition.Abilities.Count)
+						int chosenAbilityIndex = playCard.AbilityIndex ?? playCard.ChoiceIndex.GetValueOrDefault();
+						if (chosenAbilityIndex >= 0 && chosenAbilityIndex < definition.Abilities.Count)
 						{
-							AbilityDefinition abilityChoice = definition.Abilities[num];
+							AbilityDefinition abilityChoice = definition.Abilities[chosenAbilityIndex];
 							if (abilityChoice.RequiredPerformerClass != null && (!definition2.Class.HasValue || !definition2.Class.Value.ToString().Contains(abilityChoice.RequiredPerformerClass, StringComparison.OrdinalIgnoreCase)) && !definition2.Traits.Any((string t) => t.Contains(abilityChoice.RequiredPerformerClass, StringComparison.OrdinalIgnoreCase)))
 							{
 								list.Add($"Performer '{definition2.Name}' is not a {abilityChoice.RequiredPerformerClass} required by this ability.");
@@ -1253,24 +1239,24 @@ public sealed partial class GameEngine
 			}
 			else if (playerState.Ranks.Values.Sum((List<CardInstance> r) => r.Count) > 0)
 			{
-				bool flag = false;
-				foreach (List<CardInstance> value3 in playerState.Ranks.Values)
+				bool hasValidPerformer = false;
+				foreach (List<CardInstance> rankCards in playerState.Ranks.Values)
 				{
-					foreach (CardInstance item2 in value3)
+					foreach (CardInstance item2 in rankCards)
 					{
 						CardDefinition definition3 = _cardDb.GetDefinition(item2.DefinitionId);
 						if (definition3 != null && PlayCardAction.ValidatePerformerRequirements(definition, definition3, item2).IsSuccess)
 						{
-							flag = true;
+							hasValidPerformer = true;
 							break;
 						}
 					}
-					if (flag)
+					if (hasValidPerformer)
 					{
 						break;
 					}
 				}
-				if (!flag)
+				if (!hasValidPerformer)
 				{
 					list.Add("No valid performer on the board meets the requirements to play action '" + definition.Name + "'.");
 				}
@@ -1281,40 +1267,34 @@ public sealed partial class GameEngine
 			}
 			if (definition.Abilities.Any((AbilityDefinition a) => a.Effects.OfType<DestroyTargetItemEffect>().Any()) || Regex.IsMatch(definition.RulesText, "\\btarget\\s+an\\s+item\\b", RegexOptions.IgnoreCase))
 			{
-				CardInstance? cardInstance3 = CardLocator.FindCard(state, playCard.TargetCharacterId.Value);
-				if (!cardInstance3.HasValue || cardInstance3.Value.Zone != CardZone.Attached)
+				CardInstance? targetAttachedItem = CardLocator.FindCard(state, playCard.TargetCharacterId.Value);
+				if (!targetAttachedItem.HasValue || targetAttachedItem.Value.Zone != CardZone.Attached)
 				{
-					CardInstance? cardInstance4 = FindBoardCard(state, playCard.TargetCharacterId.Value);
-					if (!cardInstance4.HasValue || cardInstance4.Value.AttachedItemIds.Count == 0)
+					CardInstance? targetItemBearer = FindBoardCard(state, playCard.TargetCharacterId.Value);
+					if (!targetItemBearer.HasValue || targetItemBearer.Value.AttachedItemIds.Count == 0)
 					{
 						list.Add($"Target item {playCard.TargetCharacterId.Value} for action card not found on the board.");
 					}
 				}
 				ValidateDestroyItemTarget(state, playCard, definition, list);
-				if (true)
-				{
-					if (false)
-					{
-					}
-				}
 			}
 			else
 			{
-				CardInstance? cardInstance5 = FindBoardCard(state, playCard.TargetCharacterId.Value);
-				if (!cardInstance5.HasValue)
+				CardInstance? targetChar = FindBoardCard(state, playCard.TargetCharacterId.Value);
+				if (!targetChar.HasValue)
 				{
 					list.Add($"Target character {playCard.TargetCharacterId.Value} for action card not found on the board.");
 				}
-				else if ((definition.Name.Equals("Assassin's Strike", StringComparison.OrdinalIgnoreCase) || definition.Abilities.Any((AbilityDefinition a) => a.Effects.OfType<PerformStrikeEffect>().Any((PerformStrikeEffect s) => s.TargetSpentOnly || s.TargetSpentOrStunnedOnly)) || Regex.IsMatch(definition.RulesText, "\\b(?:spent\\s+or\\s+stunned|against\\s+a\\s+spent|target\\s+a\\s+spent)\\b", RegexOptions.IgnoreCase)) && cardInstance5.Value.ReadyState == ReadyState.Ready)
+				else if ((definition.Name.Equals("Assassin's Strike", StringComparison.OrdinalIgnoreCase) || definition.Abilities.Any((AbilityDefinition a) => a.Effects.OfType<PerformStrikeEffect>().Any((PerformStrikeEffect s) => s.TargetSpentOnly || s.TargetSpentOrStunnedOnly)) || Regex.IsMatch(definition.RulesText, "\\b(?:spent\\s+or\\s+stunned|against\\s+a\\s+spent|target\\s+a\\s+spent)\\b", RegexOptions.IgnoreCase)) && targetChar.Value.ReadyState == ReadyState.Ready)
 				{
 					list.Add("'" + definition.Name + "' can only target a spent or stunned character.");
 				}
-				if (playCard.PerformerInstanceId.HasValue && cardInstance5.HasValue && !definition.Abilities.Any((AbilityDefinition a) => a.Effects.OfType<PerformStrikeEffect>().Any()) && Regex.IsMatch(definition.RulesText ?? "", @"\btarget\s+(?:a|an|your|opposing)?\s*(?:\w+\s+)?character\s+within\s+(?:two|2)\s+ranks\b", RegexOptions.IgnoreCase))
+				if (playCard.PerformerInstanceId.HasValue && targetChar.HasValue && !definition.Abilities.Any((AbilityDefinition a) => a.Effects.OfType<PerformStrikeEffect>().Any()) && Regex.IsMatch(definition.RulesText ?? "", @"\btarget\s+(?:a|an|your|opposing)?\s*(?:\w+\s+)?character\s+within\s+(?:two|2)\s+ranks\b", RegexOptions.IgnoreCase))
 				{
 					CardInstance? rangePerformer = FindBoardCard(state, playCard.PerformerInstanceId.Value);
-					if (rangePerformer.HasValue && GetBoardRankDistance(rangePerformer.Value, cardInstance5.Value) > 2)
+					if (rangePerformer.HasValue && GetBoardRankDistance(rangePerformer.Value, targetChar.Value) > 2)
 					{
-						list.Add($"Target character {cardInstance5.Value.InstanceId} is not within two ranks of the performer.");
+						list.Add($"Target character {targetChar.Value.InstanceId} is not within two ranks of the performer.");
 					}
 				}
 				int numAbil = playCard.AbilityIndex ?? playCard.ChoiceIndex.GetValueOrDefault();
@@ -1327,22 +1307,22 @@ public sealed partial class GameEngine
 				{
 					strikeEff = definition.Abilities.SelectMany((AbilityDefinition a) => a.Effects).OfType<PerformStrikeEffect>().FirstOrDefault();
 				}
-				if (strikeEff != null && playCard.PerformerInstanceId.HasValue && cardInstance5.Value.OwnerPlayerIndex != playCard.PlayerIndex)
+				if (strikeEff != null && playCard.PerformerInstanceId.HasValue && targetChar.Value.OwnerPlayerIndex != playCard.PlayerIndex)
 				{
 					CardInstance? perf = FindBoardCard(state, playCard.PerformerInstanceId.Value);
-					if (perf.HasValue && perf.Value.Rank.HasValue && cardInstance5.Value.Rank.HasValue)
+					if (perf.HasValue && perf.Value.Rank.HasValue && targetChar.Value.Rank.HasValue)
 					{
-						if (IsTargetProtectedByStealth(state, perf.Value, cardInstance5.Value, strikeEff.IsRanged, _cardDb))
+						if (IsTargetProtectedByStealth(state, perf.Value, targetChar.Value, strikeEff.IsRanged, _cardDb))
 						{
-							list.Add($"Target character {cardInstance5.Value.InstanceId} cannot be targeted due to Stealth.");
+							list.Add($"Target character {targetChar.Value.InstanceId} cannot be targeted due to Stealth.");
 						}
-						int crossDist = BoardGeometry.GetCrossBoardDistance(perf.Value.Rank.Value, cardInstance5.Value.Rank.Value);
+						int crossDist = BoardGeometry.GetCrossBoardDistance(perf.Value.Rank.Value, targetChar.Value.Rank.Value);
 						if (strikeEff.IsRanged)
 						{
 							int effectiveMax = strikeEff.HasReach ? Math.Max(strikeEff.MaxRange, 3) : strikeEff.MaxRange;
 							if (crossDist > effectiveMax)
 							{
-								list.Add($"Target character {cardInstance5.Value.InstanceId} is out of range ({crossDist} > {effectiveMax}).");
+								list.Add($"Target character {targetChar.Value.InstanceId} is out of range ({crossDist} > {effectiveMax}).");
 							}
 						}
 						else
@@ -1350,7 +1330,7 @@ public sealed partial class GameEngine
 							int maxMelee = (strikeEff.HasReach || CharacterHasReach(perf.Value, state, _cardDb)) ? 2 : 1;
 							if (crossDist > maxMelee)
 							{
-								list.Add($"Target character {cardInstance5.Value.InstanceId} is out of melee range ({crossDist} > {maxMelee}).");
+								list.Add($"Target character {targetChar.Value.InstanceId} is out of melee range ({crossDist} > {maxMelee}).");
 							}
 						}
 					}

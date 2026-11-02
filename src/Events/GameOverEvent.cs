@@ -19,13 +19,4 @@ public sealed record GameOverEvent : GameEvent
 		return state;
 	}
 
-	[CompilerGenerated]
-	[SetsRequiredMembers]
-	private GameOverEvent(GameOverEvent original)
-		: base(original)
-	{
-		WinningPlayerIndex = original.WinningPlayerIndex;
-		Reason = original.Reason;
-		DefeatedPlayerIndex = original.DefeatedPlayerIndex;
-	}
 }

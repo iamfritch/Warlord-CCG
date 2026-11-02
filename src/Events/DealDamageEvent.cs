@@ -46,16 +46,4 @@ public sealed record DealDamageEvent : GameEvent
 		return state;
 	}
 
-	[CompilerGenerated]
-	[SetsRequiredMembers]
-	private DealDamageEvent(DealDamageEvent original)
-		: base(original)
-	{
-		TargetInstanceId = original.TargetInstanceId;
-		Amount = original.Amount;
-		DamageType = original.DamageType;
-		SourceInstanceId = original.SourceInstanceId;
-		BanishOnDeath = original.BanishOnDeath;
-		Unpreventable = original.Unpreventable;
-	}
 }

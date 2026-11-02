@@ -34,11 +34,4 @@ public sealed record EventResolutionResult
 		};
 	}
 
-	[CompilerGenerated]
-	[SetsRequiredMembers]
-	private EventResolutionResult(EventResolutionResult original)
-	{
-		Status = original.Status;
-		ModifiedEvent = original.ModifiedEvent;
-	}
 }

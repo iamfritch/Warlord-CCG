@@ -37,16 +37,16 @@ public sealed class WarlordEliminationHandler : IPostResolutionHandler
 				{
 					continue;
 				}
-				foreach (List<CardInstance> value3 in player.Ranks.Values)
+				foreach (List<CardInstance> rankCards in player.Ranks.Values)
 				{
-					foreach (CardInstance item in value3)
+					foreach (CardInstance item in rankCards)
 					{
 						if (item.InstanceId == dealDamageEvent.TargetInstanceId && item.CurrentHitPoints <= 0)
 						{
-							int value2 = 1 - player.PlayerIndex;
+							int winnerIndex = 1 - player.PlayerIndex;
 							yield return new GameOverEvent
 							{
-								WinningPlayerIndex = value2,
+								WinningPlayerIndex = winnerIndex,
 								Reason = GameOverReason.WarlordDefeated,
 								DefeatedPlayerIndex = player.PlayerIndex
 							};

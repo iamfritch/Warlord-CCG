@@ -41,13 +41,4 @@ public sealed record PlayCardEvent : GameEvent
 		return state;
 	}
 
-	[CompilerGenerated]
-	[SetsRequiredMembers]
-	private PlayCardEvent(PlayCardEvent original)
-		: base(original)
-	{
-		PlayerIndex = original.PlayerIndex;
-		CardInstanceId = original.CardInstanceId;
-		TargetRank = original.TargetRank;
-	}
 }
