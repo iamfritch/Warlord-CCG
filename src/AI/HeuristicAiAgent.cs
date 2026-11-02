@@ -57,7 +57,7 @@ public sealed class HeuristicAiAgent : IAiAgent
 				break;
 			}
 			double num3;
-			if ((item is AttackAction || item is DeclareAttackAction) ? true : false)
+			if (item is AttackAction)
 			{
 				double num2 = 0.0;
 				foreach (int roll in array)

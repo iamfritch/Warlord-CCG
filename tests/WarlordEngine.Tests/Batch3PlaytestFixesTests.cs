@@ -458,7 +458,7 @@ public class Batch3PlaytestFixesTests
 
 		if (state.Priority.ActivePlayerIndex != 0)
 		{
-			engine.Execute(new PassPriorityAction { PlayerIndex = state.Priority.ActivePlayerIndex });
+			engine.Execute(new PassAction { PlayerIndex = state.Priority.ActivePlayerIndex });
 		}
 
 		var reacts = engine.GetLegalActions(state, 0).OfType<UseAbilityAction>().Where(a => a.SourceInstanceId == 10).ToList();

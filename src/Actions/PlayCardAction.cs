@@ -10,8 +10,16 @@ using WarlordEngine.Effects;
 
 namespace WarlordEngine.Actions;
 
-public sealed record PlayCardAction : PlayerAction, IPlayerAction
+public sealed record PlayCardAction : IPlayerAction
 {
+	public required int PlayerIndex { get; init; }
+
+	public int PlayerId
+	{
+		get => PlayerIndex;
+		init => PlayerIndex = value;
+	}
+
 	public required int CardInstanceId { get; init; }
 
 	public int? TargetRank { get; init; }
@@ -641,21 +649,5 @@ public sealed record PlayCardAction : PlayerAction, IPlayerAction
 			return ActionResult.Success();
 		}
 		return ActionResult.Failure(list);
-	}
-
-	[CompilerGenerated]
-	[SetsRequiredMembers]
-	private PlayCardAction(PlayCardAction original)
-		: base(original)
-	{
-		CardInstanceId = original.CardInstanceId;
-		TargetRank = original.TargetRank;
-		TargetCharacterId = original.TargetCharacterId;
-		PerformerInstanceId = original.PerformerInstanceId;
-		AbilityIndex = original.AbilityIndex;
-		ChoiceIndex = original.ChoiceIndex;
-		DiscardCardInstanceId = original.DiscardCardInstanceId;
-		CostCharacterInstanceId = original.CostCharacterInstanceId;
-		CostBanishCardInstanceIds = original.CostBanishCardInstanceIds;
 	}
 }

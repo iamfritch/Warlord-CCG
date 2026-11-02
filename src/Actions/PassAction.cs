@@ -1,10 +1,9 @@
-using System.Diagnostics.CodeAnalysis;
-using System.Runtime.CompilerServices;
-
 namespace WarlordEngine.Actions;
 
-public sealed record PassAction : PlayerAction, IPlayerAction
+public sealed record PassAction : IPlayerAction
 {
+	public required int PlayerIndex { get; init; }
+
 	public void Execute(GameState state)
 	{
 		if (state.Priority.IsReactWindowOpen)
@@ -20,12 +19,5 @@ public sealed record PassAction : PlayerAction, IPlayerAction
 		{
 			state.TurnState.RecordPass();
 		}
-	}
-
-	[CompilerGenerated]
-	[SetsRequiredMembers]
-	private PassAction(PassAction original)
-		: base(original)
-	{
 	}
 }

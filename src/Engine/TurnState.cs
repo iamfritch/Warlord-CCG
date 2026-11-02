@@ -37,38 +37,6 @@ public sealed class TurnState
 		}
 	}
 
-	public void AdvancePhase()
-	{
-		switch (CurrentPhase)
-		{
-		case TurnPhase.Setup:
-			CurrentPhase = TurnPhase.Ready;
-			Priority.ConsecutivePasses = 0;
-			UsedLimitedAbilityKeysThisTurn.Clear();
-			break;
-		case TurnPhase.Ready:
-			CurrentPhase = TurnPhase.Draw;
-			break;
-		case TurnPhase.Draw:
-			CurrentPhase = TurnPhase.Main;
-			Priority.ConsecutivePasses = 0;
-			break;
-		case TurnPhase.Main:
-			CurrentPhase = TurnPhase.Combat;
-			break;
-		case TurnPhase.Combat:
-			CurrentPhase = TurnPhase.End;
-			break;
-		case TurnPhase.End:
-			CurrentPhase = TurnPhase.Ready;
-			ActivePlayerIndex = 1 - ActivePlayerIndex;
-			TurnNumber++;
-			Priority.ConsecutivePasses = 0;
-			UsedLimitedAbilityKeysThisTurn.Clear();
-			break;
-		}
-	}
-
 	public TurnState DeepClone()
 	{
 		return new TurnState

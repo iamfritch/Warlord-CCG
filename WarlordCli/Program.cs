@@ -683,16 +683,13 @@ public static class Program
         return action switch
         {
             AttackAction atk => FormatAttack(atk, state, cardDb),
-            DeclareAttackAction dec => FormatDeclareAttack(dec, state, cardDb),
             PlayCardAction play => FormatPlayCard(play, state, cardDb),
-            DeployCharacterAction dep => $"Deploy character {dep.DefinitionId} to Rank {dep.TargetRank}",
             JourneyAction journey => $"Journey {FindCardSimpleName(state, cardDb, journey.CardInstanceId)} (ID: {journey.CardInstanceId}) from Rank {journey.SourceRank} to Rank {journey.DestinationRank}" + (journey.TargetSlotIndex.HasValue ? $" ({GetPlacementDescription(journey.DestinationRank, journey.TargetSlotIndex, journey.CardInstanceId, state.Players[journey.PlayerIndex], cardDb)})" : ""),
             MarchAction march when march.SourceRank == march.DestinationRank => $"March {FindCardSimpleName(state, cardDb, march.CardInstanceId)} in Rank {march.SourceRank} ({GetPlacementDescription(march.DestinationRank, march.TargetSlotIndex, march.CardInstanceId, state.Players[march.PlayerIndex], cardDb)})",
             MarchAction march => $"March {FindCardSimpleName(state, cardDb, march.CardInstanceId)} (ID: {march.CardInstanceId}) from Rank {march.SourceRank} to Rank {march.DestinationRank}",
             UseAbilityAction ability => FormatUseAbility(ability, state, cardDb),
             DiscardCardAction disc => $"Discard {FindCardSimpleName(state, cardDb, disc.CardInstanceId)} (ID: {disc.CardInstanceId}) from hand",
             PassAction => state.Priority.IsReactWindowOpen ? "Pass priority (Allow pending action to resolve)" : "Pass Decree (End orders for this round)",
-            PassPriorityAction => "Pass priority (Allow pending action to resolve)",
             _ => action.GetType().Name
         };
     }
@@ -753,13 +750,6 @@ public static class Program
         string attacker = FindCardName(state, cardDb, atk.AttackerInstanceId);
         string target = FindCardName(state, cardDb, atk.TargetInstanceId);
         return $"Attack with {attacker} against {target}";
-    }
-
-    private static string FormatDeclareAttack(DeclareAttackAction dec, GameState state, CardDatabase cardDb)
-    {
-        string attacker = FindCardName(state, cardDb, dec.AttackerInstanceId);
-        string defender = FindCardName(state, cardDb, dec.DefenderInstanceId);
-        return $"Declare attack: {attacker} against {defender}";
     }
 
     private static string FormatPlayCard(PlayCardAction play, GameState state, CardDatabase cardDb)
@@ -912,7 +902,6 @@ public static class Program
             switch (action)
             {
                 case PassAction:
-                case PassPriorityAction:
                 {
                     string label = FormatAction(action, state, cardDb);
                     groups.Add(new ActionGroup
@@ -934,20 +923,6 @@ public static class Program
                         dict[key] = entry;
                     }
                     entry.Items.Add((atk, $"Target: {targetName}"));
-                    break;
-                }
-
-                case DeclareAttackAction dec:
-                {
-                    string key = $"declare_{dec.AttackerInstanceId}";
-                    string attackerName = FindCardName(state, cardDb, dec.AttackerInstanceId);
-                    string targetName = FindCardName(state, cardDb, dec.DefenderInstanceId);
-                    if (!dict.TryGetValue(key, out var entry))
-                    {
-                        entry = ($"Declare attack: {attackerName}", new List<(IPlayerAction, string)>());
-                        dict[key] = entry;
-                    }
-                    entry.Items.Add((dec, $"Defender: {targetName}"));
                     break;
                 }
 

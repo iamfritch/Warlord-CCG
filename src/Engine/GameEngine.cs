@@ -935,7 +935,7 @@ public sealed class GameEngine
 		}
 	}
 
-	public ActionResult CanExecute(PlayerAction action, GameState state)
+	public ActionResult CanExecute(IPlayerAction action, GameState state)
 	{
 		ArgumentNullException.ThrowIfNull(action, "action");
 		ArgumentNullException.ThrowIfNull(state, "state");
@@ -943,67 +943,40 @@ public sealed class GameEngine
 		{
 			return ActionResult.Failure("Game is over. No further actions can be executed.");
 		}
-		if (!(action is DeployCharacterAction deploy))
+		if (action is MarchAction march)
 		{
-			if (!(action is MarchAction march))
-			{
-				if (!(action is DeclareAttackAction attack))
-				{
-					if (!(action is PassPriorityAction))
-					{
-						if (!(action is PassAction))
-						{
-							if (!(action is UseAbilityAction useAbility))
-							{
-								if (!(action is PlayCardAction playCard))
-								{
-									if (!(action is AttackAction attack2))
-									{
-										if (action is DeployStartingArmyAction deployArmy)
-										{
-											return ValidateDeployStartingArmy(deployArmy, state);
-										}
-										if (action is DiscardCardAction discardAction)
-										{
-											PlayerState p = state.Players[discardAction.PlayerIndex];
-											if (!p.Hand.Any((CardInstance c) => c.InstanceId == discardAction.CardInstanceId))
-											{
-												return ActionResult.Failure("Card is not in hand.");
-											}
-											return ActionResult.Success();
-										}
-										return ActionResult.Failure("Unknown action type: " + action.GetType().Name);
-									}
-									return ValidateAttackAction(attack2, state);
-								}
-								return ValidatePlayCard(playCard, state);
-							}
-							return ValidateUseAbility(useAbility, state);
-						}
-						return ValidatePassPriority(action, state);
-					}
-					return ValidatePassPriority(action, state);
-				}
-				return ValidateAttack(attack, state);
-			}
 			return ValidateMarch(march, state);
 		}
-		return ValidateDeploy(deploy, state);
-	}
-
-	public ActionResult CanExecute(PlayerAction action)
-	{
-		return CanExecute(action, _state);
-	}
-
-	public ActionResult CanExecute(IPlayerAction action, GameState state)
-	{
-		ArgumentNullException.ThrowIfNull(action, "action");
-		if (action is PlayerAction action2)
+		if (action is PassAction)
 		{
-			return CanExecute(action2, state);
+			return ValidatePassPriority(action, state);
 		}
-		return ActionResult.Failure("Unsupported action type: " + action.GetType().Name);
+		if (action is UseAbilityAction useAbility)
+		{
+			return ValidateUseAbility(useAbility, state);
+		}
+		if (action is PlayCardAction playCard)
+		{
+			return ValidatePlayCard(playCard, state);
+		}
+		if (action is AttackAction attack)
+		{
+			return ValidateAttackAction(attack, state);
+		}
+		if (action is DeployStartingArmyAction deployArmy)
+		{
+			return ValidateDeployStartingArmy(deployArmy, state);
+		}
+		if (action is DiscardCardAction discardAction)
+		{
+			PlayerState p = state.Players[discardAction.PlayerIndex];
+			if (!p.Hand.Any((CardInstance c) => c.InstanceId == discardAction.CardInstanceId))
+			{
+				return ActionResult.Failure("Card is not in hand.");
+			}
+			return ActionResult.Success();
+		}
+		return ActionResult.Failure("Unknown action type: " + action.GetType().Name);
 	}
 
 	public ActionResult CanExecute(IPlayerAction action)
@@ -1023,15 +996,16 @@ public sealed class GameEngine
 		}
 	}
 
-	public ActionResult Execute(PlayerAction action)
+	public ActionResult Execute(IPlayerAction action)
 	{
+		ArgumentNullException.ThrowIfNull(action, "action");
 		ActionResult actionResult = CanExecute(action, _state);
 		if (!actionResult.IsSuccess)
 		{
 			return actionResult;
 		}
 		bool isReactWindowOpen = _state.Priority.IsReactWindowOpen;
-		bool flag = ((action is PassAction || action is PassPriorityAction) ? true : false);
+		bool flag = action is PassAction;
 		bool flag2 = flag;
 		PushEventsForAction(action);
 		if (isReactWindowOpen)
@@ -1077,21 +1051,6 @@ public sealed class GameEngine
 			}
 		}
 		return ActionResult.Success();
-	}
-
-	public ActionResult Execute(IPlayerAction action)
-	{
-		ArgumentNullException.ThrowIfNull(action, "action");
-		if (action is PlayerAction action2)
-		{
-			return Execute(action2);
-		}
-		return ActionResult.Failure("Unsupported action type: " + action.GetType().Name);
-	}
-
-	public ActionResult ExecuteAction(PlayerAction action)
-	{
-		return Execute(action);
 	}
 
 	public ActionResult ExecuteAction(IPlayerAction action)
@@ -3214,63 +3173,6 @@ public sealed class GameEngine
 		}
 	}
 
-	private ActionResult ValidateDeploy(DeployCharacterAction deploy, GameState state)
-	{
-		List<string> list = new List<string>();
-		if (state.Priority.IsReactWindowOpen)
-		{
-			list.Add("Cannot deploy characters while a React window is open.");
-		}
-		if (deploy.PlayerIndex != state.ActivePlayerIndex)
-		{
-			list.Add($"It is not Player {deploy.PlayerIndex}'s turn. Active player is Player {state.ActivePlayerIndex}.");
-		}
-		if (state.CurrentPhase != TurnPhase.Order)
-		{
-			list.Add($"Cannot deploy during {state.CurrentPhase} phase. Deployment is only allowed during the Order phase (Main phase).");
-		}
-		if (deploy.PlayerIndex < 0 || deploy.PlayerIndex >= state.Players.Count)
-		{
-			list.Add($"Player index {deploy.PlayerIndex} is out of range.");
-			return ActionResult.Failure(list);
-		}
-		CardDefinition definition = _cardDb.GetDefinition(deploy.DefinitionId);
-		if ((object)definition == null)
-		{
-			list.Add("Card definition '" + deploy.DefinitionId + "' not found in the card database.");
-		}
-		else if (definition.Type != CardType.Character)
-		{
-			list.Add($"Card '{definition.Name}' is a {definition.Type}, not a Character. " + "Only Characters can be deployed to a rank.");
-		}
-		PlayerState playerState = state.Players[deploy.PlayerIndex];
-		if (deploy.TargetRank < 1)
-		{
-			list.Add($"Target rank {deploy.TargetRank} is invalid. Ranks are 1-based.");
-		}
-		else if (deploy.TargetRank > 1)
-		{
-			if (!playerState.Ranks.ContainsKey(deploy.TargetRank - 1) || playerState.Ranks[deploy.TargetRank - 1].Count == 0)
-			{
-				list.Add($"Cannot deploy to Rank {deploy.TargetRank}: Rank {deploy.TargetRank - 1} must be occupied first.");
-			}
-			else
-			{
-				int count = playerState.Ranks[deploy.TargetRank - 1].Count;
-				int num = (playerState.Ranks.TryGetValue(deploy.TargetRank, out List<CardInstance> value) ? value.Count : 0);
-				if (num + 1 > count)
-				{
-					list.Add($"Cannot deploy to Rank {deploy.TargetRank}: Rank {deploy.TargetRank} cannot have more characters ({num + 1}) than Rank {deploy.TargetRank - 1} ({count}).");
-				}
-			}
-		}
-		if (list.Count <= 0)
-		{
-			return ActionResult.Success();
-		}
-		return ActionResult.Failure(list);
-	}
-
 	private ActionResult ValidateMarch(MarchAction march, GameState state)
 	{
 		List<string> list = new List<string>();
@@ -3565,141 +3467,7 @@ public sealed class GameEngine
 		return rating;
 	}
 
-	private ActionResult ValidateAttack(DeclareAttackAction attack, GameState state)
-	{
-		List<string> list = new List<string>();
-		if (state.Priority.IsReactWindowOpen)
-		{
-			list.Add("Cannot declare an attack while a React window is open.");
-		}
-		if (attack.PlayerIndex != state.ActivePlayerIndex)
-		{
-			list.Add($"It is not Player {attack.PlayerIndex}'s turn.");
-		}
-		if (state.CurrentPhase != TurnPhase.Order && state.CurrentPhase != TurnPhase.Combat)
-		{
-			list.Add("Attacks are only allowed during the Order phase.");
-		}
-		if (attack.PlayerIndex < 0 || attack.PlayerIndex >= state.Players.Count)
-		{
-			list.Add($"Player index {attack.PlayerIndex} is out of range.");
-			return ActionResult.Failure(list);
-		}
-		CardInstance? cardInstance = null;
-		int? num = null;
-		int key;
-		List<CardInstance> value;
-		foreach (KeyValuePair<int, List<CardInstance>> rank in state.Players[attack.PlayerIndex].Ranks)
-		{
-			rank.Deconstruct(out key, out value);
-			int value2 = key;
-			foreach (CardInstance item in value)
-			{
-				if (item.InstanceId == attack.AttackerInstanceId)
-				{
-					cardInstance = item;
-					num = value2;
-					break;
-				}
-			}
-			if (cardInstance.HasValue)
-			{
-				break;
-			}
-		}
-		if (!cardInstance.HasValue)
-		{
-			list.Add($"Attacker {attack.AttackerInstanceId} not found on the board.");
-		}
-		else
-		{
-			if (cardInstance.Value.ReadyState != ReadyState.Ready)
-			{
-				list.Add("Attacker is spent and cannot attack.");
-			}
-			if (HasTurnBuff(state, cardInstance.Value.InstanceId, "NO_MELEE_STRIKES") && (_cardDb.GetDefinition(cardInstance.Value.DefinitionId)?.Attack?.Strikes.All((StrikeDescriptor s) => !s.IsRanged) ?? true))
-			{
-				list.Add("Attacker is unable to perform melee strikes this turn.");
-			}
-			if (cardInstance.Value.OwnerPlayerIndex != attack.PlayerIndex)
-			{
-				list.Add("Cannot attack with an opponent's character.");
-			}
-		}
-		CardInstance? cardInstance2 = null;
-		int? num2 = null;
-		int num3 = -1;
-		foreach (PlayerState player in state.Players)
-		{
-			if (player.PlayerIndex == attack.PlayerIndex)
-			{
-				continue;
-			}
-			foreach (KeyValuePair<int, List<CardInstance>> rank2 in player.Ranks)
-			{
-				rank2.Deconstruct(out key, out value);
-				int value3 = key;
-				foreach (CardInstance item2 in value)
-				{
-					if (item2.InstanceId == attack.DefenderInstanceId)
-					{
-						cardInstance2 = item2;
-						num2 = value3;
-						num3 = player.PlayerIndex;
-						break;
-					}
-				}
-				if (cardInstance2.HasValue)
-				{
-					break;
-				}
-			}
-			if (cardInstance2.HasValue)
-			{
-				break;
-			}
-		}
-		if (!cardInstance2.HasValue)
-		{
-			list.Add($"Defender {attack.DefenderInstanceId} not found on an opponent's board.");
-		}
-		else if (num3 == attack.PlayerIndex)
-		{
-			list.Add("Cannot attack your own character.");
-		}
-		if (cardInstance.HasValue && cardInstance2.HasValue && num.HasValue && num2.HasValue)
-		{
-			CardDefinition? definition = _cardDb.GetDefinition(cardInstance.Value.DefinitionId);
-			bool num4 = (object)definition != null && definition.Attack?.Strikes.Any((StrikeDescriptor s) => s.IsRanged) == true;
-			if (IsTargetProtectedByStealth(state, cardInstance.Value, cardInstance2.Value, num4, _cardDb))
-			{
-				list.Add($"Cannot target '{_cardDb.GetDefinition(cardInstance2.Value.DefinitionId)?.Name ?? cardInstance2.Value.DefinitionId}' due to Stealth.");
-			}
-			int rankDistance = BoardGeometry.GetCrossBoardDistance(num.Value, num2.Value);
-			if (num4)
-			{
-				if (rankDistance > 2)
-				{
-					list.Add($"Ranged attacks reach up to 2 ranks away (distance is {rankDistance}). Attacker is at Rank {num.Value}, Defender is at Rank {num2.Value}.");
-				}
-			}
-			else
-			{
-				int num5 = (CharacterHasReach(cardInstance.Value, state, _cardDb) ? 3 : 2);
-				if (num.Value + num2.Value > num5)
-				{
-					list.Add($"Melee attacks require rank sum <= {num5}. Attacker is at Rank {num.Value}, Defender is at Rank {num2.Value}.");
-				}
-			}
-		}
-		if (list.Count <= 0)
-		{
-			return ActionResult.Success();
-		}
-		return ActionResult.Failure(list);
-	}
-
-	private static ActionResult ValidatePassPriority(PlayerAction action, GameState state)
+	private static ActionResult ValidatePassPriority(IPlayerAction action, GameState state)
 	{
 		if (action.PlayerIndex < 0 || action.PlayerIndex >= state.Players.Count)
 		{
@@ -4522,6 +4290,10 @@ public sealed class GameEngine
 				}
 			}
 		}
+		if (playCard.TargetRank.HasValue && definition.Type != CardType.Character && definition.Type != CardType.Token)
+		{
+			list.Add($"Card '{definition.Name}' is a {definition.Type}, not a Character. Only Characters can be deployed to a rank.");
+		}
 		switch (definition.Type)
 		{
 		case CardType.Character:
@@ -4531,7 +4303,7 @@ public sealed class GameEngine
 			int? targetRank = playCard.TargetRank;
 			if ((!targetRank.HasValue || targetRank.GetValueOrDefault() < 1) ? true : false)
 			{
-				list.Add("Playing a Character card requires a valid TargetRank (1-based).");
+				list.Add($"Target rank {playCard.TargetRank} is invalid. Playing a Character card requires a valid TargetRank (1-based).");
 			}
 			else if (playCard.TargetRank.Value != num2)
 			{
@@ -4551,7 +4323,7 @@ public sealed class GameEngine
 				int num3 = (playerState.Ranks.TryGetValue(playCard.TargetRank.Value, out List<CardInstance> value2) ? value2.Count : 0);
 				if (num3 + 1 > value.Count)
 				{
-					list.Add($"Cannot deploy character to Rank {playCard.TargetRank}: Rank {playCard.TargetRank} would have {num3 + 1} characters, exceeding Rank {playCard.TargetRank - 1} with {value.Count}.");
+					list.Add($"Cannot deploy character to Rank {playCard.TargetRank}: Rank {playCard.TargetRank} cannot have more characters ({num3 + 1}) than Rank {playCard.TargetRank - 1} ({value.Count}).");
 				}
 			}
 			break;
@@ -4768,35 +4540,100 @@ public sealed class GameEngine
 		return ActionResult.Failure(list);
 	}
 
-	private void PushEventsForAction(PlayerAction action)
+	private void PushEventsForAction(IPlayerAction action)
 	{
 		if (action is DiscardCardAction discardCardAction)
 		{
 			DiscardCardFromHand(discardCardAction.PlayerIndex, discardCardAction.CardInstanceId);
 			return;
 		}
-		PlayCardAction playCardAction = action as PlayCardAction;
-		if ((object)playCardAction == null)
+		if (action is MarchAction marchAction)
 		{
-			if (!(action is DeployCharacterAction deployCharacterAction))
+			CardLocator.FindAndMutate(_state, marchAction.CardInstanceId, delegate(ref CardInstance reference)
 			{
-				if (!(action is MarchAction marchAction))
+				reference.ReadyState = ReadyState.Spent;
+			});
+			_resolver.Push(new MarchEvent
+			{
+				PlayerIndex = marchAction.PlayerIndex,
+				CardInstanceId = marchAction.CardInstanceId,
+				SourceRank = marchAction.SourceRank,
+				DestinationRank = marchAction.DestinationRank,
+				TargetSlotIndex = marchAction.TargetSlotIndex
+			});
+			return;
+		}
+		if (action is AttackAction attackAction)
+		{
+			CardLocator.FindAndMutate(_state, attackAction.AttackerInstanceId, delegate(ref CardInstance reference)
+			{
+				reference.ReadyState = ReadyState.Spent;
+			});
+			_resolver.Push(new DeclareAttackEvent
+			{
+				AttackerInstanceId = attackAction.AttackerInstanceId,
+				DefenderInstanceId = attackAction.TargetInstanceId,
+				DefenderInstanceIds = attackAction.TargetInstanceIds
+			});
+			return;
+		}
+		if (action is DeployStartingArmyAction deployStartingArmyAction)
+		{
+			PlayerState playerState5 = _state.Players[deployStartingArmyAction.PlayerIndex];
+			foreach (StartingCharacterDeployment dep in deployStartingArmyAction.Deployments)
+			{
+				CardInstance? cardInstance4 = null;
+				int num4 = playerState5.Hand.FindIndex((CardInstance c) => c.InstanceId == dep.CardInstanceId);
+				if (num4 >= 0)
 				{
-					if (!(action is DeclareAttackAction declareAttackAction))
+					cardInstance4 = playerState5.Hand[num4];
+					playerState5.Hand.RemoveAt(num4);
+				}
+				else
+				{
+					int num5 = playerState5.Deck.FindIndex((CardInstance c) => c.InstanceId == dep.CardInstanceId);
+					if (num5 >= 0)
 					{
-						if (!(action is AttackAction attackAction))
-						{
-							if (!(action is DeployStartingArmyAction deployStartingArmyAction))
-							{
-								if (!(action is PassPriorityAction passPriorityAction))
-								{
-									if (!(action is PassAction passAction))
-									{
-										UseAbilityAction useAbilityAction = action as UseAbilityAction;
-										if ((object)useAbilityAction == null)
-										{
-											return;
-										}
+						cardInstance4 = playerState5.Deck[num5];
+						playerState5.Deck.RemoveAt(num5);
+					}
+				}
+				if (cardInstance4.HasValue)
+				{
+					CardInstance cardInstance5 = cardInstance4.Value with
+					{
+						Zone = CardZone.Board,
+						Rank = dep.TargetRank
+					};
+					if (!playerState5.Ranks.TryGetValue(dep.TargetRank, out List<CardInstance> value2))
+					{
+						value2 = new List<CardInstance>();
+						playerState5.Ranks[dep.TargetRank] = value2;
+					}
+					value2.Add(cardInstance5);
+					TriggerCharacterEnterReacts(cardInstance5, dep.TargetRank, deployStartingArmyAction.PlayerIndex);
+					CardDefinition definition3 = _cardDb.GetDefinition(cardInstance5.DefinitionId);
+					if (definition3 != null && definition3.IsWarlord)
+					{
+						playerState5.WarlordInstanceId = cardInstance5.InstanceId;
+					}
+				}
+			}
+			if (_state.CurrentPhase == TurnPhase.Setup && _state.Players.All((PlayerState p) => p.WarlordInstanceId.HasValue))
+			{
+				_state.CurrentPhase = TurnPhase.Ready;
+				_state.TurnNumber = 1;
+				UnspendAndUnstunCards();
+			}
+			return;
+		}
+		if (action is PassAction passAction)
+		{
+			passAction.Execute(_state);
+			return;
+		}
+		if (action is UseAbilityAction useAbilityAction)
+		{
 										CardInstance? cardInstance = null;
 										foreach (PlayerState player in _state.Players)
 										{
@@ -5035,129 +4872,10 @@ public sealed class GameEngine
 											Ability = abilityDefinition,
 											OwnerPlayerIndex = cardInstance.Value.OwnerPlayerIndex
 										});
-									}
-									else
-									{
-										passAction.Execute(_state);
-									}
-								}
-								else
-								{
-									_state.Priority.ConsecutivePasses++;
-									_state.Priority.HasPassed = true;
-									if (_state.Priority.IsReactWindowOpen && _state.Players.Count > 0)
-									{
-										_state.Priority.ActivePlayerIndex = (passPriorityAction.PlayerIndex + 1) % _state.Players.Count;
-									}
-								}
-								return;
-							}
-							PlayerState playerState5 = _state.Players[deployStartingArmyAction.PlayerIndex];
-							foreach (StartingCharacterDeployment dep in deployStartingArmyAction.Deployments)
-							{
-								CardInstance? cardInstance4 = null;
-								int num4 = playerState5.Hand.FindIndex((CardInstance c) => c.InstanceId == dep.CardInstanceId);
-								if (num4 >= 0)
-								{
-									cardInstance4 = playerState5.Hand[num4];
-									playerState5.Hand.RemoveAt(num4);
-								}
-								else
-								{
-									int num5 = playerState5.Deck.FindIndex((CardInstance c) => c.InstanceId == dep.CardInstanceId);
-									if (num5 >= 0)
-									{
-										cardInstance4 = playerState5.Deck[num5];
-										playerState5.Deck.RemoveAt(num5);
-									}
-								}
-								if (cardInstance4.HasValue)
-								{
-									CardInstance cardInstance5 = cardInstance4.Value with
-									{
-										Zone = CardZone.Board,
-										Rank = dep.TargetRank
-									};
-									if (!playerState5.Ranks.TryGetValue(dep.TargetRank, out List<CardInstance> value2))
-									{
-										value2 = new List<CardInstance>();
-										playerState5.Ranks[dep.TargetRank] = value2;
-									}
-									value2.Add(cardInstance5);
-									TriggerCharacterEnterReacts(cardInstance5, dep.TargetRank, deployStartingArmyAction.PlayerIndex);
-									CardDefinition definition3 = _cardDb.GetDefinition(cardInstance5.DefinitionId);
-									if (definition3 != null && definition3.IsWarlord)
-									{
-										playerState5.WarlordInstanceId = cardInstance5.InstanceId;
-									}
-								}
-							}
-							if (_state.CurrentPhase == TurnPhase.Setup && _state.Players.All((PlayerState p) => p.WarlordInstanceId.HasValue))
-							{
-								_state.CurrentPhase = TurnPhase.Ready;
-								_state.TurnNumber = 1;
-								UnspendAndUnstunCards();
-							}
-						}
-						else
-						{
-							CardLocator.FindAndMutate(_state, attackAction.AttackerInstanceId, delegate(ref CardInstance reference)
-							{
-								reference.ReadyState = ReadyState.Spent;
-							});
-							_resolver.Push(new DeclareAttackEvent
-							{
-								AttackerInstanceId = attackAction.AttackerInstanceId,
-								DefenderInstanceId = attackAction.TargetInstanceId,
-								DefenderInstanceIds = attackAction.TargetInstanceIds
-							});
-						}
-					}
-					else
-					{
-						CardLocator.FindAndMutate(_state, declareAttackAction.AttackerInstanceId, delegate(ref CardInstance reference)
-						{
-							reference.ReadyState = ReadyState.Spent;
-						});
-						_resolver.Push(new DeclareAttackEvent
-						{
-							AttackerInstanceId = declareAttackAction.AttackerInstanceId,
-							DefenderInstanceId = declareAttackAction.DefenderInstanceId,
-							DefenderInstanceIds = declareAttackAction.TargetInstanceIds
-						});
-					}
-				}
-				else
-				{
-					CardLocator.FindAndMutate(_state, marchAction.CardInstanceId, delegate(ref CardInstance reference)
-					{
-						reference.ReadyState = ReadyState.Spent;
-					});
-					_resolver.Push(new MarchEvent
-					{
-						PlayerIndex = marchAction.PlayerIndex,
-						CardInstanceId = marchAction.CardInstanceId,
-						SourceRank = marchAction.SourceRank,
-						DestinationRank = marchAction.DestinationRank,
-						TargetSlotIndex = marchAction.TargetSlotIndex
-					});
-				}
-			}
-			else
-			{
-				CardDefinition definition4 = _cardDb.GetDefinition(deployCharacterAction.DefinitionId);
-				CardInstance cardInstance6 = CreateCardInstance(definition4, deployCharacterAction.PlayerIndex, CardZone.Hand);
-				_state.Players[deployCharacterAction.PlayerIndex].Hand.Add(cardInstance6);
-				_resolver.Push(new PlayCardEvent
-				{
-					PlayerIndex = deployCharacterAction.PlayerIndex,
-					CardInstanceId = cardInstance6.InstanceId,
-					TargetRank = deployCharacterAction.TargetRank
-				});
-				TriggerCharacterEnterReacts(cardInstance6, deployCharacterAction.TargetRank, deployCharacterAction.PlayerIndex);
-			}
 			return;
 		}
+		if (action is PlayCardAction playCardAction)
+		{
 		PlayerState playerState6 = _state.Players[playCardAction.PlayerIndex];
 		int num6 = playerState6.Hand.FindIndex((CardInstance c) => c.InstanceId == playCardAction.CardInstanceId);
 		if (num6 < 0)
@@ -5405,6 +5123,7 @@ public sealed class GameEngine
 			break;
 		}
 		}
+		}
 	}
 
 	public CardInstance CreateCardInstance(CardDefinition definition, int ownerPlayerIndex, CardZone initialZone)
@@ -5520,7 +5239,7 @@ public sealed class GameEngine
 				for (int j = 0; j < legalActions.Count; j++)
 				{
 					IPlayerAction playerAction = legalActions[j];
-					if (!(playerAction is PassAction) && !(playerAction is PassPriorityAction))
+					if (!(playerAction is PassAction))
 					{
 						return true;
 					}

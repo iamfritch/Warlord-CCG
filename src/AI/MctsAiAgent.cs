@@ -349,11 +349,11 @@ public sealed class MctsAiAgent : IAiAgent
 		for (int i = 0; i < actions.Count; i++)
 		{
 			IPlayerAction playerAction2 = actions[i];
-			if ((playerAction2 is PassAction || playerAction2 is PassPriorityAction) ? true : false)
+			if (playerAction2 is PassAction)
 			{
 				playerAction = playerAction2;
 			}
-			else if ((playerAction2 is AttackAction || playerAction2 is DeclareAttackAction) ? true : false)
+			else if (playerAction2 is AttackAction)
 			{
 				list.Add(playerAction2);
 			}

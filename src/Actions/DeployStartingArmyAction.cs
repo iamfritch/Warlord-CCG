@@ -1,19 +1,11 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
-using System.Runtime.CompilerServices;
 
 namespace WarlordEngine.Actions;
 
-public sealed record DeployStartingArmyAction : PlayerAction, IPlayerAction
+public sealed record DeployStartingArmyAction : IPlayerAction
 {
-	public required IReadOnlyList<StartingCharacterDeployment> Deployments { get; init; } = Array.Empty<StartingCharacterDeployment>();
+	public required int PlayerIndex { get; init; }
 
-	[CompilerGenerated]
-	[SetsRequiredMembers]
-	private DeployStartingArmyAction(DeployStartingArmyAction original)
-		: base(original)
-	{
-		Deployments = original.Deployments;
-	}
+	public required IReadOnlyList<StartingCharacterDeployment> Deployments { get; init; } = Array.Empty<StartingCharacterDeployment>();
 }

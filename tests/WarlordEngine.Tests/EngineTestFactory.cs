@@ -33,6 +33,27 @@ internal static class EngineTestFactory
 					},
 					BaseHitPoints = 10
 				},
+				["test-fighter-r2"] = new CardDefinition
+				{
+					DefinitionId = "test-fighter-r2",
+					Name = "Test Fighter Rank 2",
+					Type = CardType.Character,
+					Class = CharacterClass.Fighter,
+					Alignment = Alignment.Good,
+					Level = 2,
+					ArmorClass = 15,
+					Skill = 5,
+					Attack = new AttackValue
+					{
+						Strikes = new List<StrikeDescriptor> { new StrikeDescriptor
+						{
+							Modifier = 3,
+							IsRanged = false
+						} },
+						RawText = "+3"
+					},
+					BaseHitPoints = 10
+				},
 				["test-action"] = new CardDefinition
 				{
 					DefinitionId = "test-action",

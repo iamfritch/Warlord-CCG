@@ -425,9 +425,9 @@ public class StarterDeckAuditTests
 		{
 			Assert.False(File.Exists(Path.Combine(path, "cards.json")), "Duplicate ./cards.json in repo root must not exist.");
 			Assert.False(File.Exists(Path.Combine(path, "src", "cards.json")), "Duplicate src/cards.json must not exist.");
-			Assert.True(File.Exists(Path.Combine(path, "DataParser", "cards.json")), "DataParser/cards.json must exist as the single source of truth.");
+			Assert.True(File.Exists(Path.Combine(path, "Data", "cards.json")), "Data/cards.json must exist as the single source of truth.");
 		}
-		Assert.True(File.Exists(DataPaths.CardsJsonPath), "DataParser/cards.json must be copied to the output directory.");
+		Assert.True(File.Exists(DataPaths.CardsJsonPath), "Data/cards.json must be copied to the output directory.");
 	}
 
 	[Fact]

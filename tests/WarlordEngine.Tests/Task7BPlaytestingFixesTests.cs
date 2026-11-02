@@ -701,11 +701,11 @@ public class Task7BPlaytestingFixesTests
 		gameState.Players = list;
 		GameState state = gameState;
 		GameEngine gameEngine = new GameEngine(state, cardDb);
-		DeclareAttackAction action = new DeclareAttackAction
+		AttackAction action = new AttackAction
 		{
 			PlayerIndex = 0,
 			AttackerInstanceId = 1,
-			DefenderInstanceId = 2
+			TargetInstanceId = 2
 		};
 		ActionResult actionResult = gameEngine.CanExecute(action);
 		Assert.False(actionResult.IsSuccess);
@@ -809,18 +809,18 @@ public class Task7BPlaytestingFixesTests
 		gameState.Players = list;
 		GameState state = gameState;
 		GameEngine gameEngine = new GameEngine(state, cardDb);
-		DeclareAttackAction action = new DeclareAttackAction
+		AttackAction action = new AttackAction
 		{
 			PlayerIndex = 0,
 			AttackerInstanceId = 1,
-			DefenderInstanceId = 2
+			TargetInstanceId = 2
 		};
 		Assert.True(gameEngine.CanExecute(action).IsSuccess);
-		DeclareAttackAction action2 = new DeclareAttackAction
+		AttackAction action2 = new AttackAction
 		{
 			PlayerIndex = 0,
 			AttackerInstanceId = 1,
-			DefenderInstanceId = 3
+			TargetInstanceId = 3
 		};
 		ActionResult actionResult = gameEngine.CanExecute(action2);
 		Assert.False(actionResult.IsSuccess);

@@ -652,7 +652,7 @@ public sealed class CoreTabletopRulesBugsTests
 		HeuristicAiAgent heuristicAiAgent = new HeuristicAiAgent();
 		IPlayerAction playerAction = heuristicAiAgent.SelectAction(state, engine, 0);
 		Assert.IsNotType<PassAction>(playerAction);
-		bool condition = ((playerAction is AttackAction || playerAction is DeclareAttackAction) ? true : false);
+		bool condition = playerAction is AttackAction;
 		Assert.True(condition);
 	}
 

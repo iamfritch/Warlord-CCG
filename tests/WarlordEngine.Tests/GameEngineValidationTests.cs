@@ -7,15 +7,25 @@ namespace WarlordEngine.Tests;
 
 public sealed class GameEngineValidationTests
 {
+	private static CardInstance AddCardToHand(GameState state, GameEngine engine, CardDatabase cardDb, string defId, int playerIndex = 0)
+	{
+		CardDefinition def = cardDb.GetDefinition(defId)!;
+		CardInstance card = engine.CreateCardInstance(def, playerIndex, CardZone.Hand);
+		state.Players[playerIndex].Hand.Add(card);
+		return card;
+	}
+
 	[Fact]
 	public void Deploy_On_Opponents_Turn_Is_Rejected()
 	{
 		GameState state = EngineTestFactory.CreateMainPhaseState();
-		GameEngine gameEngine = new GameEngine(state, EngineTestFactory.CreateCardDb());
-		DeployCharacterAction action = new DeployCharacterAction
+		CardDatabase cardDb = EngineTestFactory.CreateCardDb();
+		GameEngine gameEngine = new GameEngine(state, cardDb);
+		CardInstance card = AddCardToHand(state, gameEngine, cardDb, "test-fighter", playerIndex: 1);
+		PlayCardAction action = new PlayCardAction
 		{
 			PlayerIndex = 1,
-			DefinitionId = "test-fighter",
+			CardInstanceId = card.InstanceId,
 			TargetRank = 1
 		};
 		ActionResult actionResult = gameEngine.CanExecute(action);
@@ -28,11 +38,13 @@ public sealed class GameEngineValidationTests
 	{
 		GameState gameState = EngineTestFactory.CreateMainPhaseState();
 		gameState.CurrentPhase = TurnPhase.Ready;
-		GameEngine gameEngine = new GameEngine(gameState, EngineTestFactory.CreateCardDb());
-		DeployCharacterAction action = new DeployCharacterAction
+		CardDatabase cardDb = EngineTestFactory.CreateCardDb();
+		GameEngine gameEngine = new GameEngine(gameState, cardDb);
+		CardInstance card = AddCardToHand(gameState, gameEngine, cardDb, "test-fighter", playerIndex: 0);
+		PlayCardAction action = new PlayCardAction
 		{
 			PlayerIndex = 0,
-			DefinitionId = "test-fighter",
+			CardInstanceId = card.InstanceId,
 			TargetRank = 1
 		};
 		ActionResult actionResult = gameEngine.CanExecute(action);
@@ -44,11 +56,20 @@ public sealed class GameEngineValidationTests
 	public void Deploy_Unknown_DefinitionId_Is_Rejected()
 	{
 		GameState state = EngineTestFactory.CreateMainPhaseState();
-		GameEngine gameEngine = new GameEngine(state, EngineTestFactory.CreateCardDb());
-		DeployCharacterAction action = new DeployCharacterAction
+		CardDatabase cardDb = EngineTestFactory.CreateCardDb();
+		GameEngine gameEngine = new GameEngine(state, cardDb);
+		CardInstance card = new CardInstance
+		{
+			InstanceId = state.NextInstanceId++,
+			DefinitionId = "nonexistent-card",
+			OwnerPlayerIndex = 0,
+			Zone = CardZone.Hand
+		};
+		state.Players[0].Hand.Add(card);
+		PlayCardAction action = new PlayCardAction
 		{
 			PlayerIndex = 0,
-			DefinitionId = "nonexistent-card",
+			CardInstanceId = card.InstanceId,
 			TargetRank = 1
 		};
 		ActionResult actionResult = gameEngine.CanExecute(action);
@@ -60,11 +81,15 @@ public sealed class GameEngineValidationTests
 	public void Deploy_Non_Character_Definition_Is_Rejected()
 	{
 		GameState state = EngineTestFactory.CreateMainPhaseState();
-		GameEngine gameEngine = new GameEngine(state, EngineTestFactory.CreateCardDb());
-		DeployCharacterAction action = new DeployCharacterAction
+		CardDatabase cardDb = EngineTestFactory.CreateCardDb();
+		GameEngine gameEngine = new GameEngine(state, cardDb);
+		CardDefinition def = cardDb.GetDefinition("test-action")!;
+		CardInstance card = gameEngine.CreateCardInstance(def, 0, CardZone.Hand);
+		state.Players[0].Hand.Add(card);
+		PlayCardAction action = new PlayCardAction
 		{
 			PlayerIndex = 0,
-			DefinitionId = "test-action",
+			CardInstanceId = card.InstanceId,
 			TargetRank = 1
 		};
 		ActionResult actionResult = gameEngine.CanExecute(action);
@@ -76,11 +101,13 @@ public sealed class GameEngineValidationTests
 	public void Deploy_To_Rank_Beyond_Occupied_Front_Is_Rejected()
 	{
 		GameState state = EngineTestFactory.CreateMainPhaseState();
-		GameEngine gameEngine = new GameEngine(state, EngineTestFactory.CreateCardDb());
-		DeployCharacterAction action = new DeployCharacterAction
+		CardDatabase cardDb = EngineTestFactory.CreateCardDb();
+		GameEngine gameEngine = new GameEngine(state, cardDb);
+		CardInstance card = AddCardToHand(state, gameEngine, cardDb, "test-fighter-r2", playerIndex: 0);
+		PlayCardAction action = new PlayCardAction
 		{
 			PlayerIndex = 0,
-			DefinitionId = "test-fighter",
+			CardInstanceId = card.InstanceId,
 			TargetRank = 2
 		};
 		ActionResult actionResult = gameEngine.CanExecute(action);
@@ -92,11 +119,13 @@ public sealed class GameEngineValidationTests
 	public void Deploy_To_Rank2_Exceeding_Rank1_Count_Is_Rejected()
 	{
 		GameState state = EngineTestFactory.CreateMainPhaseState();
-		GameEngine gameEngine = new GameEngine(state, EngineTestFactory.CreateCardDb());
-		ActionResult actionResult = gameEngine.Execute(new DeployCharacterAction
+		CardDatabase cardDb = EngineTestFactory.CreateCardDb();
+		GameEngine gameEngine = new GameEngine(state, cardDb);
+		CardInstance card1 = AddCardToHand(state, gameEngine, cardDb, "test-fighter", playerIndex: 0);
+		ActionResult actionResult = gameEngine.Execute(new PlayCardAction
 		{
 			PlayerIndex = 0,
-			DefinitionId = "test-fighter",
+			CardInstanceId = card1.InstanceId,
 			TargetRank = 1
 		});
 		Assert.True(actionResult.IsSuccess);
@@ -104,10 +133,11 @@ public sealed class GameEngineValidationTests
 		{
 			PlayerIndex = 1
 		});
-		ActionResult actionResult2 = gameEngine.Execute(new DeployCharacterAction
+		CardInstance card2 = AddCardToHand(state, gameEngine, cardDb, "test-fighter-r2", playerIndex: 0);
+		ActionResult actionResult2 = gameEngine.Execute(new PlayCardAction
 		{
 			PlayerIndex = 0,
-			DefinitionId = "test-fighter",
+			CardInstanceId = card2.InstanceId,
 			TargetRank = 2
 		});
 		Assert.True(actionResult2.IsSuccess);
@@ -115,10 +145,11 @@ public sealed class GameEngineValidationTests
 		{
 			PlayerIndex = 1
 		});
-		ActionResult actionResult3 = gameEngine.CanExecute(new DeployCharacterAction
+		CardInstance card3 = AddCardToHand(state, gameEngine, cardDb, "test-fighter-r2", playerIndex: 0);
+		ActionResult actionResult3 = gameEngine.CanExecute(new PlayCardAction
 		{
 			PlayerIndex = 0,
-			DefinitionId = "test-fighter",
+			CardInstanceId = card3.InstanceId,
 			TargetRank = 2
 		});
 		Assert.False(actionResult3.IsSuccess);
@@ -129,11 +160,13 @@ public sealed class GameEngineValidationTests
 	public void Deploy_To_Invalid_Rank_Zero_Is_Rejected()
 	{
 		GameState state = EngineTestFactory.CreateMainPhaseState();
-		GameEngine gameEngine = new GameEngine(state, EngineTestFactory.CreateCardDb());
-		DeployCharacterAction action = new DeployCharacterAction
+		CardDatabase cardDb = EngineTestFactory.CreateCardDb();
+		GameEngine gameEngine = new GameEngine(state, cardDb);
+		CardInstance card = AddCardToHand(state, gameEngine, cardDb, "test-fighter", playerIndex: 0);
+		PlayCardAction action = new PlayCardAction
 		{
 			PlayerIndex = 0,
-			DefinitionId = "test-fighter",
+			CardInstanceId = card.InstanceId,
 			TargetRank = 0
 		};
 		ActionResult actionResult = gameEngine.CanExecute(action);
@@ -145,11 +178,13 @@ public sealed class GameEngineValidationTests
 	public void Valid_Deploy_To_Rank_1_Succeeds()
 	{
 		GameState state = EngineTestFactory.CreateMainPhaseState();
-		GameEngine gameEngine = new GameEngine(state, EngineTestFactory.CreateCardDb());
-		DeployCharacterAction action = new DeployCharacterAction
+		CardDatabase cardDb = EngineTestFactory.CreateCardDb();
+		GameEngine gameEngine = new GameEngine(state, cardDb);
+		CardInstance card = AddCardToHand(state, gameEngine, cardDb, "test-fighter", playerIndex: 0);
+		PlayCardAction action = new PlayCardAction
 		{
 			PlayerIndex = 0,
-			DefinitionId = "test-fighter",
+			CardInstanceId = card.InstanceId,
 			TargetRank = 1
 		};
 		ActionResult actionResult = gameEngine.CanExecute(action);
@@ -162,11 +197,13 @@ public sealed class GameEngineValidationTests
 	{
 		GameState gameState = EngineTestFactory.CreateMainPhaseState();
 		gameState.CurrentPhase = TurnPhase.End;
-		GameEngine gameEngine = new GameEngine(gameState, EngineTestFactory.CreateCardDb());
-		DeployCharacterAction action = new DeployCharacterAction
+		CardDatabase cardDb = EngineTestFactory.CreateCardDb();
+		GameEngine gameEngine = new GameEngine(gameState, cardDb);
+		CardInstance card = AddCardToHand(gameState, gameEngine, cardDb, "test-fighter", playerIndex: 1);
+		PlayCardAction action = new PlayCardAction
 		{
 			PlayerIndex = 1,
-			DefinitionId = "test-fighter",
+			CardInstanceId = card.InstanceId,
 			TargetRank = 1
 		};
 		ActionResult actionResult = gameEngine.CanExecute(action);
@@ -179,13 +216,15 @@ public sealed class GameEngineValidationTests
 	{
 		GameState gameState = EngineTestFactory.CreateMainPhaseState();
 		gameState.CurrentPhase = TurnPhase.Ready;
-		GameEngine gameEngine = new GameEngine(gameState, EngineTestFactory.CreateCardDb());
+		CardDatabase cardDb = EngineTestFactory.CreateCardDb();
+		GameEngine gameEngine = new GameEngine(gameState, cardDb);
+		CardInstance card = AddCardToHand(gameState, gameEngine, cardDb, "test-fighter", playerIndex: 0);
 		int count = gameState.Players[0].Hand.Count;
 		int count2 = gameState.Players[0].Ranks.Count;
-		ActionResult actionResult = gameEngine.Execute(new DeployCharacterAction
+		ActionResult actionResult = gameEngine.Execute(new PlayCardAction
 		{
 			PlayerIndex = 0,
-			DefinitionId = "test-fighter",
+			CardInstanceId = card.InstanceId,
 			TargetRank = 1
 		});
 		Assert.False(actionResult.IsSuccess);
@@ -197,11 +236,13 @@ public sealed class GameEngineValidationTests
 	public void Execute_Valid_Deploy_Mints_Instance_And_Places_On_Board()
 	{
 		GameState gameState = EngineTestFactory.CreateMainPhaseState();
-		GameEngine gameEngine = new GameEngine(gameState, EngineTestFactory.CreateCardDb());
-		ActionResult actionResult = gameEngine.Execute(new DeployCharacterAction
+		CardDatabase cardDb = EngineTestFactory.CreateCardDb();
+		GameEngine gameEngine = new GameEngine(gameState, cardDb);
+		CardInstance card = AddCardToHand(gameState, gameEngine, cardDb, "test-fighter", playerIndex: 0);
+		ActionResult actionResult = gameEngine.Execute(new PlayCardAction
 		{
 			PlayerIndex = 0,
-			DefinitionId = "test-fighter",
+			CardInstanceId = card.InstanceId,
 			TargetRank = 1
 		});
 		Assert.True(actionResult.IsSuccess);
@@ -218,11 +259,13 @@ public sealed class GameEngineValidationTests
 	public void Execute_Deploy_Hydrates_Stats_From_Definition()
 	{
 		GameState gameState = EngineTestFactory.CreateMainPhaseState();
-		GameEngine gameEngine = new GameEngine(gameState, EngineTestFactory.CreateCardDb());
-		gameEngine.Execute(new DeployCharacterAction
+		CardDatabase cardDb = EngineTestFactory.CreateCardDb();
+		GameEngine gameEngine = new GameEngine(gameState, cardDb);
+		CardInstance card = AddCardToHand(gameState, gameEngine, cardDb, "test-fighter", playerIndex: 0);
+		gameEngine.Execute(new PlayCardAction
 		{
 			PlayerIndex = 0,
-			DefinitionId = "test-fighter",
+			CardInstanceId = card.InstanceId,
 			TargetRank = 1
 		});
 		CardInstance cardInstance = gameState.Players[0].Ranks[1][0];
@@ -237,21 +280,24 @@ public sealed class GameEngineValidationTests
 	{
 		GameState gameState = EngineTestFactory.CreateMainPhaseState();
 		gameState.NextInstanceId = 100;
-		GameEngine gameEngine = new GameEngine(gameState, EngineTestFactory.CreateCardDb());
-		gameEngine.Execute(new DeployCharacterAction
+		CardDatabase cardDb = EngineTestFactory.CreateCardDb();
+		GameEngine gameEngine = new GameEngine(gameState, cardDb);
+		CardInstance card1 = AddCardToHand(gameState, gameEngine, cardDb, "test-fighter", playerIndex: 0);
+		gameEngine.Execute(new PlayCardAction
 		{
 			PlayerIndex = 0,
-			DefinitionId = "test-fighter",
+			CardInstanceId = card1.InstanceId,
 			TargetRank = 1
 		});
 		gameEngine.Execute(new PassAction
 		{
 			PlayerIndex = 1
 		});
-		gameEngine.Execute(new DeployCharacterAction
+		CardInstance card2 = AddCardToHand(gameState, gameEngine, cardDb, "test-fighter", playerIndex: 0);
+		gameEngine.Execute(new PlayCardAction
 		{
 			PlayerIndex = 0,
-			DefinitionId = "test-fighter",
+			CardInstanceId = card2.InstanceId,
 			TargetRank = 1
 		});
 		List<CardInstance> list = gameState.Players[0].Ranks[1];
