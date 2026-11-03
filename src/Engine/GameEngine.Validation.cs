@@ -317,6 +317,10 @@ public sealed partial class GameEngine
 		{
 			return ActionResult.Success();
 		}
+		if (state.CurrentPhase is TurnPhase.Ready or TurnPhase.Draw)
+		{
+			return ActionResult.Success();
+		}
 		if (action.PlayerIndex != state.ActivePlayerIndex)
 		{
 			return ActionResult.Failure($"It is not Player {action.PlayerIndex}'s turn.");

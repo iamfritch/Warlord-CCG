@@ -207,7 +207,16 @@ public static class Program
                 }
 
                 Console.WriteLine($"[Phase: {engine.State.CurrentPhase}] Advancing phase...");
-                engine.AdvancePhase();
+                var passPhaseAction = new PassAction { PlayerIndex = humanPlayerId };
+                var passPhaseRes = engine.ExecuteAction(passPhaseAction);
+                if (passPhaseRes.IsSuccess)
+                {
+                    RenderResolvedEvents(passPhaseRes.ResolvedEvents, engine.State, cardDb);
+                }
+                else
+                {
+                    engine.AdvancePhase();
+                }
             }
 
             if (engine.State.IsGameOver)

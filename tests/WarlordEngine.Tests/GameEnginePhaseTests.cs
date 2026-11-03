@@ -1,3 +1,4 @@
+using WarlordEngine.Actions;
 using WarlordEngine.Engine;
 using Xunit;
 
@@ -43,5 +44,39 @@ public sealed class GameEnginePhaseTests
 		gameEngine.AdvancePhase();
 		Assert.Equal(0, gameState.ActivePlayerIndex);
 		Assert.Equal(TurnPhase.Ready, gameState.CurrentPhase);
+	}
+
+	[Fact]
+	public void PassAction_During_Ready_Advances_To_Draw_Even_If_Not_Active_Player()
+	{
+		GameState gameState = EngineTestFactory.CreateMainPhaseState();
+		gameState.CurrentPhase = TurnPhase.Ready;
+		gameState.ActivePlayerIndex = 1;
+		GameEngine gameEngine = new GameEngine(gameState, EngineTestFactory.CreateCardDb());
+
+		PassAction passAction = new PassAction { PlayerIndex = 0 };
+		ActionResult canExecute = gameEngine.CanExecute(passAction, gameState);
+		Assert.True(canExecute.IsSuccess);
+
+		ActionResult result = gameEngine.Execute(passAction);
+		Assert.True(result.IsSuccess);
+		Assert.Equal(TurnPhase.Draw, gameState.CurrentPhase);
+	}
+
+	[Fact]
+	public void PassAction_During_Draw_Advances_To_Order_Even_If_Not_Active_Player()
+	{
+		GameState gameState = EngineTestFactory.CreateMainPhaseState();
+		gameState.CurrentPhase = TurnPhase.Draw;
+		gameState.ActivePlayerIndex = 1;
+		GameEngine gameEngine = new GameEngine(gameState, EngineTestFactory.CreateCardDb());
+
+		PassAction passAction = new PassAction { PlayerIndex = 0 };
+		ActionResult canExecute = gameEngine.CanExecute(passAction, gameState);
+		Assert.True(canExecute.IsSuccess);
+
+		ActionResult result = gameEngine.Execute(passAction);
+		Assert.True(result.IsSuccess);
+		Assert.Equal(TurnPhase.Order, gameState.CurrentPhase);
 	}
 }

@@ -308,7 +308,7 @@ public sealed partial class GameEngine
 			SyncPendingEvents();
 			if (!_state.Priority.IsReactWindowOpen && _state.PendingPrompt == null)
 			{
-				if (_state.CurrentPhase == TurnPhase.Ready)
+				if (_state.CurrentPhase is TurnPhase.Ready or TurnPhase.Draw)
 				{
 					if (isPass)
 					{
