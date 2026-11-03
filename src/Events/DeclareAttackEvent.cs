@@ -1,6 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
-using System.Runtime.CompilerServices;
-
 namespace WarlordEngine.Events;
 
 public sealed record DeclareAttackEvent : GameEvent
@@ -12,6 +9,10 @@ public sealed record DeclareAttackEvent : GameEvent
 	public int[]? DefenderInstanceIds { get; init; }
 
 	public int AdditionalWounds { get; set; }
+
+	public int StartStrikeIndex { get; init; }
+
+	public bool SkipRemainingStrikes { get; init; }
 
 	// Attack costs (spending the attacker) are paid once in GameEngine.PayActionCosts.
 	public override GameState ApplyToState(GameState state)

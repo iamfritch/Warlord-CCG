@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using WarlordEngine.Events;
 
 namespace WarlordEngine;
 
@@ -211,18 +212,19 @@ public static class BoardGeometry
 		}
 	}
 
-	public static void CollapseEmptyRanks(PlayerState player)
+	public static List<FormationFallForwardEvent> CollapseEmptyRanks(PlayerState player, GameState? state = null)
 	{
-		ResolveFallingForward(player);
+		return ResolveFallingForward(player, state);
 	}
 
-	public static void ResolveIllegalRanks(PlayerState player)
+	public static List<FormationFallForwardEvent> ResolveIllegalRanks(PlayerState player, GameState? state = null)
 	{
-		ResolveFallingForward(player);
+		return ResolveFallingForward(player, state);
 	}
 
-	public static void ResolveFallingForward(PlayerState player)
+	public static List<FormationFallForwardEvent> ResolveFallingForward(PlayerState player, GameState? state = null)
 	{
+		List<FormationFallForwardEvent> fallForwardEvents = new List<FormationFallForwardEvent>();
 		TrimTrailingEmptyRanks(player);
 		while (player.Ranks.Count != 0)
 		{
@@ -248,6 +250,16 @@ public static class BoardGeometry
 						ReadyState.Stunned => ReadyState.Stunned, 
 						_ => ReadyState.Spent, 
 					};
+					FormationFallForwardEvent fallEvt = new FormationFallForwardEvent(
+						player.PlayerIndex,
+						cardInstance.InstanceId,
+						num2,
+						num2 - 1,
+						cardInstance.DefinitionId,
+						cardInstance.ReadyState,
+						readyState);
+					fallForwardEvents.Add(fallEvt);
+					state?.CurrentActionEvents?.Add(fallEvt);
 					if (!player.IsSimulation)
 					{
 						OnFormationNotice?.Invoke($"[Formation] Character ID {cardInstance.InstanceId} ({cardInstance.DefinitionId}) fell forward from Rank {num2} to Rank {num2 - 1} and transitioned {cardInstance.ReadyState} -> {readyState}!");
@@ -273,10 +285,11 @@ public static class BoardGeometry
 			}
 		}
 		TrimTrailingEmptyRanks(player);
+		return fallForwardEvents;
 	}
 
-	public static void EnforceFormation(PlayerState player)
+	public static List<FormationFallForwardEvent> EnforceFormation(PlayerState player, GameState? state = null)
 	{
-		ResolveFallingForward(player);
+		return ResolveFallingForward(player, state);
 	}
 }

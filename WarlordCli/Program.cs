@@ -9,6 +9,7 @@ using WarlordEngine.Actions;
 using WarlordEngine.AI;
 using WarlordEngine.Effects;
 using WarlordEngine.Engine;
+using WarlordEngine.Events;
 
 public static class Program
 {
@@ -107,124 +108,6 @@ public static class Program
         engine.ShuffleAllDecks(rng);
         Console.WriteLine("[Setup] Shuffled both player draw decks (50 cards each).");
 
-        BoardGeometry.OnFormationNotice = msg =>
-        {
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine(msg);
-            Console.ResetColor();
-        };
-
-        // Fix 4: Log exact d20 roll, ATK bonus, target AC, Hit/Miss/Crit result, and Wounds dealt
-        engine.OnAttackResolved = details =>
-        {
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("\n[COMBAT STRIKE RESOLUTION]");
-            Console.WriteLine($"  Attacker: {details.AttackerName} (ID: {details.AttackerInstanceId})");
-            Console.WriteLine($"  Target:   {details.DefenderName} (ID: {details.DefenderInstanceId}) [AC: {details.DefenderArmorClass}]");
-            Console.WriteLine($"  Attack Roll: d20 ({details.Roll}) + ATK Bonus ({details.StrikeBonus}) = Total {details.TotalRoll} vs AC {details.DefenderArmorClass}");
-
-            if (details.IsCritical)
-            {
-                Console.ForegroundColor = ConsoleColor.Magenta;
-                Console.WriteLine($"  Result:   CRITICAL HIT! (Natural 20 -> Critical Wound bonus!) -> Wounds Dealt: {details.DamageDealt}");
-            }
-            else if (details.IsCriticalFailure)
-            {
-                Console.ForegroundColor = ConsoleColor.DarkRed;
-                Console.WriteLine("  Result:   CRITICAL MISS! (Natural 1 -> Automatic Miss) -> Wounds Dealt: 0");
-            }
-            else if (details.IsHit)
-            {
-                Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine($"  Result:   HIT! ({details.TotalRoll} >= {details.DefenderArmorClass}) -> Wounds Dealt: {details.DamageDealt}");
-            }
-            else
-            {
-                Console.ForegroundColor = ConsoleColor.DarkYellow;
-                Console.WriteLine($"  Result:   MISS! ({details.TotalRoll} < {details.DefenderArmorClass}) -> Wounds Dealt: 0");
-            }
-            Console.ResetColor();
-        };
-        ResolveAttackEffect.GlobalOnAttackResolved = engine.OnAttackResolved;
-
-        RollTableEffect.GlobalOnRollTableResolved = (sourceId, roll, minRoll, maxRoll) =>
-        {
-            string srcName = FindCardSimpleName(engine.State, cardDb, sourceId);
-            Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine($"\n[ROLL ORDER] {srcName} (ID: {sourceId}) rolled d20 = {roll} (matched range {minRoll}-{maxRoll})!");
-            Console.ResetColor();
-        };
-
-        // Multi-strike dynamic targeting: prompt human player for each strike 1 at a time
-        engine.SelectStrikeTarget = prompt =>
-        {
-            var defCards = prompt.LegalTargets;
-            if (defCards.Count == 0) return null;
-
-            if (prompt.Attacker.OwnerPlayerIndex == 0)
-            {
-                var atkDef = cardDb.GetDefinition(prompt.Attacker.DefinitionId);
-                string atkName = atkDef?.Name ?? prompt.Attacker.DefinitionId;
-                string bonusStr = prompt.Strike.Modifier >= 0 ? $"+{prompt.Strike.Modifier}" : prompt.Strike.Modifier.ToString();
-
-                Console.ForegroundColor = ConsoleColor.Cyan;
-                Console.WriteLine("\n======================================================================");
-                Console.WriteLine($"  [MULTI-STRIKE TARGETING] Strike #{prompt.StrikeIndex + 1} of {prompt.TotalStrikes} ({bonusStr} {(prompt.Strike.IsRanged ? "Ranged" : "Melee")})");
-                Console.WriteLine($"  Attacker: {atkName} (ID: {prompt.Attacker.InstanceId})");
-                Console.WriteLine("======================================================================");
-                Console.ResetColor();
-
-                Console.WriteLine("Select target for this strike:");
-                int defaultIdx = 1;
-                for (int i = 0; i < defCards.Count; i++)
-                {
-                    var c = defCards[i];
-                    var cDef = cardDb.GetDefinition(c.DefinitionId);
-                    string name = cDef?.Name ?? c.DefinitionId;
-                    int maxHp = GameEngine.GetEffectiveMaxHitPoints(prompt.State, c, cardDb);
-                    int curHp = Math.Max(0, maxHp - c.Wounds);
-                    string targetInfo = $"{name} (Rank {c.Rank}, ID {c.InstanceId}) [AC: {c.CurrentArmorClass}, HP: {curHp}/{maxHp}, Wounds: {c.Wounds}]";
-                    Console.WriteLine($"  [{i + 1}] {targetInfo}");
-
-                    if (prompt.PreviousTargetId.HasValue && c.InstanceId == prompt.PreviousTargetId.Value)
-                    {
-                        defaultIdx = i + 1;
-                    }
-                }
-                Console.WriteLine("  [0] Skip remaining strikes");
-
-                while (true)
-                {
-                    Console.Write($"Choose target (1-{defCards.Count}, default [{defaultIdx}], 0 to skip): ");
-                    string? input = Console.ReadLine()?.Trim();
-                    if (string.IsNullOrEmpty(input))
-                    {
-                        return defCards[defaultIdx - 1].InstanceId;
-                    }
-                    if (int.TryParse(input, out int choice))
-                    {
-                        if (choice == 0) return null;
-                        if (choice >= 1 && choice <= defCards.Count)
-                        {
-                            return defCards[choice - 1].InstanceId;
-                        }
-                    }
-                    Console.WriteLine("Invalid selection. Please choose a valid target number.");
-                }
-            }
-            else
-            {
-                if (prompt.PreviousTargetId.HasValue)
-                {
-                    var prev = defCards.FirstOrDefault(c => c.InstanceId == prompt.PreviousTargetId.Value);
-                    if (prev.InstanceId != 0) return prev.InstanceId;
-                }
-
-                var best = defCards.OrderBy(c => Math.Max(0, GameEngine.GetEffectiveMaxHitPoints(prompt.State, c, cardDb) - c.Wounds)).First();
-                return best.InstanceId;
-            }
-        };
-
         // Auto-deploy starting armies for both players to advance through Setup phase
         for (int pIdx = 0; pIdx < 2; pIdx++)
         {
@@ -263,49 +146,64 @@ public static class Program
         // Main game loop
         while (!engine.State.IsGameOver)
         {
-            // Automatic transitions for Ready and Draw phases (with optional pre-draw discard for human player)
+            // Automatic transitions for Ready and Draw phases (with optional pre-draw discard via GetLegalActions/ExecuteAction)
             while (!engine.State.IsGameOver && engine.State.CurrentPhase is TurnPhase.Ready or TurnPhase.Draw)
             {
                 if (engine.State.CurrentPhase == TurnPhase.Ready && engine.State.TurnNumber >= 1)
                 {
-                    var humanPlayer = engine.State.Players[humanPlayerId];
-                    while (humanPlayer.Hand.Count > 0)
+                    var readyActions = engine.GetLegalActions(engine.State, humanPlayerId);
+                    var discardActions = readyActions.OfType<DiscardCardAction>().ToList();
+                    var passReadyAction = readyActions.OfType<PassAction>().FirstOrDefault() ?? new PassAction { PlayerIndex = humanPlayerId };
+
+                    if (discardActions.Count == 0)
                     {
-                        Console.ForegroundColor = ConsoleColor.Cyan;
-                        Console.WriteLine("\n======================================================================");
-                        Console.WriteLine("             DRAW PHASE - OPTIONAL PRE-DRAW DISCARD                   ");
-                        Console.WriteLine("======================================================================");
-                        Console.ResetColor();
-                        Console.WriteLine($"You have {humanPlayer.Hand.Count} card(s) in hand. You may discard unwanted cards before drawing up to 5:");
-                        for (int i = 0; i < humanPlayer.Hand.Count; i++)
-                        {
-                            var c = humanPlayer.Hand[i];
-                            var def = cardDb.GetDefinition(c.DefinitionId);
-                            string name = def?.Name ?? c.DefinitionId;
-                            string type = def?.Type.ToString() ?? "Unknown";
-                            Console.WriteLine($"  [{i + 1}] Discard {name} [{type}] (ID: {c.InstanceId})");
-                        }
-                        Console.WriteLine("  [0] Done discarding / Pass (Draw up to 5 cards)");
-                        Console.Write($"Select card to discard (0-{humanPlayer.Hand.Count}, default [0]): ");
-                        string? discInput = Console.ReadLine()?.Trim();
-                        if (string.IsNullOrEmpty(discInput) || discInput == "0")
-                        {
-                            break;
-                        }
-                        if (int.TryParse(discInput, out int discChoice) && discChoice >= 1 && discChoice <= humanPlayer.Hand.Count)
-                        {
-                            var discarded = humanPlayer.Hand[discChoice - 1];
-                            string discName = cardDb.GetDefinition(discarded.DefinitionId)?.Name ?? discarded.DefinitionId;
-                            engine.DiscardCardFromHand(humanPlayerId, discarded.InstanceId);
-                            Console.ForegroundColor = ConsoleColor.Yellow;
-                            Console.WriteLine($"  -> Discarded {discName} (ID: {discarded.InstanceId}).");
-                            Console.ResetColor();
-                        }
-                        else
-                        {
-                            Console.WriteLine("Invalid selection. Enter a card number or 0 to finish.");
-                        }
+                        Console.WriteLine($"[Phase: {engine.State.CurrentPhase}] Advancing phase...");
+                        var passRes = engine.ExecuteAction(passReadyAction);
+                        RenderResolvedEvents(passRes.ResolvedEvents, engine.State, cardDb);
+                        continue;
                     }
+
+                    var humanPlayer = engine.State.Players[humanPlayerId];
+                    Console.ForegroundColor = ConsoleColor.Cyan;
+                    Console.WriteLine("\n======================================================================");
+                    Console.WriteLine("             DRAW PHASE - OPTIONAL PRE-DRAW DISCARD                   ");
+                    Console.WriteLine("======================================================================");
+                    Console.ResetColor();
+                    Console.WriteLine($"You have {humanPlayer.Hand.Count} card(s) in hand. You may discard unwanted cards before drawing up to 5:");
+                    for (int i = 0; i < discardActions.Count; i++)
+                    {
+                        var discAction = discardActions[i];
+                        var c = humanPlayer.Hand.FirstOrDefault(h => h.InstanceId == discAction.CardInstanceId);
+                        var def = c.DefinitionId != null ? cardDb.GetDefinition(c.DefinitionId) : null;
+                        string name = def?.Name ?? c.DefinitionId ?? $"Card #{discAction.CardInstanceId}";
+                        string type = def?.Type.ToString() ?? "Unknown";
+                        Console.WriteLine($"  [{i + 1}] Discard {name} [{type}] (ID: {discAction.CardInstanceId})");
+                    }
+                    Console.WriteLine("  [0] Done discarding / Pass (Draw up to 5 cards)");
+                    Console.Write($"Select card to discard (0-{discardActions.Count}, default [0]): ");
+                    string? discInput = Console.ReadLine()?.Trim();
+                    if (string.IsNullOrEmpty(discInput) || discInput == "0")
+                    {
+                        Console.WriteLine($"[Phase: {engine.State.CurrentPhase}] Advancing phase...");
+                        var passRes = engine.ExecuteAction(passReadyAction);
+                        RenderResolvedEvents(passRes.ResolvedEvents, engine.State, cardDb);
+                        continue;
+                    }
+                    if (int.TryParse(discInput, out int discChoice) && discChoice >= 1 && discChoice <= discardActions.Count)
+                    {
+                        var chosenDiscard = discardActions[discChoice - 1];
+                        string discName = FindCardSimpleName(engine.State, cardDb, chosenDiscard.CardInstanceId);
+                        var discRes = engine.ExecuteAction(chosenDiscard);
+                        RenderResolvedEvents(discRes.ResolvedEvents, engine.State, cardDb);
+                        Console.ForegroundColor = ConsoleColor.Yellow;
+                        Console.WriteLine($"  -> Discarded {discName} (ID: {chosenDiscard.CardInstanceId}).");
+                        Console.ResetColor();
+                    }
+                    else
+                    {
+                        Console.WriteLine("Invalid selection. Enter a card number or 0 to finish.");
+                    }
+                    continue;
                 }
 
                 Console.WriteLine($"[Phase: {engine.State.CurrentPhase}] Advancing phase...");
@@ -337,7 +235,9 @@ public static class Program
 
             int actingPlayer = engine.State.Priority.IsReactWindowOpen
                 ? engine.State.Priority.ActivePlayerIndex
-                : engine.State.ActivePlayerIndex;
+                : (engine.State.PendingPrompt != null
+                    ? engine.State.PendingPrompt.Attacker.OwnerPlayerIndex
+                    : engine.State.ActivePlayerIndex);
 
             if (actingPlayer == humanPlayerId)
             {
@@ -349,7 +249,8 @@ public static class Program
                 {
                     Console.WriteLine("\nNo legal actions available. Passing priority automatically...");
                     var autoPass = new PassAction { PlayerIndex = humanPlayerId };
-                    engine.ExecuteAction(autoPass);
+                    var autoPassRes = engine.ExecuteAction(autoPass);
+                    RenderResolvedEvents(autoPassRes.ResolvedEvents, engine.State, cardDb);
                     continue;
                 }
 
@@ -363,12 +264,27 @@ public static class Program
                     Console.WriteLine("└──────────────────────────────────────────────────────────────────┘");
                     Console.ResetColor();
                 }
+                else if (engine.State.PendingPrompt is { } prompt)
+                {
+                    var atkDef = cardDb.GetDefinition(prompt.Attacker.DefinitionId);
+                    string atkName = atkDef?.Name ?? prompt.Attacker.DefinitionId;
+                    string bonusStr = prompt.Strike.Modifier >= 0 ? $"+{prompt.Strike.Modifier}" : prompt.Strike.Modifier.ToString();
+
+                    Console.ForegroundColor = ConsoleColor.Cyan;
+                    Console.WriteLine("\n======================================================================");
+                    Console.WriteLine($"  [MULTI-STRIKE TARGETING] Strike #{prompt.StrikeIndex + 1} of {prompt.TotalStrikes} ({bonusStr} {(prompt.Strike.IsRanged ? "Ranged" : "Melee")})");
+                    Console.WriteLine($"  Attacker: {atkName} (ID: {prompt.Attacker.InstanceId})");
+                    Console.WriteLine("======================================================================");
+                    Console.ResetColor();
+                }
 
                 var groups = GroupLegalActions(legalActions, engine.State, cardDb);
 
                 Console.WriteLine(engine.State.Priority.IsReactWindowOpen
                     ? "\nAvailable React Actions:"
-                    : $"\nLegal Actions (Round {engine.State.TurnNumber} - Choose 1 Order/Decree):");
+                    : (engine.State.PendingPrompt != null
+                        ? "\nSelect Target for Follow-Up Strike:"
+                        : $"\nLegal Actions (Round {engine.State.TurnNumber} - Choose 1 Order/Decree):"));
 
                 for (int i = 0; i < groups.Count; i++)
                 {
@@ -436,6 +352,7 @@ public static class Program
                 Console.ResetColor();
 
                 var execResult = engine.ExecuteAction(chosenAction);
+                RenderResolvedEvents(execResult.ResolvedEvents, engine.State, cardDb);
                 if (!execResult.IsSuccess)
                 {
                     Console.ForegroundColor = ConsoleColor.Red;
@@ -454,6 +371,7 @@ public static class Program
                     Console.WriteLine($"AI chose: {FormatAction(aiAction, engine.State, cardDb)}");
 
                     var execResult = engine.ExecuteAction(aiAction);
+                    RenderResolvedEvents(execResult.ResolvedEvents, engine.State, cardDb);
                     if (!execResult.IsSuccess)
                     {
                         Console.ForegroundColor = ConsoleColor.Red;
@@ -476,6 +394,7 @@ public static class Program
                     Console.ResetColor();
 
                     var execResult = engine.ExecuteAction(aiAction);
+                    RenderResolvedEvents(execResult.ResolvedEvents, engine.State, cardDb);
                     if (!execResult.IsSuccess)
                     {
                         Console.ForegroundColor = ConsoleColor.Red;
@@ -678,18 +597,85 @@ public static class Program
         return $"{name}{warlordTag} (Lv {level} | ATK {atk} | AC {ac} | HP {currentHp}/{maxHp} | Wounds: {wounds} | {card.ReadyState}){itemStr} [ID: {card.InstanceId}]";
     }
 
+    public static void RenderResolvedEvents(IReadOnlyList<GameEvent> resolvedEvents, GameState state, CardDatabase cardDb)
+    {
+        foreach (var evt in resolvedEvents)
+        {
+            switch (evt)
+            {
+                case StrikeResolvedEvent strikeEvt:
+                {
+                    var details = strikeEvt.Details;
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine("\n[COMBAT STRIKE RESOLUTION]");
+                    Console.WriteLine($"  Attacker: {details.AttackerName} (ID: {details.AttackerInstanceId})");
+                    Console.WriteLine($"  Target:   {details.DefenderName} (ID: {details.DefenderInstanceId}) [AC: {details.DefenderArmorClass}]");
+                    Console.WriteLine($"  Attack Roll: d20 ({details.Roll}) + ATK Bonus ({details.StrikeBonus}) = Total {details.TotalRoll} vs AC {details.DefenderArmorClass}");
+
+                    if (details.IsCritical)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Magenta;
+                        Console.WriteLine($"  Result:   CRITICAL HIT! (Natural 20 -> Critical Wound bonus!) -> Wounds Dealt: {details.DamageDealt}");
+                    }
+                    else if (details.IsCriticalFailure)
+                    {
+                        Console.ForegroundColor = ConsoleColor.DarkRed;
+                        Console.WriteLine("  Result:   CRITICAL MISS! (Natural 1 -> Automatic Miss) -> Wounds Dealt: 0");
+                    }
+                    else if (details.IsHit)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Green;
+                        Console.WriteLine($"  Result:   HIT! ({details.TotalRoll} >= {details.DefenderArmorClass}) -> Wounds Dealt: {details.DamageDealt}");
+                    }
+                    else
+                    {
+                        Console.ForegroundColor = ConsoleColor.DarkYellow;
+                        Console.WriteLine($"  Result:   MISS! ({details.TotalRoll} < {details.DefenderArmorClass}) -> Wounds Dealt: 0");
+                    }
+                    Console.ResetColor();
+                    break;
+                }
+
+                case RollTableResolvedEvent rollEvt:
+                {
+                    string srcName = FindCardSimpleName(state, cardDb, rollEvt.SourceInstanceId);
+                    Console.ForegroundColor = ConsoleColor.Cyan;
+                    Console.WriteLine($"\n[ROLL ORDER] {srcName} (ID: {rollEvt.SourceInstanceId}) rolled d20 = {rollEvt.Roll} (matched range {rollEvt.MinRoll}-{rollEvt.MaxRoll})!");
+                    Console.ResetColor();
+                    break;
+                }
+
+                case FormationFallForwardEvent fallEvt:
+                {
+                    string cardName = cardDb.GetDefinition(fallEvt.DefinitionId)?.Name ?? fallEvt.DefinitionId;
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine($"  [Formation] Player {fallEvt.PlayerIndex + 1}'s {cardName} (ID: {fallEvt.CharacterInstanceId}) fell forward from Rank {fallEvt.FromRank} to Rank {fallEvt.ToRank} ({fallEvt.PreviousReadyState} -> {fallEvt.NewReadyState})!");
+                    Console.ResetColor();
+                    break;
+                }
+            }
+        }
+    }
+
     public static string FormatAction(IPlayerAction action, GameState state, CardDatabase cardDb)
     {
         return action switch
         {
             AttackAction atk => FormatAttack(atk, state, cardDb),
+            SelectStrikeTargetAction strikeTarget => strikeTarget.TargetInstanceId.HasValue
+                ? $"Select strike target: {FindCardName(state, cardDb, strikeTarget.TargetInstanceId.Value)}"
+                : "Skip remaining strikes",
             PlayCardAction play => FormatPlayCard(play, state, cardDb),
             JourneyAction journey => $"Journey {FindCardSimpleName(state, cardDb, journey.CardInstanceId)} (ID: {journey.CardInstanceId}) from Rank {journey.SourceRank} to Rank {journey.DestinationRank}" + (journey.TargetSlotIndex.HasValue ? $" ({GetPlacementDescription(journey.DestinationRank, journey.TargetSlotIndex, journey.CardInstanceId, state.Players[journey.PlayerIndex], cardDb)})" : ""),
             MarchAction march when march.SourceRank == march.DestinationRank => $"March {FindCardSimpleName(state, cardDb, march.CardInstanceId)} in Rank {march.SourceRank} ({GetPlacementDescription(march.DestinationRank, march.TargetSlotIndex, march.CardInstanceId, state.Players[march.PlayerIndex], cardDb)})",
             MarchAction march => $"March {FindCardSimpleName(state, cardDb, march.CardInstanceId)} (ID: {march.CardInstanceId}) from Rank {march.SourceRank} to Rank {march.DestinationRank}",
             UseAbilityAction ability => FormatUseAbility(ability, state, cardDb),
             DiscardCardAction disc => $"Discard {FindCardSimpleName(state, cardDb, disc.CardInstanceId)} (ID: {disc.CardInstanceId}) from hand",
-            PassAction => state.Priority.IsReactWindowOpen ? "Pass priority (Allow pending action to resolve)" : "Pass Decree (End orders for this round)",
+            PassAction => state.Priority.IsReactWindowOpen
+                ? "Pass priority (Allow pending action to resolve)"
+                : (state.CurrentPhase == TurnPhase.Ready
+                    ? "Done discarding / Pass (Draw up to 5 cards)"
+                    : "Pass Decree (End orders for this round)"),
             _ => action.GetType().Name
         };
     }
@@ -849,6 +835,22 @@ public static class Program
                 }
             }
             foreach (var card in player.AttachedItems)
+            {
+                if (card.InstanceId == instanceId)
+                {
+                    var def = cardDb.GetDefinition(card.DefinitionId);
+                    return def?.Name ?? card.DefinitionId;
+                }
+            }
+            foreach (var card in player.Hand)
+            {
+                if (card.InstanceId == instanceId)
+                {
+                    var def = cardDb.GetDefinition(card.DefinitionId);
+                    return def?.Name ?? card.DefinitionId;
+                }
+            }
+            foreach (var card in player.DiscardPile)
             {
                 if (card.InstanceId == instanceId)
                 {

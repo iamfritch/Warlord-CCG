@@ -167,7 +167,7 @@ public sealed class MctsAiAgent : IAiAgent
 					mctsNode2 = mctsNode3;
 					gameEngine.ExecuteAction(mctsNode2.Action);
 					DrainReactWindow(gameEngine, gameState);
-					if (!gameState.Priority.IsReactWindowOpen && mctsNode2.Action is PassAction)
+					if (!gameState.Priority.IsReactWindowOpen && gameState.PendingPrompt == null && mctsNode2.Action is PassAction && gameState.CurrentPhase is TurnPhase.Order or TurnPhase.Combat)
 					{
 						gameEngine.AdvancePhase();
 					}
@@ -220,7 +220,7 @@ public sealed class MctsAiAgent : IAiAgent
 				{
 					break;
 				}
-				if (!gameState.Priority.IsReactWindowOpen && mctsNode2.Action is PassAction)
+				if (!gameState.Priority.IsReactWindowOpen && gameState.PendingPrompt == null && mctsNode2.Action is PassAction && gameState.CurrentPhase is TurnPhase.Order or TurnPhase.Combat)
 				{
 					gameEngine.AdvancePhase();
 				}
@@ -270,7 +270,7 @@ public sealed class MctsAiAgent : IAiAgent
 					break;
 				}
 				num11++;
-				if (!gameState.Priority.IsReactWindowOpen && playerAction2 is PassAction)
+				if (!gameState.Priority.IsReactWindowOpen && gameState.PendingPrompt == null && playerAction2 is PassAction && gameState.CurrentPhase is TurnPhase.Order or TurnPhase.Combat)
 				{
 					gameEngine.AdvancePhase();
 				}
@@ -330,6 +330,10 @@ public sealed class MctsAiAgent : IAiAgent
 
 	private static int GetActivePlayer(GameState state)
 	{
+		if (state.PendingPrompt != null)
+		{
+			return state.PendingPrompt.Attacker.OwnerPlayerIndex;
+		}
 		if (!state.Priority.IsReactWindowOpen)
 		{
 			return state.TurnState.ActivePlayerIndex;
@@ -349,11 +353,11 @@ public sealed class MctsAiAgent : IAiAgent
 		for (int i = 0; i < actions.Count; i++)
 		{
 			IPlayerAction playerAction2 = actions[i];
-			if (playerAction2 is PassAction)
+			if (playerAction2 is PassAction or SelectStrikeTargetAction { TargetInstanceId: null })
 			{
 				playerAction = playerAction2;
 			}
-			else if (playerAction2 is AttackAction)
+			else if (playerAction2 is AttackAction or SelectStrikeTargetAction)
 			{
 				list.Add(playerAction2);
 			}

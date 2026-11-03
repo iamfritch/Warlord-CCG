@@ -232,6 +232,7 @@ public sealed record PerformStrikeEffect(int StrikeBonus = 0, bool IsRanged = fa
 		{
 			(context.OnAttackResolved ?? ResolveAttackEffect.GlobalOnAttackResolved)?.Invoke(obj);
 		}
+		context.State.CurrentActionEvents?.Add(new StrikeResolvedEvent(obj));
 		if (!flag4)
 		{
 			yield break;

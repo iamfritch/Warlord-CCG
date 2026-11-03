@@ -104,6 +104,7 @@ public sealed class EventResolver
 			}
 		}
 		gameEvent.ApplyToState(state);
+		state.CurrentActionEvents?.Add(gameEvent);
 		foreach (IPostResolutionHandler postHandler in _postHandlers)
 		{
 			foreach (GameEvent item in postHandler.AfterResolve(gameEvent, state))

@@ -57,7 +57,7 @@ public sealed class HeuristicAiAgent : IAiAgent
 				break;
 			}
 			double num3;
-			if (item is AttackAction)
+			if (item is AttackAction or SelectStrikeTargetAction)
 			{
 				double num2 = 0.0;
 				foreach (int roll in array)
@@ -71,6 +71,7 @@ public sealed class HeuristicAiAgent : IAiAgent
 					};
 					ActionResult actionResult = gameEngine.ExecuteAction(item);
 					DrainReactWindow(gameEngine, gameState);
+					DrainPendingPrompts(gameEngine, gameState);
 					num2 += (actionResult.IsSuccess ? stateEvaluator3.Evaluate(gameState, playerId) : (-100000.0));
 				}
 				num3 = num2 / (double)array.Length;
@@ -86,6 +87,7 @@ public sealed class HeuristicAiAgent : IAiAgent
 				};
 				ActionResult actionResult2 = gameEngine2.ExecuteAction(item);
 				DrainReactWindow(gameEngine2, gameState2);
+				DrainPendingPrompts(gameEngine2, gameState2);
 				num3 = (actionResult2.IsSuccess ? stateEvaluator3.Evaluate(gameState2, playerId) : (-100000.0));
 			}
 			if (item is UseAbilityAction uaa)
@@ -134,6 +136,37 @@ public sealed class HeuristicAiAgent : IAiAgent
 			{
 				PlayerIndex = simState.Priority.ActivePlayerIndex
 			});
+		}
+	}
+
+	private static void DrainPendingPrompts(GameEngine simEngine, GameState simState)
+	{
+		int safety = 10;
+		while (simState.PendingPrompt != null && safety-- > 0)
+		{
+			StrikeTargetPrompt prompt = simState.PendingPrompt;
+			int? chosenTargetId = null;
+			if (prompt.LegalTargets.Count > 0)
+			{
+				if (prompt.PreviousTargetId.HasValue)
+				{
+					foreach (CardInstance c in prompt.LegalTargets)
+					{
+						if (c.InstanceId == prompt.PreviousTargetId.Value)
+						{
+							chosenTargetId = c.InstanceId;
+							break;
+						}
+					}
+				}
+				chosenTargetId ??= prompt.LegalTargets[0].InstanceId;
+			}
+			simEngine.ExecuteAction(new SelectStrikeTargetAction
+			{
+				PlayerIndex = prompt.Attacker.OwnerPlayerIndex,
+				TargetInstanceId = chosenTargetId
+			});
+			DrainReactWindow(simEngine, simState);
 		}
 	}
 }

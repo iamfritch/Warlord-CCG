@@ -67,7 +67,24 @@ public sealed partial class GameEngine
 					break;
 				}
 			}
-			if (!attackerCard.HasValue || !defenderCard.HasValue || attackerCard.Value.ReadyState == ReadyState.Stunned)
+			if (!attackerCard.HasValue || attackerCard.Value.ReadyState == ReadyState.Stunned)
+			{
+				yield break;
+			}
+			if (declareAttack.SkipRemainingStrikes)
+			{
+				if (HasTurnBuff(state, declareAttack.AttackerInstanceId, "CIANE_SELF_WOUND"))
+				{
+					yield return new DealDamageEvent
+					{
+						TargetInstanceId = declareAttack.AttackerInstanceId,
+						Amount = 1,
+						DamageType = "physical"
+					};
+				}
+				yield break;
+			}
+			if (!defenderCard.HasValue)
 			{
 				yield break;
 			}
@@ -91,7 +108,7 @@ public sealed partial class GameEngine
 					}
 				}
 			}
-			if (!attackerHasTrueStrike && HasTurnBuff(state, defenderCard.Value.InstanceId, "DUPE_ACTIVE"))
+			if (!attackerHasTrueStrike && HasTurnBuff(state, defenderCard.Value.InstanceId, "DUPE_ACTIVE") && declareAttack.StartStrikeIndex == 0)
 			{
 				int baseDefSkill = (engine._cardDb.GetDefinition(defenderCard.Value.DefinitionId)?.Skill).GetValueOrDefault();
 				int defSkill = (defenderCard.Value.CurrentSkill > 0 ? defenderCard.Value.CurrentSkill : baseDefSkill) + GetTurnBuffValue(state, defenderCard.Value.InstanceId, "SKILL");
@@ -168,7 +185,7 @@ public sealed partial class GameEngine
 			}
 			Dictionary<int, int> strikeWounds = new Dictionary<int, int>();
 			int previousDefId = declareAttack.DefenderInstanceId;
-			for (int strikeIdx = 0; strikeIdx < strikes.Count; strikeIdx++)
+			for (int strikeIdx = declareAttack.StartStrikeIndex; strikeIdx < strikes.Count; strikeIdx++)
 			{
 				StrikeDescriptor strikeDescriptor = strikes[strikeIdx];
 				CardInstance? currentAttacker = CardLocator.FindCard(state, declareAttack.AttackerInstanceId);
@@ -178,7 +195,7 @@ public sealed partial class GameEngine
 				}
 				attackerCard = currentAttacker;
 				int currentDefId;
-				if (strikeIdx == 0)
+				if (strikeIdx == declareAttack.StartStrikeIndex)
 				{
 					currentDefId = declareAttack.DefenderInstanceId;
 					CardInstance? initialDefender = CardLocator.FindCard(state, currentDefId);
@@ -189,13 +206,13 @@ public sealed partial class GameEngine
 				}
 				else
 				{
-					List<CardInstance> legalDefendersForStrike = GetLegalDefendersForStrike(state, attackerCard.Value, strikeDescriptor, engine._cardDb, strikeWounds);
-					if (legalDefendersForStrike.Count == 0)
-					{
-						yield break;
-					}
 					if (engine.SelectStrikeTarget != null)
 					{
+						List<CardInstance> legalDefendersForStrike = GetLegalDefendersForStrike(state, attackerCard.Value, strikeDescriptor, engine._cardDb, strikeWounds);
+						if (legalDefendersForStrike.Count == 0)
+						{
+							yield break;
+						}
 						StrikeTargetPrompt arg = new StrikeTargetPrompt(state, attackerCard.Value, strikeIdx, strikes.Count, strikeDescriptor, legalDefendersForStrike, previousDefId);
 						int? chosen = engine.SelectStrikeTarget(arg);
 						if (!chosen.HasValue || !legalDefendersForStrike.Any((CardInstance c) => c.InstanceId == chosen.Value))
@@ -206,6 +223,11 @@ public sealed partial class GameEngine
 					}
 					else if (declareAttack.DefenderInstanceIds != null && strikeIdx < declareAttack.DefenderInstanceIds.Length)
 					{
+						List<CardInstance> legalDefendersForStrike = GetLegalDefendersForStrike(state, attackerCard.Value, strikeDescriptor, engine._cardDb, strikeWounds);
+						if (legalDefendersForStrike.Count == 0)
+						{
+							yield break;
+						}
 						int targetId = declareAttack.DefenderInstanceIds[strikeIdx];
 						if (!legalDefendersForStrike.Any((CardInstance c) => c.InstanceId == targetId))
 						{
@@ -215,11 +237,9 @@ public sealed partial class GameEngine
 					}
 					else
 					{
-						if (!legalDefendersForStrike.Any((CardInstance c) => c.InstanceId == previousDefId))
-						{
-							continue;
-						}
-						currentDefId = previousDefId;
+						List<CardInstance> legalDefendersForStrike = GetLegalDefendersForStrike(state, attackerCard.Value, strikeDescriptor, engine._cardDb, strikeWounds);
+						state.PendingPrompt = new StrikeTargetPrompt(state, attackerCard.Value, strikeIdx, strikes.Count, strikeDescriptor, legalDefendersForStrike, previousDefId);
+						yield break;
 					}
 				}
 					previousDefId = currentDefId;

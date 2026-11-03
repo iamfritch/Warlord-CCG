@@ -72,7 +72,7 @@ public record MarchEvent : GameEvent
 		}
 		if (!IsForcedMove)
 		{
-			BoardGeometry.EnforceFormation(playerState);
+			BoardGeometry.EnforceFormation(playerState, state);
 		}
 		return state;
 	}

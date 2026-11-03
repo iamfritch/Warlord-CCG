@@ -67,7 +67,7 @@ public sealed record CharacterDefeatedEvent : GameEvent
 					{
 						playerState.WarlordInstanceId = null;
 					}
-					BoardGeometry.EnforceFormation(playerState);
+					BoardGeometry.EnforceFormation(playerState, state);
 					return state;
 				}
 			}

@@ -275,52 +275,69 @@ public sealed partial class GameEngine
 		{
 			return actionResult;
 		}
-		bool isReactWindowOpen = _state.Priority.IsReactWindowOpen;
-		bool isPass = action is PassAction;
-		PushEventsForAction(action);
-		if (isReactWindowOpen)
+		List<GameEvent> resolvedEvents = new List<GameEvent>();
+		List<GameEvent>? previousEvents = _state.CurrentActionEvents;
+		_state.CurrentActionEvents = resolvedEvents;
+		try
 		{
-			if (isPass)
+			bool isReactWindowOpen = _state.Priority.IsReactWindowOpen;
+			bool isPass = action is PassAction;
+			PushEventsForAction(action);
+			if (isReactWindowOpen)
 			{
-				int requiredPasses = Math.Max(2, _state.Players.Count);
-				if (_state.Priority.ConsecutivePasses >= requiredPasses)
+				if (isPass)
 				{
-					ResolveReactWindowStack();
+					int requiredPasses = Math.Max(2, _state.Players.Count);
+					if (_state.Priority.ConsecutivePasses >= requiredPasses)
+					{
+						ResolveReactWindowStack();
+					}
+					SyncPendingEvents();
+					return ActionResult.Success(resolvedEvents);
 				}
-				SyncPendingEvents();
-				return ActionResult.Success();
-			}
-			_state.Priority.ConsecutivePasses = 0;
-			_state.Priority.HasPassed = false;
-			if (_state.Players.Count > 0)
-			{
-				_state.Priority.ActivePlayerIndex = (action.PlayerIndex + 1) % _state.Players.Count;
-			}
-			SyncPendingEvents();
-			return ActionResult.Success();
-		}
-		DrainResolverStack(action.PlayerIndex);
-		SyncPendingEvents();
-		if (!_state.Priority.IsReactWindowOpen)
-		{
-			if (!isPass && !(action is DeployStartingArmyAction))
-			{
-				if (_state.CurrentPhase == TurnPhase.Order)
-				{
-					_state.TurnState.RecordAction();
-				}
-			}
-			else if (isPass && _state.CurrentPhase == TurnPhase.Main && _state.Priority.ConsecutivePasses >= 2)
-			{
-				PerformTurnEndSurvivalChecks();
-				_state.CurrentPhase = TurnPhase.Ready;
-				_state.TurnNumber++;
 				_state.Priority.ConsecutivePasses = 0;
 				_state.Priority.HasPassed = false;
-				UnspendAndUnstunCards();
+				if (_state.Players.Count > 0)
+				{
+					_state.Priority.ActivePlayerIndex = (action.PlayerIndex + 1) % _state.Players.Count;
+				}
+				SyncPendingEvents();
+				return ActionResult.Success(resolvedEvents);
 			}
+			DrainResolverStack(action.PlayerIndex);
+			SyncPendingEvents();
+			if (!_state.Priority.IsReactWindowOpen && _state.PendingPrompt == null)
+			{
+				if (_state.CurrentPhase == TurnPhase.Ready)
+				{
+					if (isPass)
+					{
+						AdvancePhase();
+					}
+				}
+				else if (!isPass && !(action is DeployStartingArmyAction) && !(action is DiscardCardAction))
+				{
+					if (_state.CurrentPhase == TurnPhase.Order)
+					{
+						_state.TurnState.RecordAction();
+					}
+				}
+				else if (isPass && _state.CurrentPhase == TurnPhase.Main && _state.Priority.ConsecutivePasses >= 2)
+				{
+					PerformTurnEndSurvivalChecks();
+					_state.CurrentPhase = TurnPhase.Ready;
+					_state.TurnNumber++;
+					_state.Priority.ConsecutivePasses = 0;
+					_state.Priority.HasPassed = false;
+					UnspendAndUnstunCards();
+				}
+			}
+			return ActionResult.Success(resolvedEvents);
 		}
-		return ActionResult.Success();
+		finally
+		{
+			_state.CurrentActionEvents = previousEvents;
+		}
 	}
 
 	public ActionResult ExecuteAction(IPlayerAction action)

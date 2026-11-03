@@ -34,8 +34,14 @@ public sealed partial class GameEngine
 				return ValidateAttackAction(attack, state);
 			case DeployStartingArmyAction deployArmy:
 				return ValidateDeployStartingArmy(deployArmy, state);
+			case SelectStrikeTargetAction selectStrikeTarget:
+				return ValidateSelectStrikeTarget(selectStrikeTarget, state);
 			case DiscardCardAction discardAction:
 			{
+				if (discardAction.PlayerIndex < 0 || discardAction.PlayerIndex >= state.Players.Count)
+				{
+					return ActionResult.Failure($"Player index {discardAction.PlayerIndex} is out of range.");
+				}
 				PlayerState p = state.Players[discardAction.PlayerIndex];
 				if (!p.Hand.Any((CardInstance c) => c.InstanceId == discardAction.CardInstanceId))
 				{
@@ -46,6 +52,23 @@ public sealed partial class GameEngine
 			default:
 				return ActionResult.Failure("Unknown action type: " + action.GetType().Name);
 		}
+	}
+
+	private static ActionResult ValidateSelectStrikeTarget(SelectStrikeTargetAction action, GameState state)
+	{
+		if (state.PendingPrompt == null)
+		{
+			return ActionResult.Failure("There is no pending strike target prompt.");
+		}
+		if (action.PlayerIndex != state.PendingPrompt.Attacker.OwnerPlayerIndex)
+		{
+			return ActionResult.Failure($"It is not Player {action.PlayerIndex}'s strike target selection.");
+		}
+		if (action.TargetInstanceId.HasValue && !state.PendingPrompt.LegalTargets.Any((CardInstance c) => c.InstanceId == action.TargetInstanceId.Value))
+		{
+			return ActionResult.Failure($"Target {action.TargetInstanceId.Value} is not a legal target for this strike.");
+		}
+		return ActionResult.Success();
 	}
 
 	public ActionResult CanExecute(IPlayerAction action)

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using WarlordEngine.Events;
 
 namespace WarlordEngine.Actions;
 
@@ -9,11 +10,14 @@ public sealed record ActionResult
 
 	public IReadOnlyList<string> Errors { get; init; } = Array.Empty<string>();
 
-	public static ActionResult Success()
+	public IReadOnlyList<GameEvent> ResolvedEvents { get; init; } = Array.Empty<GameEvent>();
+
+	public static ActionResult Success(IReadOnlyList<GameEvent>? resolvedEvents = null)
 	{
 		return new ActionResult
 		{
-			IsSuccess = true
+			IsSuccess = true,
+			ResolvedEvents = resolvedEvents ?? Array.Empty<GameEvent>()
 		};
 	}
 

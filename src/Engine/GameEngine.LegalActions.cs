@@ -26,6 +26,27 @@ public sealed partial class GameEngine
 		}
 		List<IPlayerAction> list = new List<IPlayerAction>();
 		PlayerState playerState = state.Players[playerId];
+		if (!state.Priority.IsReactWindowOpen && state.PendingPrompt != null)
+		{
+			if (state.PendingPrompt.Attacker.OwnerPlayerIndex != playerId)
+			{
+				return Array.Empty<IPlayerAction>();
+			}
+			foreach (CardInstance legalTarget in state.PendingPrompt.LegalTargets)
+			{
+				list.Add(new SelectStrikeTargetAction
+				{
+					PlayerIndex = playerId,
+					TargetInstanceId = legalTarget.InstanceId
+				});
+			}
+			list.Add(new SelectStrikeTargetAction
+			{
+				PlayerIndex = playerId,
+				TargetInstanceId = null
+			});
+			return list;
+		}
 		if (state.Priority.IsReactWindowOpen)
 		{
 			if (state.Priority.ActivePlayerIndex != playerId)
@@ -161,6 +182,22 @@ public sealed partial class GameEngine
 		if (state.ActivePlayerIndex != playerId)
 		{
 			return Array.Empty<IPlayerAction>();
+		}
+		if (state.CurrentPhase == TurnPhase.Ready)
+		{
+			foreach (CardInstance handCard in playerState.Hand)
+			{
+				list.Add(new DiscardCardAction
+				{
+					PlayerIndex = playerId,
+					CardInstanceId = handCard.InstanceId
+				});
+			}
+			list.Add(new PassAction
+			{
+				PlayerIndex = playerId
+			});
+			return list;
 		}
 		if (state.CurrentPhase == TurnPhase.Main)
 		{

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using WarlordEngine.Effects;
 using WarlordEngine.Engine;
 using WarlordEngine.Events;
 
@@ -30,6 +31,11 @@ public sealed class GameState
 	public bool AutoPassWhenNoReactsAvailable { get; set; } = true;
 
 	public List<GameEvent> PendingEvents { get; set; } = new List<GameEvent>();
+
+	public StrikeTargetPrompt? PendingPrompt { get; set; }
+
+	[System.Text.Json.Serialization.JsonIgnore]
+	internal List<GameEvent>? CurrentActionEvents { get; set; }
 
 	public int TurnNumber
 	{
@@ -148,6 +154,22 @@ public sealed class GameState
 				DeterminizeHiddenZones(playerState);
 			}
 			gameState.Players.Add(playerState);
+		}
+		if (PendingPrompt != null)
+		{
+			List<CardInstance> clonedTargets = new List<CardInstance>(PendingPrompt.LegalTargets.Count);
+			for (int t = 0; t < PendingPrompt.LegalTargets.Count; t++)
+			{
+				clonedTargets.Add(PendingPrompt.LegalTargets[t].DeepClone());
+			}
+			gameState.PendingPrompt = new StrikeTargetPrompt(
+				gameState,
+				PendingPrompt.Attacker.DeepClone(),
+				PendingPrompt.StrikeIndex,
+				PendingPrompt.TotalStrikes,
+				PendingPrompt.Strike,
+				clonedTargets,
+				PendingPrompt.PreviousTargetId);
 		}
 		return gameState;
 	}

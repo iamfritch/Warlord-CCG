@@ -136,6 +136,7 @@ public sealed record ResolveAttackEffect : IEffect
 		{
 			(context.OnAttackResolved ?? GlobalOnAttackResolved)?.Invoke(obj);
 		}
+		context.State.CurrentActionEvents?.Add(new StrikeResolvedEvent(obj));
 		if (flag3)
 		{
 			CardDefinition cardDefinition = (cardInstance3.HasValue ? context.CardDb.GetDefinition(cardInstance3.Value.DefinitionId) : null);

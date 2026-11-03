@@ -52,9 +52,41 @@ public sealed partial class GameEngine
 	{
 		switch (action)
 		{
+		case SelectStrikeTargetAction selectStrikeTargetAction:
+		{
+			StrikeTargetPrompt? prompt = _state.PendingPrompt;
+			_state.PendingPrompt = null;
+			if (prompt != null)
+			{
+				if (selectStrikeTargetAction.TargetInstanceId.HasValue)
+				{
+					_resolver.Push(new DeclareAttackEvent
+					{
+						AttackerInstanceId = prompt.Attacker.InstanceId,
+						DefenderInstanceId = selectStrikeTargetAction.TargetInstanceId.Value,
+						StartStrikeIndex = prompt.StrikeIndex
+					});
+				}
+				else
+				{
+					_resolver.Push(new DeclareAttackEvent
+					{
+						AttackerInstanceId = prompt.Attacker.InstanceId,
+						DefenderInstanceId = prompt.PreviousTargetId ?? prompt.Attacker.InstanceId,
+						StartStrikeIndex = prompt.TotalStrikes,
+						SkipRemainingStrikes = true
+					});
+				}
+			}
+			return;
+		}
 		case DiscardCardAction discardCardAction:
 		{
-			DiscardCardFromHand(discardCardAction.PlayerIndex, discardCardAction.CardInstanceId);
+			_resolver.Push(new DiscardCardEvent
+			{
+				PlayerIndex = discardCardAction.PlayerIndex,
+				CardInstanceId = discardCardAction.CardInstanceId
+			});
 			return;
 		}
 		case MarchAction marchAction:
@@ -495,21 +527,29 @@ public sealed partial class GameEngine
 
 	private void DrainResolverStack(int? actingPlayerIndex = null)
 	{
-		for (; _resolver.PendingCount > 0; _resolver.Resolve(_state))
+		while (_resolver.PendingCount > 0)
 		{
-			GameEvent gameEvent = _resolver.Peek();
+			GameEvent gameEvent = _resolver.Peek()!;
 			if (gameEvent is CharacterDefeatedEvent cde && cde.BanishInsteadOfDiscard)
 			{
+				_resolver.Resolve(_state);
+				continue;
+			}
+			if (gameEvent is DeclareAttackEvent resumedAttack && (resumedAttack.StartStrikeIndex > 0 || resumedAttack.SkipRemainingStrikes))
+			{
+				_resolver.Resolve(_state);
 				continue;
 			}
 			if ((!EventResolver.RequiresReactWindow(gameEvent) && !(gameEvent is CharacterDefeatedEvent)) || (gameEvent is AbilityActivatedEvent abilityActivatedEvent && abilityActivatedEvent.Ability.SplitSecond))
 			{
+				_resolver.Resolve(_state);
 				continue;
 			}
 			bool shouldOpenReactWindow = (gameEvent is not CharacterDefeatedEvent && gameEvent is not PlayCardEvent && !_state.AutoPassWhenNoReactsAvailable)
 				|| HasAnyLegalReact(_state);
 			if (!shouldOpenReactWindow)
 			{
+				_resolver.Resolve(_state);
 				continue;
 			}
 			_state.Priority.IsReactWindowOpen = true;
@@ -525,6 +565,7 @@ public sealed partial class GameEngine
 			return;
 		}
 		CloseReactWindow();
+		FinalizePendingPrompt();
 		SyncPendingEvents();
 	}
 
@@ -535,11 +576,55 @@ public sealed partial class GameEngine
 			_resolver.Resolve(_state);
 		}
 		CloseReactWindow();
+		FinalizePendingPrompt();
 		SyncPendingEvents();
-		if (_state.CurrentPhase == TurnPhase.Order)
+		if (_state.PendingPrompt == null && _state.CurrentPhase == TurnPhase.Order)
 		{
 			_state.TurnState.RecordAction();
 		}
+	}
+
+	private void FinalizePendingPrompt()
+	{
+		if (_state.PendingPrompt == null)
+		{
+			return;
+		}
+		if (_state.IsGameOver)
+		{
+			_state.PendingPrompt = null;
+			return;
+		}
+		StrikeTargetPrompt prompt = _state.PendingPrompt;
+		CardInstance? currentAttacker = CardLocator.FindCard(_state, prompt.Attacker.InstanceId);
+		if (!currentAttacker.HasValue || currentAttacker.Value.Zone != CardZone.Board || currentAttacker.Value.ReadyState == ReadyState.Stunned || currentAttacker.Value.CurrentHitPoints <= 0 || currentAttacker.Value.Wounds >= GetEffectiveMaxHitPoints(_state, currentAttacker.Value, _cardDb))
+		{
+			_state.PendingPrompt = null;
+			return;
+		}
+		List<CardInstance> legalTargets = AttackResolutionHandler.GetLegalDefendersForStrike(_state, currentAttacker.Value, prompt.Strike, _cardDb);
+		if (legalTargets.Count == 0)
+		{
+			_state.PendingPrompt = null;
+			_resolver.Push(new DeclareAttackEvent
+			{
+				AttackerInstanceId = prompt.Attacker.InstanceId,
+				DefenderInstanceId = prompt.PreviousTargetId ?? prompt.Attacker.InstanceId,
+				StartStrikeIndex = prompt.TotalStrikes,
+				SkipRemainingStrikes = true
+			});
+			while (_resolver.PendingCount > 0)
+			{
+				_resolver.Resolve(_state);
+			}
+			return;
+		}
+		_state.PendingPrompt = prompt with
+		{
+			State = _state,
+			Attacker = currentAttacker.Value,
+			LegalTargets = legalTargets
+		};
 	}
 
 	private void CloseReactWindow()

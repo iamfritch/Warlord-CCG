@@ -21,6 +21,7 @@ public sealed record RollTableEffect(IReadOnlyList<RollTableBranch> Branches) : 
 			{
 				GlobalOnRollTableResolved?.Invoke(context.SourceInstanceId, num, branch.MinRoll, branch.MaxRoll);
 			}
+			context.State.CurrentActionEvents?.Add(new RollTableResolvedEvent(context.SourceInstanceId, num, branch.MinRoll, branch.MaxRoll));
 			foreach (IEffect effect in branch.Effects)
 			{
 				foreach (GameEvent item in effect.Evaluate(context))

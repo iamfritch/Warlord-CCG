@@ -2,9 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
+using WarlordEngine.Abilities;
 using WarlordEngine.Actions;
+using WarlordEngine.AI;
 using WarlordEngine.Effects;
 using WarlordEngine.Engine;
+using WarlordEngine.Events;
 using Xunit;
 
 namespace WarlordEngine.Tests;
@@ -1007,5 +1010,200 @@ public class TabletopRulesAndMechanicsTests
 		CardInstance cardInstance4 = gameState2.Players[1].Ranks[1].First((CardInstance c) => c.InstanceId == 3);
 		Assert.Equal(0, cardInstance4.Wounds);
 		Assert.Equal(5, cardInstance4.CurrentHitPoints);
+	}
+
+	[Fact]
+	public void NonBlocking_MultiStrike_PausesWithPendingPrompt_And_ResumesWithSelectStrikeTargetAction()
+	{
+		CardDefinition strikerDef = new CardDefinition
+		{
+			DefinitionId = "striker_2",
+			Name = "Two Striker",
+			Type = CardType.Character,
+			Class = CharacterClass.Fighter,
+			Level = 2,
+			ArmorClass = 14,
+			BaseHitPoints = 5,
+			Faction = "Mercenary",
+			IsWarlord = true,
+			Attack = new AttackValue
+			{
+				Strikes = new List<StrikeDescriptor>
+				{
+					new StrikeDescriptor { Modifier = 5, IsRanged = false },
+					new StrikeDescriptor { Modifier = 3, IsRanged = false }
+				}
+			}
+		};
+		CardDefinition weakDef = new CardDefinition
+		{
+			DefinitionId = "target_weak",
+			Name = "Target Weak",
+			Type = CardType.Character,
+			Class = CharacterClass.Fighter,
+			Level = 1,
+			ArmorClass = 10,
+			BaseHitPoints = 1,
+			Faction = "Elf"
+		};
+		CardDefinition bystanderDef = new CardDefinition
+		{
+			DefinitionId = "target_bystander",
+			Name = "Target Bystander",
+			Type = CardType.Character,
+			Class = CharacterClass.Fighter,
+			Level = 1,
+			ArmorClass = 10,
+			BaseHitPoints = 5,
+			Faction = "Elf",
+			IsWarlord = true
+		};
+		CardDatabase cardDb = new CardDatabase
+		{
+			Definitions = new Dictionary<string, CardDefinition>
+			{
+				["striker_2"] = strikerDef,
+				["target_weak"] = weakDef,
+				["target_bystander"] = bystanderDef
+			}
+		};
+		GameState state = new GameState
+		{
+			TurnNumber = 1,
+			ActivePlayerIndex = 0,
+			CurrentPhase = TurnPhase.Combat,
+			Players = new List<PlayerState>
+			{
+				new PlayerState
+				{
+					PlayerIndex = 0,
+					WarlordInstanceId = 1,
+					Ranks = new SortedDictionary<int, List<CardInstance>>
+					{
+						[1] = new List<CardInstance>
+						{
+							new CardInstance { InstanceId = 1, DefinitionId = "striker_2", Zone = CardZone.Board, Rank = 1, OwnerPlayerIndex = 0, ReadyState = ReadyState.Ready, CurrentHitPoints = 5 }
+						}
+					}
+				},
+				new PlayerState
+				{
+					PlayerIndex = 1,
+					WarlordInstanceId = 3,
+					Ranks = new SortedDictionary<int, List<CardInstance>>
+					{
+						[1] = new List<CardInstance>
+						{
+							new CardInstance { InstanceId = 2, DefinitionId = "target_weak", Zone = CardZone.Board, Rank = 1, OwnerPlayerIndex = 1, CurrentHitPoints = 1, CurrentArmorClass = 10 },
+							new CardInstance { InstanceId = 3, DefinitionId = "target_bystander", Zone = CardZone.Board, Rank = 1, OwnerPlayerIndex = 1, CurrentHitPoints = 5, CurrentArmorClass = 10 }
+						}
+					}
+				}
+			}
+		};
+
+		GameEngine gameEngine = new GameEngine(state, cardDb, (int count, int sides) => 20);
+		AttackAction attackAction = new AttackAction
+		{
+			PlayerIndex = 0,
+			AttackerInstanceId = 1,
+			TargetInstanceId = 2
+		};
+		ActionResult firstStrikeResult = gameEngine.Execute(attackAction);
+		Assert.True(firstStrikeResult.IsSuccess);
+		Assert.Contains(firstStrikeResult.ResolvedEvents, e => e is StrikeResolvedEvent);
+		Assert.Contains(state.Players[1].DiscardPile, (CardInstance c) => c.InstanceId == 2);
+		CardInstance bystanderBeforeSecondStrike = state.Players[1].Ranks[1].First((CardInstance c) => c.InstanceId == 3);
+		Assert.Equal(0, bystanderBeforeSecondStrike.Wounds);
+		Assert.NotNull(state.PendingPrompt);
+		Assert.Equal(1, state.PendingPrompt!.StrikeIndex);
+		Assert.Single(state.PendingPrompt.LegalTargets);
+		Assert.Equal(3, state.PendingPrompt.LegalTargets[0].InstanceId);
+
+		// Verify Clone() copies PendingPrompt and GetLegalActions emits SelectStrikeTargetAction choices
+		GameState clonedState = state.Clone();
+		Assert.NotNull(clonedState.PendingPrompt);
+		Assert.Equal(1, clonedState.PendingPrompt!.StrikeIndex);
+
+		IReadOnlyList<IPlayerAction> legalStrikeActions = gameEngine.GetLegalActions(state, 0);
+		Assert.Equal(2, legalStrikeActions.Count);
+		Assert.Contains(legalStrikeActions.OfType<SelectStrikeTargetAction>(), a => a.TargetInstanceId == 3);
+		Assert.Contains(legalStrikeActions.OfType<SelectStrikeTargetAction>(), a => a.TargetInstanceId == null);
+
+		// Verify HeuristicAiAgent handles SelectStrikeTargetAction
+		HeuristicAiAgent heuristicAi = new HeuristicAiAgent();
+		IPlayerAction aiChoice = heuristicAi.SelectAction(state, gameEngine, 0);
+		SelectStrikeTargetAction chosenStrikeAction = Assert.IsType<SelectStrikeTargetAction>(aiChoice);
+		Assert.Equal(3, chosenStrikeAction.TargetInstanceId);
+
+		ActionResult secondStrikeResult = gameEngine.Execute(chosenStrikeAction);
+		Assert.True(secondStrikeResult.IsSuccess);
+		Assert.Null(state.PendingPrompt);
+		Assert.Contains(secondStrikeResult.ResolvedEvents, e => e is StrikeResolvedEvent);
+		CardInstance updatedBystander = state.Players[1].Ranks[1].First((CardInstance c) => c.InstanceId == 3);
+		Assert.True(updatedBystander.Wounds > 0);
+	}
+
+	[Fact]
+	public void PreDrawDiscard_GetLegalActions_EmitsDiscardAndPass_And_ResolvedEvents_CapturesAllStructuredEvents()
+	{
+		CardDatabase cardDb = CreateTestDb();
+		GameState state = new GameState
+		{
+			TurnNumber = 1,
+			ActivePlayerIndex = 0,
+			CurrentPhase = TurnPhase.Ready,
+			Players = new List<PlayerState>
+			{
+				new PlayerState
+				{
+					PlayerIndex = 0,
+					WarlordInstanceId = 1,
+					Hand = new List<CardInstance>
+					{
+						new CardInstance { InstanceId = 10, DefinitionId = "test_hero", Zone = CardZone.Hand, OwnerPlayerIndex = 0 }
+					},
+					Ranks = new SortedDictionary<int, List<CardInstance>>
+					{
+						[1] = new List<CardInstance>
+						{
+							new CardInstance { InstanceId = 1, DefinitionId = "test_hero", Zone = CardZone.Board, Rank = 1, OwnerPlayerIndex = 0, CurrentHitPoints = 5 }
+						},
+						[2] = new List<CardInstance>
+						{
+							new CardInstance { InstanceId = 2, DefinitionId = "test_hero", Zone = CardZone.Board, Rank = 2, OwnerPlayerIndex = 0, CurrentHitPoints = 5 }
+						}
+					}
+				},
+				new PlayerState
+				{
+					PlayerIndex = 1,
+					WarlordInstanceId = 3,
+					Ranks = new SortedDictionary<int, List<CardInstance>>
+					{
+						[1] = new List<CardInstance>
+						{
+							new CardInstance { InstanceId = 3, DefinitionId = "test_hero", Zone = CardZone.Board, Rank = 1, OwnerPlayerIndex = 1, CurrentHitPoints = 5 }
+						}
+					}
+				}
+			}
+		};
+
+		GameEngine engine = new GameEngine(state, cardDb, (count, sides) => 15);
+		IReadOnlyList<IPlayerAction> readyActions = engine.GetLegalActions(state, 0);
+		DiscardCardAction discardAction = Assert.Single(readyActions.OfType<DiscardCardAction>());
+		Assert.Equal(10, discardAction.CardInstanceId);
+		PassAction passReady = Assert.Single(readyActions.OfType<PassAction>());
+
+		ActionResult discardResult = engine.Execute(discardAction);
+		Assert.True(discardResult.IsSuccess);
+		Assert.Empty(state.Players[0].Hand);
+		Assert.Single(state.Players[0].DiscardPile);
+		Assert.Contains(discardResult.ResolvedEvents, e => e is DiscardCardEvent);
+
+		ActionResult passResult = engine.Execute(passReady);
+		Assert.True(passResult.IsSuccess);
+		Assert.Equal(TurnPhase.Draw, state.CurrentPhase);
 	}
 }
