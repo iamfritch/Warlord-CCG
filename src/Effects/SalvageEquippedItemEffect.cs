@@ -33,32 +33,10 @@ public sealed record SalvageEquippedItemEffect : IEffect
 		{
 			itemToSalvage = cardInstance.Value.AttachedItemIds[0];
 		}
-		CardLocator.FindAndMutate(context.State, instanceId, delegate(ref CardInstance c)
+		yield return new SalvageItemEvent
 		{
-			c.AttachedItemIds.Remove(itemToSalvage);
-		});
-		CardLocator.FindAndMutate(context.State, itemToSalvage, delegate(ref CardInstance c)
-		{
-			c.Zone = CardZone.Hand;
-			c.AttachedToInstanceId = null;
-		});
-		CardInstance? cardInstance3 = context.FindCard(itemToSalvage);
-		if (cardInstance3.HasValue)
-		{
-			PlayerState playerState = context.State.Players[cardInstance3.Value.OwnerPlayerIndex];
-			playerState.DiscardPile.RemoveAll((CardInstance c) => c.InstanceId == itemToSalvage);
-			foreach (PlayerState p in context.State.Players)
-			{
-				p.AttachedItems.RemoveAll((CardInstance c) => c.InstanceId == itemToSalvage);
-			}
-			if (!playerState.Hand.Any((CardInstance c) => c.InstanceId == itemToSalvage))
-			{
-				playerState.Hand.Add(cardInstance3.Value with
-				{
-					Zone = CardZone.Hand,
-					AttachedToInstanceId = null
-				});
-			}
-		}
+			ItemInstanceId = itemToSalvage,
+			HolderInstanceId = instanceId
+		};
 	}
 }

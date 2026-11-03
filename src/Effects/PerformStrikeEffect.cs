@@ -283,31 +283,11 @@ public sealed record PerformStrikeEffect(int StrikeBonus = 0, bool IsRanged = fa
 		}
 		if (DestroyItemOnHit && defender.Value.AttachedItemIds.Count > 0)
 		{
-			int itemToDestroy = defender.Value.AttachedItemIds[0];
-			CardLocator.FindAndMutate(context.State, targetId, delegate(ref CardInstance c)
+			yield return new DestroyItemEvent
 			{
-				c.AttachedItemIds.Remove(itemToDestroy);
-			});
-			CardInstance? destroyedItem = CardLocator.FindCard(context.State, itemToDestroy);
-			int ownerIdx = destroyedItem?.OwnerPlayerIndex ?? defender.Value.OwnerPlayerIndex;
-			PlayerState ownerState = context.State.Players[ownerIdx];
-			foreach (PlayerState p in context.State.Players)
-			{
-				p.AttachedItems.RemoveAll((CardInstance c) => c.InstanceId == itemToDestroy);
-			}
-			CardLocator.FindAndMutate(context.State, itemToDestroy, delegate(ref CardInstance c)
-			{
-				c.Zone = CardZone.Discard;
-				c.AttachedToInstanceId = null;
-			});
-			if (destroyedItem.HasValue && !ownerState.DiscardPile.Any((CardInstance c) => c.InstanceId == itemToDestroy))
-			{
-				ownerState.DiscardPile.Add(destroyedItem.Value with
-				{
-					Zone = CardZone.Discard,
-					AttachedToInstanceId = null
-				});
-			}
+				ItemInstanceId = defender.Value.AttachedItemIds[0],
+				HolderInstanceId = targetId
+			};
 		}
 	}
 }

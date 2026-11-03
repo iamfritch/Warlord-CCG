@@ -22,19 +22,15 @@ public sealed record PutCharacterIntoPlayEffect(bool ReduceRank = true) : IEffec
 		});
 		if (charInHand.InstanceId != 0)
 		{
-			playerState.Hand.RemoveAll((CardInstance c) => c.InstanceId == charInHand.InstanceId);
-			int num = context.CardDb.GetDefinition(charInHand.DefinitionId)?.Level ?? 1;
-			int num2 = (ReduceRank ? Math.Max(1, num - 1) : Math.Max(1, num));
-			if (!playerState.Ranks.TryGetValue(num2, out List<CardInstance> value))
+			int level = context.CardDb.GetDefinition(charInHand.DefinitionId)?.Level ?? 1;
+			int targetRank = (ReduceRank ? Math.Max(1, level - 1) : Math.Max(1, level));
+			yield return new PlayCardEvent
 			{
-				value = new List<CardInstance>();
-				playerState.Ranks[num2] = value;
-			}
-			value.Add(charInHand with
-			{
-				Zone = CardZone.Board,
-				Rank = num2
-			});
+				PlayerIndex = cardInstance.Value.OwnerPlayerIndex,
+				CardInstanceId = charInHand.InstanceId,
+				TargetRank = targetRank,
+				SkipEntryChecks = true
+			};
 		}
 	}
 }

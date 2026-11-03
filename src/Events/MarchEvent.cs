@@ -16,6 +16,9 @@ public record MarchEvent : GameEvent
 
 	public int? TargetSlotIndex { get; init; }
 
+	/// <summary>Forced movement caused by an effect (pull/push); does not open a react window.</summary>
+	public bool IsForcedMove { get; init; }
+
 	public MarchEvent()
 	{
 	}
@@ -67,7 +70,10 @@ public record MarchEvent : GameEvent
 				Rank = DestinationRank
 			});
 		}
-		BoardGeometry.EnforceFormation(playerState);
+		if (!IsForcedMove)
+		{
+			BoardGeometry.EnforceFormation(playerState);
+		}
 		return state;
 	}
 }

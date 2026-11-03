@@ -161,7 +161,7 @@ public sealed class EventResolverTests
 	}
 
 	[Fact]
-	public void DeclareAttackEvent_Spends_Attacker()
+	public void DeclareAttackEvent_Does_Not_Spend_Attacker_Costs_Paid_By_Engine()
 	{
 		var (gameState, cardInstance) = TestStateFactory.CreateWithOneCharacterOnBoard();
 		Assert.Equal(ReadyState.Ready, gameState.Players[0].Ranks[1][0].ReadyState);
@@ -172,7 +172,7 @@ public sealed class EventResolverTests
 			DefenderInstanceId = 99
 		});
 		eventResolver.Resolve(gameState);
-		Assert.Equal(ReadyState.Spent, gameState.Players[0].Ranks[1][0].ReadyState);
+		Assert.Equal(ReadyState.Ready, gameState.Players[0].Ranks[1][0].ReadyState);
 	}
 
 	[Fact]

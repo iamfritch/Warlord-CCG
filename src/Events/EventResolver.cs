@@ -46,7 +46,7 @@ public sealed class EventResolver
 
 	public static bool RequiresReactWindow(GameEvent gameEvent)
 	{
-		if (gameEvent is DeclareAttackEvent || gameEvent is AbilityActivatedEvent || gameEvent is MarchEvent || gameEvent is DealDamageEvent)
+		if (gameEvent is DeclareAttackEvent || gameEvent is AbilityActivatedEvent || (gameEvent is MarchEvent march && !march.IsForcedMove) || gameEvent is DealDamageEvent || gameEvent is PlayCardEvent)
 		{
 			return true;
 		}

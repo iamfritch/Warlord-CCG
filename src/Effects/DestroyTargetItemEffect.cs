@@ -84,30 +84,10 @@ public sealed record DestroyTargetItemEffect(int MaxRankDistance = 2, int LevelO
 		{
 			yield break;
 		}
-		if (cardInstance.HasValue)
+		yield return new DestroyItemEvent
 		{
-			CardLocator.FindAndMutate(context.State, cardInstance.Value.InstanceId, delegate(ref CardInstance c)
-			{
-				c.AttachedItemIds.Remove(targetItemId);
-			});
-		}
-		CardLocator.FindAndMutate(context.State, targetItemId, delegate(ref CardInstance c)
-		{
-			c.Zone = CardZone.Discard;
-			c.AttachedToInstanceId = null;
-		});
-		foreach (PlayerState p in context.State.Players)
-		{
-			p.AttachedItems.RemoveAll((CardInstance c) => c.InstanceId == targetItemId);
-		}
-		PlayerState playerState = context.State.Players[cardInstance3.Value.OwnerPlayerIndex];
-		if (!playerState.DiscardPile.Any((CardInstance c) => c.InstanceId == targetItemId))
-		{
-			playerState.DiscardPile.Add(cardInstance3.Value with
-			{
-				Zone = CardZone.Discard,
-				AttachedToInstanceId = null
-			});
-		}
+			ItemInstanceId = targetItemId,
+			HolderInstanceId = cardInstance?.InstanceId
+		};
 	}
 }

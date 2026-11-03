@@ -13,12 +13,9 @@ public sealed record DeclareAttackEvent : GameEvent
 
 	public int AdditionalWounds { get; set; }
 
+	// Attack costs (spending the attacker) are paid once in GameEngine.PayActionCosts.
 	public override GameState ApplyToState(GameState state)
 	{
-		CardLocator.FindAndMutate(state, AttackerInstanceId, delegate(ref CardInstance card)
-		{
-			card.ReadyState = ReadyState.Spent;
-		});
 		return state;
 	}
 

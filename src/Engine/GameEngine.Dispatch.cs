@@ -12,6 +12,42 @@ namespace WarlordEngine.Engine;
 
 public sealed partial class GameEngine
 {
+	/// <summary>
+	/// Single place where Spend costs for player actions are paid. Events must not re-spend cards.
+	/// </summary>
+	private void PayActionCosts(IPlayerAction action, AbilityDefinition? ability = null, int? performerId = null, CardDefinition? sourceDef = null)
+	{
+		int? spendId = null;
+		switch (action)
+		{
+		case MarchAction march:
+			spendId = march.CardInstanceId;
+			break;
+		case AttackAction attack:
+			spendId = attack.AttackerInstanceId;
+			break;
+		case UseAbilityAction use:
+			if (ability != null && ability.RequiresSpend)
+			{
+				spendId = use.SourceInstanceId;
+			}
+			break;
+		case PlayCardAction:
+			if (ability != null && performerId.HasValue && (ability.RequiresSpend || (sourceDef != null && Regex.IsMatch(sourceDef.RulesText, "\\bSpend\\s+(?:Limited\\s+)?(?:Order|React):", RegexOptions.IgnoreCase))))
+			{
+				spendId = performerId;
+			}
+			break;
+		}
+		if (spendId.HasValue)
+		{
+			CardLocator.FindAndMutate(_state, spendId.Value, delegate(ref CardInstance c)
+			{
+				c.ReadyState = ReadyState.Spent;
+			});
+		}
+	}
+
 	private void PushEventsForAction(IPlayerAction action)
 	{
 		switch (action)
@@ -23,10 +59,7 @@ public sealed partial class GameEngine
 		}
 		case MarchAction marchAction:
 		{
-			CardLocator.FindAndMutate(_state, marchAction.CardInstanceId, delegate(ref CardInstance reference)
-			{
-				reference.ReadyState = ReadyState.Spent;
-			});
+			PayActionCosts(action);
 			_resolver.Push(new MarchEvent
 			{
 				PlayerIndex = marchAction.PlayerIndex,
@@ -39,10 +72,7 @@ public sealed partial class GameEngine
 		}
 		case AttackAction attackAction:
 		{
-			CardLocator.FindAndMutate(_state, attackAction.AttackerInstanceId, delegate(ref CardInstance reference)
-			{
-				reference.ReadyState = ReadyState.Spent;
-			});
+			PayActionCosts(action);
 			_resolver.Push(new DeclareAttackEvent
 			{
 				AttackerInstanceId = attackAction.AttackerInstanceId,
@@ -283,13 +313,7 @@ public sealed partial class GameEngine
 												});
 											}
 										}
-										if (abilityDefinition.RequiresSpend)
-										{
-											CardLocator.FindAndMutate(_state, useAbilityAction.SourceInstanceId, delegate(ref CardInstance c)
-											{
-												c.ReadyState = ReadyState.Spent;
-											});
-										}
+										PayActionCosts(action, abilityDefinition);
 										if (definition != null)
 										{
 											if (definition.Name.Equals("Ciane", StringComparison.OrdinalIgnoreCase))
@@ -357,60 +381,25 @@ public sealed partial class GameEngine
 			return;
 		}
 		CardInstance card = actingPlayer.Hand[cardHandIndex];
-		actingPlayer.Hand.RemoveAt(cardHandIndex);
 		CardDefinition cardDef = _cardDb.GetDefinition(card.DefinitionId);
+		CardType playedType = cardDef?.Type ?? CardType.Character;
+		if (playedType != CardType.Character && playedType != CardType.Token)
+		{
+			actingPlayer.Hand.RemoveAt(cardHandIndex);
+		}
 		switch (cardDef?.Type ?? CardType.Character)
 		{
 		case CardType.Character:
 		case CardType.Token:
 		{
-			int targetRank = playCardAction.TargetRank ?? 1;
-			ReadyState readyState = ReadyState.Ready;
-			if (cardDef != null && actingPlayer.WarlordInstanceId.HasValue)
+			_resolver.Push(new PlayCardEvent
 			{
-				CardInstance? warlordCard = null;
-				foreach (List<CardInstance> warlordRankCards in actingPlayer.Ranks.Values)
-				{
-					foreach (CardInstance item9 in warlordRankCards)
-					{
-						if (item9.InstanceId == actingPlayer.WarlordInstanceId.Value)
-						{
-							warlordCard = item9;
-							break;
-						}
-					}
-					if (warlordCard.HasValue)
-					{
-						break;
-					}
-				}
-				if (warlordCard.HasValue)
-				{
-					CardDefinition warlordDef = _cardDb.GetDefinition(warlordCard.Value.DefinitionId);
-					if (warlordDef != null)
-					{
-						string effectiveFaction = warlordDef.GetEffectiveFaction();
-						string effectiveFaction2 = cardDef.GetEffectiveFaction();
-						if (!effectiveFaction2.Equals("Mercenary", StringComparison.OrdinalIgnoreCase) && !cardDef.Traits.Contains("Mercenary", StringComparer.OrdinalIgnoreCase) && !effectiveFaction2.Equals(effectiveFaction, StringComparison.OrdinalIgnoreCase))
-						{
-							readyState = ReadyState.Stunned;
-						}
-					}
-				}
-			}
-			CardInstance deployedCard = card with
-			{
-				Zone = CardZone.Board,
-				ReadyState = readyState,
-				Rank = targetRank
-			};
-			if (!actingPlayer.Ranks.TryGetValue(targetRank, out List<CardInstance> targetRankCards))
-			{
-				targetRankCards = new List<CardInstance>();
-				actingPlayer.Ranks[targetRank] = targetRankCards;
-			}
-			targetRankCards.Add(deployedCard);
-			TriggerCharacterEnterReacts(deployedCard, targetRank, playCardAction.PlayerIndex);
+				PlayerIndex = playCardAction.PlayerIndex,
+				CardInstanceId = card.InstanceId,
+				TargetRank = playCardAction.TargetRank ?? 1,
+				CardDb = _cardDb,
+				OnEntered = TriggerCharacterEnterReacts
+			});
 			break;
 		}
 		case CardType.Item:
@@ -481,13 +470,7 @@ public sealed partial class GameEngine
 				abilityIdx = 0;
 			}
 			AbilityDefinition chosenAbility = cardDef.Abilities[abilityIdx];
-			if (chosenAbility.RequiresSpend || Regex.IsMatch(cardDef.RulesText, "\\bSpend\\s+(?:Limited\\s+)?(?:Order|React):", RegexOptions.IgnoreCase))
-			{
-				CardLocator.FindAndMutate(_state, performerId, delegate(ref CardInstance c)
-				{
-					c.ReadyState = ReadyState.Spent;
-				});
-			}
+			PayActionCosts(action, chosenAbility, performerId, cardDef);
 			int[] targetInstanceIds = ((!playCardAction.TargetCharacterId.HasValue) ? Array.Empty<int>() : new int[1] { playCardAction.TargetCharacterId.Value });
 			CardInstance? performerCard = CardLocator.FindCard(_state, performerId);
 			int performerLevel = 0;
@@ -632,7 +615,7 @@ public sealed partial class GameEngine
 			{
 				continue;
 			}
-			bool shouldOpenReactWindow = (gameEvent is not CharacterDefeatedEvent && !_state.AutoPassWhenNoReactsAvailable)
+			bool shouldOpenReactWindow = (gameEvent is not CharacterDefeatedEvent && gameEvent is not PlayCardEvent && !_state.AutoPassWhenNoReactsAvailable)
 				|| HasAnyLegalReact(_state);
 			if (!shouldOpenReactWindow)
 			{
