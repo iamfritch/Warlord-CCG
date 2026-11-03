@@ -412,9 +412,19 @@ public sealed partial class GameEngine
 					strikeWounds[currentDefId] = strikeWounds.GetValueOrDefault(currentDefId, 0) + details.DamageDealt;
 					AddTurnBuff(state, declareAttack.AttackerInstanceId, "WOUNDED_OPPONENT_THIS_TURN", 1);
 				}
-				if (def != null && def.Name.Equals("Stirges", StringComparison.OrdinalIgnoreCase) && !HasTurnBuff(state, declareAttack.AttackerInstanceId, "STIRGES_BONUS_STRIKE"))
+				if (def != null)
 				{
-					AddTurnBuff(state, declareAttack.AttackerInstanceId, "STIRGES_BONUS_STRIKE", 1);
+					CardInstance? attackerCard = CardLocator.FindCard(state, declareAttack.AttackerInstanceId);
+					CardScriptContext strikeCtx = new CardScriptContext
+					{
+						State = state,
+						CardDb = engine._cardDb,
+						Card = attackerCard.GetValueOrDefault(),
+						Definition = def,
+						PerformerId = declareAttack.AttackerInstanceId,
+						PlayerIndex = attackerCard?.OwnerPlayerIndex ?? 0
+					};
+					CardScriptRegistry.OnStrikeHit(strikeCtx);
 				}
 				if (HasTurnBuff(state, declareAttack.AttackerInstanceId, "CUNNING_SHOT_PULL"))
 				{
@@ -432,35 +442,21 @@ public sealed partial class GameEngine
 					}
 				}
 				CardInstance? defenderStatusCheck = CardLocator.FindCard(state, currentDefId);
-				if (defenderStatusCheck.HasValue && defenderStatusCheck.Value.CurrentHitPoints <= 0)
+				if (defenderStatusCheck.HasValue && defenderStatusCheck.Value.CurrentHitPoints <= 0 && def != null)
 				{
-					if (def != null && def.Name.Equals("Mistress Allandra", StringComparison.OrdinalIgnoreCase))
+					CardInstance? attackerCard = CardLocator.FindCard(state, declareAttack.AttackerInstanceId);
+					CardScriptContext killCtx = new CardScriptContext
 					{
-						yield return new ChangeReadyStateEvent
-						{
-							TargetInstanceId = declareAttack.AttackerInstanceId,
-							NewReadyState = ReadyState.Ready
-						};
-					}
-					if (def != null && def.Name.Equals("Tunnel Worm", StringComparison.OrdinalIgnoreCase))
+						State = state,
+						CardDb = engine._cardDb,
+						Card = attackerCard.GetValueOrDefault(),
+						Definition = def,
+						PerformerId = declareAttack.AttackerInstanceId,
+						PlayerIndex = attackerCard?.OwnerPlayerIndex ?? 0
+					};
+					foreach (GameEvent killEvt in CardScriptRegistry.OnDefenderKilled(killCtx))
 					{
-						(int, int, int)? tuple = FindCharacterPosition(state, declareAttack.AttackerInstanceId);
-						if (tuple.HasValue)
-						{
-							List<CardInstance> list = state.Players[tuple.Value.Item1].Ranks[tuple.Value.Item2];
-							if (list.Count > 1)
-							{
-								int targetSlot = (tuple.Value.Item3 == 0) ? list.Count - 1 : 0;
-								yield return new CharacterMovedEvent
-								{
-									PlayerIndex = tuple.Value.Item1,
-									CardInstanceId = declareAttack.AttackerInstanceId,
-									SourceRank = tuple.Value.Item2,
-									DestinationRank = tuple.Value.Item2,
-									TargetSlotIndex = targetSlot
-								};
-							}
-						}
+						yield return killEvt;
 					}
 				}
 				if (HasTurnBuff(state, declareAttack.AttackerInstanceId, "CRUSH_DESTROY_ITEM"))

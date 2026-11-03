@@ -279,7 +279,7 @@ public static class RulesParser
 		{
 			return null;
 		}
-		bool destroysSource = text2.StartsWith("Destroy", StringComparison.OrdinalIgnoreCase) || Regex.IsMatch(text3, "^Destroy\\s+this\\s+(?:item|card):\\s*", RegexOptions.IgnoreCase) || Regex.IsMatch(text3, "^Discard\\s+this\\s+(?:item|card):\\s*", RegexOptions.IgnoreCase) || (cardName != null && cardName.Equals("Strongarm Stout", StringComparison.OrdinalIgnoreCase));
+		bool destroysSource = text2.StartsWith("Destroy", StringComparison.OrdinalIgnoreCase) || Regex.IsMatch(text3, "^Destroy\\s+this\\s+(?:item|card):\\s*", RegexOptions.IgnoreCase) || Regex.IsMatch(text3, "^Discard\\s+this\\s+(?:item|card):\\s*", RegexOptions.IgnoreCase);
 		if (Regex.IsMatch(text3, "^Destroy\\s+this\\s+(?:item|card):\\s*", RegexOptions.IgnoreCase))
 		{
 			text3 = Regex.Replace(text3, "^Destroy\\s+this\\s+(?:item|card):\\s*", "", RegexOptions.IgnoreCase);

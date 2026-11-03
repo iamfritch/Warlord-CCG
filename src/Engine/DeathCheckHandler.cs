@@ -6,7 +6,7 @@ namespace WarlordEngine.Engine;
 
 public sealed class DeathCheckHandler(CardDatabase? cardDb = null) : IPostResolutionHandler
 {
-	private CardDatabase GetDb() => cardDb ?? GameEngine.GetLastActiveCardDb();
+	private CardDatabase GetDb(GameState state) => GameEngine.GetActiveCardDb(state, cardDb);
 
 	public IEnumerable<GameEvent> AfterResolve(GameEvent resolvedEvent, GameState state)
 	{
@@ -14,7 +14,7 @@ public sealed class DeathCheckHandler(CardDatabase? cardDb = null) : IPostResolu
 		List<CardInstance> value;
 		if (resolvedEvent is DealDamageEvent dealDamageEvent)
 		{
-			CardDatabase activeCardDb = GetDb();
+			CardDatabase activeCardDb = GetDb(state);
 			foreach (PlayerState player in state.Players)
 			{
 				foreach (KeyValuePair<int, List<CardInstance>> rank in player.Ranks)
@@ -52,7 +52,7 @@ public sealed class DeathCheckHandler(CardDatabase? cardDb = null) : IPostResolu
 			{
 				yield break;
 			}
-			CardDatabase activeCardDb2 = GetDb();
+			CardDatabase activeCardDb2 = GetDb(state);
 			foreach (PlayerState player2 in state.Players)
 			{
 				foreach (KeyValuePair<int, List<CardInstance>> rank2 in player2.Ranks)
@@ -95,19 +95,15 @@ public sealed class DeathCheckHandler(CardDatabase? cardDb = null) : IPostResolu
 		}
 	}
 
-	private static bool IsBanishOnKillSource(GameState state, int sourceId)
+	private bool IsBanishOnKillSource(GameState state, int sourceId)
 	{
 		CardInstance? cardInstance = CardLocator.FindCard(state, sourceId);
 		if (cardInstance.HasValue)
 		{
-			CardDefinition cardDefinition = GameEngine.GetActiveCardDb()?.GetDefinition(cardInstance.Value.DefinitionId);
+			CardDefinition cardDefinition = GetDb(state).GetDefinition(cardInstance.Value.DefinitionId);
 			if (cardDefinition != null)
 			{
-				if (cardDefinition.Name.Equals("Shambling Horror", StringComparison.OrdinalIgnoreCase))
-				{
-					return true;
-				}
-				if (cardDefinition.Name.Equals("Graveyard Librarian", StringComparison.OrdinalIgnoreCase))
+				if (CardScriptRegistry.BanishesOnKill(cardDefinition))
 				{
 					return true;
 				}

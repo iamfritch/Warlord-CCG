@@ -139,7 +139,7 @@ public sealed record ResolveAttackEffect : IEffect
 		if (flag3)
 		{
 			CardDefinition cardDefinition = (cardInstance3.HasValue ? context.CardDb.GetDefinition(cardInstance3.Value.DefinitionId) : null);
-			bool banishOnDeath = BanishOnKill || (cardDefinition?.Name.Equals("Shambling Horror", StringComparison.OrdinalIgnoreCase) ?? false);
+			bool banishOnDeath = BanishOnKill || CardScriptRegistry.BanishesOnKill(cardDefinition);
 			yield return new DealDamageEvent
 			{
 				TargetInstanceId = value,

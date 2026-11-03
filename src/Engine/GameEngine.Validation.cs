@@ -692,8 +692,8 @@ public sealed partial class GameEngine
 		ValidateMultiTargetSelection(state, useAbility, abilityDefinition, list);
 		CardInstance? srcCardInst = CardLocator.FindCard(state, useAbility.SourceInstanceId);
 		CardDefinition? srcCardDef = srcCardInst.HasValue ? _cardDb.GetDefinition(srcCardInst.Value.DefinitionId) : null;
-		bool isHodsLegacyAbility = srcCardDef != null && srcCardDef.Name.Equals("Hod's Legacy", StringComparison.OrdinalIgnoreCase);
-		bool isHuntingStaffAbility = srcCardDef != null && srcCardDef.Name.Equals("Hunting Staff", StringComparison.OrdinalIgnoreCase);
+		bool isHodsLegacyAbility = CardScriptRegistry.UsesLowerLevelFactionTargeting(srcCardDef);
+		bool isHuntingStaffAbility = CardScriptRegistry.UsesAdjacentMoveForwardTargeting(srcCardDef);
 
 		if (isHodsLegacyAbility || (abilityDefinition.Description?.Contains("Hod's Legacy", StringComparison.OrdinalIgnoreCase) ?? false) || ((abilityDefinition.Description?.Contains("lower level", StringComparison.OrdinalIgnoreCase) ?? false) && (abilityDefinition.Description?.Contains("same faction", StringComparison.OrdinalIgnoreCase) ?? false)))
 		{
@@ -1163,7 +1163,7 @@ public sealed partial class GameEngine
 				break;
 			}
 			CardDefinition cardDefinition = bearerDef;
-			bool isTinker = bearerDef.Name.Equals("Tinker", StringComparison.OrdinalIgnoreCase);
+			bool isTinker = CardScriptRegistry.BearerIgnoresClassWhenEquipping(bearerDef);
 			if (isTinker)
 			{
 				cardDefinition = bearerDef with
@@ -1285,7 +1285,7 @@ public sealed partial class GameEngine
 				{
 					list.Add($"Target character {playCard.TargetCharacterId.Value} for action card not found on the board.");
 				}
-				else if ((definition.Name.Equals("Assassin's Strike", StringComparison.OrdinalIgnoreCase) || definition.Abilities.Any((AbilityDefinition a) => a.Effects.OfType<PerformStrikeEffect>().Any((PerformStrikeEffect s) => s.TargetSpentOnly || s.TargetSpentOrStunnedOnly)) || Regex.IsMatch(definition.RulesText, "\\b(?:spent\\s+or\\s+stunned|against\\s+a\\s+spent|target\\s+a\\s+spent)\\b", RegexOptions.IgnoreCase)) && targetChar.Value.ReadyState == ReadyState.Ready)
+				else if ((CardScriptRegistry.RequiresSpentOrStunnedTarget(definition) || definition.Abilities.Any((AbilityDefinition a) => a.Effects.OfType<PerformStrikeEffect>().Any((PerformStrikeEffect s) => s.TargetSpentOnly || s.TargetSpentOrStunnedOnly)) || Regex.IsMatch(definition.RulesText, "\\b(?:spent\\s+or\\s+stunned|against\\s+a\\s+spent|target\\s+a\\s+spent)\\b", RegexOptions.IgnoreCase)) && targetChar.Value.ReadyState == ReadyState.Ready)
 				{
 					list.Add("'" + definition.Name + "' can only target a spent or stunned character.");
 				}

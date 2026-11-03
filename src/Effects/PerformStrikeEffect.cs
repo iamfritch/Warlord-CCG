@@ -239,7 +239,7 @@ public sealed record PerformStrikeEffect(int StrikeBonus = 0, bool IsRanged = fa
 		if (!ZeroDamage)
 		{
 			CardDefinition cardDefinition = ((opponentCard.HasValue && context.CardDb != null) ? context.CardDb.GetDefinition(opponentCard.Value.DefinitionId) : null);
-			bool banishOnDeath = BanishOnKill || ((object)cardDefinition != null && cardDefinition.Name.Equals("Shambling Horror", StringComparison.OrdinalIgnoreCase)) || (cardDefinition?.Name.Equals("Graveyard Librarian", StringComparison.OrdinalIgnoreCase) ?? false);
+			bool banishOnDeath = BanishOnKill || CardScriptRegistry.BanishesOnKill(cardDefinition);
 			yield return new DealDamageEvent
 			{
 				TargetInstanceId = targetId,

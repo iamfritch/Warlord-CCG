@@ -400,48 +400,16 @@ public sealed partial class GameEngine
 		{
 			return;
 		}
-		if (definition.Name.Equals("Albrecht Novice", StringComparison.OrdinalIgnoreCase))
+		CardScriptContext enterCtx = new CardScriptContext
 		{
-			if (!_state.Players[playerIndex].Ranks.TryGetValue(rank, out List<CardInstance> rankCards))
-			{
-				return;
-			}
-			int cardIdx = rankCards.FindIndex((CardInstance c) => c.InstanceId == card.InstanceId);
-			if (cardIdx >= 0)
-			{
-				if (cardIdx > 0)
-				{
-					AddTurnBuff(_state, rankCards[cardIdx - 1].InstanceId, "ATK", 2);
-					AddTurnBuff(_state, rankCards[cardIdx - 1].InstanceId, "AC", 2);
-				}
-				if (cardIdx + 1 < rankCards.Count)
-				{
-					AddTurnBuff(_state, rankCards[cardIdx + 1].InstanceId, "ATK", 2);
-					AddTurnBuff(_state, rankCards[cardIdx + 1].InstanceId, "AC", 2);
-				}
-			}
-		}
-		else if (definition.Name.Equals("Frameseer", StringComparison.OrdinalIgnoreCase))
-		{
-			AddTurnBuff(_state, card.InstanceId, "SURVEYED", 1);
-		}
-		else
-		{
-			if (!definition.Name.Equals("Shannon the Daring", StringComparison.OrdinalIgnoreCase) || !_state.Players[playerIndex].Ranks.TryGetValue(1, out List<CardInstance> rank1Cards))
-			{
-				return;
-			}
-			foreach (CardInstance ally in rank1Cards)
-			{
-				CardDefinition? definition2 = _cardDb.GetDefinition(ally.DefinitionId);
-				int effectiveLevel = GetEffectiveLevel(_state, ally, _cardDb);
-				if (IsFreeKingdoms(definition2) && effectiveLevel <= 2)
-				{
-					AddTurnBuff(_state, ally.InstanceId, "ATK", 2);
-					AddTurnBuff(_state, ally.InstanceId, "AC", 2);
-				}
-			}
-		}
+			State = _state,
+			CardDb = _cardDb,
+			Card = card,
+			Definition = definition,
+			PlayerIndex = playerIndex,
+			Rank = rank
+		};
+		CardScriptRegistry.OnEnterPlay(enterCtx);
 	}
 
 	private bool HasAnyLegalReact(GameState state)

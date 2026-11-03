@@ -9,6 +9,20 @@ public sealed class GameState
 {
 	private bool _isSimulation;
 
+	private CardDatabase? _cardDb;
+
+	/// <summary>Read-only card database reference, shared by reference across clones.</summary>
+	public CardDatabase? CardDb
+	{
+		get => _cardDb;
+		init => _cardDb = value;
+	}
+
+	internal void BindCardDb(CardDatabase cardDb)
+	{
+		_cardDb ??= cardDb;
+	}
+
 	public List<PlayerState> Players { get; set; } = new List<PlayerState>();
 
 	public TurnState TurnState { get; set; } = new TurnState();
@@ -107,7 +121,8 @@ public sealed class GameState
 			NextInstanceId = NextInstanceId,
 			Players = new List<PlayerState>(Players.Count),
 			PendingEvents = new List<GameEvent>(PendingEvents.Count),
-			_isSimulation = isSimulation
+			_isSimulation = isSimulation,
+			CardDb = _cardDb
 		};
 		for (int i = 0; i < PendingEvents.Count; i++)
 		{

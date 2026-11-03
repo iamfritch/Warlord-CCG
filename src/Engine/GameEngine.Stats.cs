@@ -18,11 +18,6 @@ public sealed partial class GameEngine
 		{
 			return (Atk: 0, Ac: 0, Hp: 0);
 		}
-		string text = itemDef.Name.Trim();
-		if (text.Equals("Gapfinder", StringComparison.OrdinalIgnoreCase) || text.Equals("Breastplate of Power", StringComparison.OrdinalIgnoreCase) || text.Equals("Revenger", StringComparison.OrdinalIgnoreCase) || text.Equals("Shillelagh", StringComparison.OrdinalIgnoreCase))
-		{
-			return (Atk: 0, Ac: 0, Hp: 0);
-		}
 		int atk = 0;
 		int ac = 0;
 		int hp = 0;
@@ -32,7 +27,9 @@ public sealed partial class GameEngine
 			string[] array = rulesText.Split(new char[2] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 			foreach (string input in array)
 			{
-				if (Regex.IsMatch(input, "^\\s*(?:(?:Spend|Destroy|Limited|Spend Limited)\\s+)?(?:Order|React|Death React|Enter React)\\b", RegexOptions.IgnoreCase) || Regex.IsMatch(input, "^\\s*(?:Destroy|Discard|Sacrifice)\\s+(?:this\\s+(?:item|card)|[A-Za-z]+)\\b", RegexOptions.IgnoreCase) || Regex.IsMatch(input, "\\b(?:during|while|other characters|against|equal to)\\b", RegexOptions.IgnoreCase))
+				if (Regex.IsMatch(input, @"(?:^|\s)(?:(?:Spend|Destroy|Limited|Spend Limited|Roll)\s+)?(?:Order|React|Death React|Enter React|Kill React)\b", RegexOptions.IgnoreCase)
+					|| Regex.IsMatch(input, @"\b(?:Order|React|Spend|Destroy|Discard|Sacrifice)\b", RegexOptions.IgnoreCase)
+					|| Regex.IsMatch(input, @"\b(?:if|while|when|during|against|other characters|equal to)\b", RegexOptions.IgnoreCase))
 				{
 					continue;
 				}
@@ -334,8 +331,7 @@ public sealed partial class GameEngine
 		{
 			return false;
 		}
-		return def.Name.Equals("Revenger", StringComparison.OrdinalIgnoreCase)
-			|| def.Traits.Any((string t) => t.Equals("Dual Wield", StringComparison.OrdinalIgnoreCase))
+		return def.Traits.Any((string t) => t.Equals("Dual Wield", StringComparison.OrdinalIgnoreCase))
 			|| def.RulesText.Contains("Dual Wield", StringComparison.OrdinalIgnoreCase);
 	}
 
@@ -372,7 +368,7 @@ public sealed partial class GameEngine
 		}
 		if (cardDb == null)
 		{
-			cardDb = _lastActiveCardDb ?? GetActiveCardDb();
+			cardDb = GetActiveCardDb(state);
 		}
 		int effectiveMaxHitPoints = GetEffectiveMaxHitPoints(state, card, cardDb);
 		return Math.Max(0, effectiveMaxHitPoints - card.CurrentHitPoints);
@@ -387,7 +383,7 @@ public sealed partial class GameEngine
 	{
 		if (cardDb == null)
 		{
-			cardDb = _lastActiveCardDb ?? GetActiveCardDb();
+			cardDb = GetActiveCardDb(state);
 		}
 		CardDefinition definition = cardDb.GetDefinition(character.DefinitionId);
 		int charLevel = (definition?.Level ?? 0) + (character.SkillRatings.TryGetValue("BonusLevel", out var bonusLevel) ? bonusLevel : 0);
@@ -404,222 +400,35 @@ public sealed partial class GameEngine
 		if (position.HasValue)
 		{
 			(int playerIdx, int rank, int slotIndex) = position.Value;
-			List<CardInstance> rankCards = state.Players[playerIdx].Ranks[rank];
-			CardInstance? leftNeighbor = ((slotIndex > 0) ? new CardInstance?(rankCards[slotIndex - 1]) : ((CardInstance?)null));
-			CardInstance? rightNeighbor = ((slotIndex + 1 < rankCards.Count) ? new CardInstance?(rankCards[slotIndex + 1]) : ((CardInstance?)null));
-			CardInstance?[] adjacentNeighbors;
-			if (definition != null && definition.Name.Equals("Ambitious Squire", StringComparison.OrdinalIgnoreCase))
+			PassiveAccumulator acc = new PassiveAccumulator
 			{
-				adjacentNeighbors = new CardInstance?[2] { leftNeighbor, rightNeighbor };
-				for (int i = 0; i < adjacentNeighbors.Length; i++)
-				{
-					CardInstance? neighbor = adjacentNeighbors[i];
-					if (neighbor.HasValue)
-					{
-						CardDefinition? neighborDef = cardDb.GetDefinition(neighbor.Value.DefinitionId);
-						int neighborLevel = (neighborDef?.Level ?? 0) + (neighbor.Value.SkillRatings.TryGetValue("BonusLevel", out var neighborBonusLevel) ? neighborBonusLevel : 0);
-						if (IsDeverenian(neighborDef) && neighborLevel > charLevel)
-						{
-							atkBonus += 2;
-							acBonus += 2;
-						}
-					}
-				}
-			}
-			if (IsMercenary(definition))
+				Atk = atkBonus,
+				Ac = acBonus,
+				Hp = hpBonus,
+				Skill = skillBonus,
+				ExtraWounds = extraWounds
+			};
+			PassiveContext passiveCtx = new PassiveContext
 			{
-				adjacentNeighbors = new CardInstance?[2] { leftNeighbor, rightNeighbor };
-				for (int i = 0; i < adjacentNeighbors.Length; i++)
-				{
-					CardInstance? neighbor = adjacentNeighbors[i];
-					if (neighbor.HasValue)
-					{
-						CardDefinition neighborDef = cardDb.GetDefinition(neighbor.Value.DefinitionId);
-						if (neighborDef != null && neighborDef.Name.Equals("Balian", StringComparison.OrdinalIgnoreCase))
-						{
-							acBonus += 2;
-							break;
-						}
-					}
-				}
-			}
-			bool isSelfHazahk = definition != null && definition.Name.Equals("Hazahk of Shadow", StringComparison.OrdinalIgnoreCase);
-			bool hasAdjacentHazahk = false;
-			adjacentNeighbors = new CardInstance?[2] { leftNeighbor, rightNeighbor };
-			for (int i = 0; i < adjacentNeighbors.Length; i++)
-			{
-				CardInstance? neighbor = adjacentNeighbors[i];
-				if (neighbor.HasValue)
-				{
-					CardDefinition neighborDef = cardDb.GetDefinition(neighbor.Value.DefinitionId);
-					if (neighborDef != null && neighborDef.Name.Equals("Hazahk of Shadow", StringComparison.OrdinalIgnoreCase))
-					{
-						hasAdjacentHazahk = true;
-						break;
-					}
-				}
-			}
-			if ((isSelfHazahk || hasAdjacentHazahk) && (character.Wounds > 0 || isWounded))
-			{
-				atkBonus += 5;
-			}
-			if (IsNothrog(definition))
-			{
-				adjacentNeighbors = new CardInstance?[2] { leftNeighbor, rightNeighbor };
-				for (int i = 0; i < adjacentNeighbors.Length; i++)
-				{
-					CardInstance? neighbor = adjacentNeighbors[i];
-					if (neighbor.HasValue)
-					{
-						CardDefinition neighborDef = cardDb.GetDefinition(neighbor.Value.DefinitionId);
-						if (neighborDef != null && neighborDef.Name.Equals("Joleg", StringComparison.OrdinalIgnoreCase))
-						{
-							atkBonus += 2;
-							break;
-						}
-					}
-				}
-			}
-			if (IsSiege(definition))
-			{
-				adjacentNeighbors = new CardInstance?[2] { leftNeighbor, rightNeighbor };
-				for (int i = 0; i < adjacentNeighbors.Length; i++)
-				{
-					CardInstance? neighbor = adjacentNeighbors[i];
-					if (neighbor.HasValue)
-					{
-						CardDefinition neighborDef = cardDb.GetDefinition(neighbor.Value.DefinitionId);
-						if (neighborDef != null && neighborDef.Name.Equals("Makusog Steelhorn", StringComparison.OrdinalIgnoreCase))
-						{
-							atkBonus += 2;
-							break;
-						}
-					}
-				}
-			}
-			if (charLevel <= 2)
-			{
-				adjacentNeighbors = new CardInstance?[2] { leftNeighbor, rightNeighbor };
-				for (int i = 0; i < adjacentNeighbors.Length; i++)
-				{
-					CardInstance? neighbor = adjacentNeighbors[i];
-					if (neighbor.HasValue)
-					{
-						CardDefinition neighborDef = cardDb.GetDefinition(neighbor.Value.DefinitionId);
-						if (neighborDef != null && neighborDef.Name.Equals("Shannon the Daring", StringComparison.OrdinalIgnoreCase))
-						{
-							atkBonus += 2;
-							break;
-						}
-					}
-				}
-			}
-			if (IsDwarf(definition))
-			{
-				adjacentNeighbors = new CardInstance?[2] { leftNeighbor, rightNeighbor };
-				for (int i = 0; i < adjacentNeighbors.Length; i++)
-				{
-					CardInstance? neighbor = adjacentNeighbors[i];
-					if (neighbor.HasValue)
-					{
-						CardDefinition neighborDef = cardDb.GetDefinition(neighbor.Value.DefinitionId);
-						if (neighborDef != null && neighborDef.Name.Equals("Tunnel Vanguard", StringComparison.OrdinalIgnoreCase))
-						{
-							hpBonus++;
-						}
-					}
-				}
-			}
-			for (int j = 0; j < rankCards.Count; j++)
-			{
-				if (j == slotIndex)
-				{
-					continue;
-				}
-				foreach (int attachedItemId in rankCards[j].AttachedItemIds)
-				{
-					CardInstance? equippedItem = CardLocator.FindCard(state, attachedItemId);
-					if (equippedItem.HasValue)
-					{
-						CardDefinition itemDef = cardDb.GetDefinition(equippedItem.Value.DefinitionId);
-						if (itemDef != null && itemDef.Name.Equals("Breastplate of Power", StringComparison.OrdinalIgnoreCase))
-						{
-							atkBonus += 2;
-							acBonus += 2;
-						}
-					}
-				}
-			}
-			if ((IsDwarf(definition) & isWounded) && rankCards.Any((CardInstance c) =>
-			{
-				CardDefinition def = cardDb.GetDefinition(c.DefinitionId);
-				return def != null && def.Name.Equals("Dress", StringComparison.OrdinalIgnoreCase);
-			}))
-			{
-				acBonus += 3;
-			}
-			if (IsFreeKingdoms(definition))
-			{
-				for (int squireIdx = 0; squireIdx < rankCards.Count; squireIdx++)
-				{
-					if (squireIdx == slotIndex)
-					{
-						continue;
-					}
-					CardInstance otherChar = rankCards[squireIdx];
-					CardDefinition otherDef = cardDb.GetDefinition(otherChar.DefinitionId);
-					if (otherDef != null && otherDef.Name.Equals("Squire Argos", StringComparison.OrdinalIgnoreCase))
-					{
-						int argosLevel = otherDef.Level + (otherChar.SkillRatings.TryGetValue("BonusLevel", out var argosBonusLevel) ? argosBonusLevel : 0);
-						if (charLevel <= argosLevel)
-						{
-							atkBonus += 2;
-							acBonus++;
-						}
-					}
-				}
-			}
-			if (IsDeverenian(definition) && IsFighter(definition))
-			{
-				int rearRank = rank + 1;
-				if (state.Players[playerIdx].Ranks.TryGetValue(rearRank, out List<CardInstance> rearRankCards) && rearRankCards.Any((CardInstance c) =>
-				{
-					CardDefinition def = cardDb.GetDefinition(c.DefinitionId);
-					return def != null && def.Name.Equals("Taumar the Protector", StringComparison.OrdinalIgnoreCase);
-				}))
-				{
-					acBonus += 2;
-					skillBonus += 2;
-				}
-			}
-			for (int oppIdx = 0; oppIdx < state.Players.Count; oppIdx++)
-			{
-				if (oppIdx == playerIdx)
-				{
-					continue;
-				}
-				foreach (var (oppRank, oppRankCards) in state.Players[oppIdx].Ranks)
-				{
-					if (BoardGeometry.GetCrossBoardDistance(rank, oppRank) > 1)
-					{
-						continue;
-					}
-					foreach (CardInstance enemy in oppRankCards)
-					{
-						CardDefinition enemyDef = cardDb.GetDefinition(enemy.DefinitionId);
-						if (enemyDef != null && enemyDef.Name.Equals("Ghed Bane", StringComparison.OrdinalIgnoreCase))
-						{
-							int targetLevel = GetEffectiveLevel(state, character, cardDb);
-							int ghedLevel = GetEffectiveLevel(state, enemy, cardDb);
-							if (targetLevel < ghedLevel)
-							{
-								atkBonus -= 2;
-								acBonus -= 2;
-							}
-						}
-					}
-				}
-			}
+				State = state,
+				CardDb = cardDb,
+				Character = character,
+				Definition = definition,
+				Combat = combatCtx,
+				CharLevel = charLevel,
+				IsWounded = isWounded,
+				PlayerIndex = playerIdx,
+				Rank = rank,
+				SlotIndex = slotIndex,
+				Acc = acc
+			};
+			CardScriptRegistry.ApplySelfPassive(passiveCtx);
+			CardScriptRegistry.ApplyBoardPassives(passiveCtx);
+			atkBonus = acc.Atk;
+			acBonus = acc.Ac;
+			hpBonus = acc.Hp;
+			skillBonus = acc.Skill;
+			extraWounds = acc.ExtraWounds;
 		}
 		int equippedWeaponCount = 0;
 		bool hasDualWieldItem = false;
@@ -660,34 +469,41 @@ public sealed partial class GameEngine
 			{
 				hasDualWieldItem = true;
 			}
-			if (definition12.Name.Equals("Shillelagh", StringComparison.OrdinalIgnoreCase))
+			PassiveAccumulator itemAcc = new PassiveAccumulator
 			{
-				int currentEffectiveSkill = character.CurrentSkill + skillBonus;
-				int shillelaghBonus = Math.Max(0, (currentEffectiveSkill + 1) / 2);
-				atkBonus += shillelaghBonus;
-			}
-			if (definition12.Name.Equals("Gapfinder", StringComparison.OrdinalIgnoreCase) && (object)combatCtx != null && combatCtx.IsAttacking && (object)combatCtx != null && combatCtx.IsMelee && (object)combatCtx != null && combatCtx.OpponentCard?.ReadyState == ReadyState.Spent)
+				Atk = atkBonus,
+				Ac = acBonus,
+				Hp = hpBonus,
+				Skill = skillBonus,
+				ExtraWounds = extraWounds
+			};
+			PassiveContext itemCtx = new PassiveContext
 			{
-				atkBonus += 5;
-			}
-			if (definition12.Name.Equals("Scale Mail", StringComparison.OrdinalIgnoreCase) && combatCtx != null && combatCtx.IsDefending && combatCtx.IsRanged)
+				State = state,
+				CardDb = cardDb,
+				Character = character,
+				Definition = definition,
+				Combat = combatCtx,
+				CharLevel = charLevel,
+				IsWounded = isWounded,
+				PlayerIndex = position?.Item1 ?? character.OwnerPlayerIndex,
+				Rank = position?.Item2 ?? character.Rank ?? 1,
+				SlotIndex = position?.Item3 ?? 0,
+				Acc = itemAcc
+			};
+			bool handled = CardScriptRegistry.ApplyItemPassive(itemCtx, definition12);
+			atkBonus = itemAcc.Atk;
+			acBonus = itemAcc.Ac;
+			hpBonus = itemAcc.Hp;
+			skillBonus = itemAcc.Skill;
+			extraWounds = itemAcc.ExtraWounds;
+			if (!handled)
 			{
-				acBonus += 2;
-			}
-			if (definition12.Name.Equals("Ardian Greathawk", StringComparison.OrdinalIgnoreCase))
-			{
-				skillBonus += 3;
-				continue;
-			}
-			if (definition12.Name.Equals("Unicorn of Thun", StringComparison.OrdinalIgnoreCase))
-			{
-				skillBonus += 2;
-				continue;
-			}
-			Match match = Regex.Match(definition12.RulesText, "\\+(\\d+)\\s+Skill", RegexOptions.IgnoreCase);
-			if (match.Success && int.TryParse(match.Groups[1].Value, out var result))
-			{
-				skillBonus += result;
+				Match match = Regex.Match(definition12.RulesText, "\\+(\\d+)\\s+Skill", RegexOptions.IgnoreCase);
+				if (match.Success && int.TryParse(match.Groups[1].Value, out var result))
+				{
+					skillBonus += result;
+				}
 			}
 		}
 		if ((hasDualWieldItem || HasDualWield(definition)) && (object)combatCtx != null && combatCtx.IsMelee && equippedWeaponCount >= 2)
@@ -696,22 +512,34 @@ public sealed partial class GameEngine
 		}
 		if (definition != null)
 		{
-			if (definition.Name.Equals("'Mad' Pat Carrik", StringComparison.OrdinalIgnoreCase) && (object)combatCtx != null && combatCtx.IsAttacking && (object)combatCtx != null && combatCtx.IsMelee)
+			PassiveAccumulator lateAcc = new PassiveAccumulator
 			{
-				extraWounds++;
-			}
-			if (definition.Name.Equals("Blitzer", StringComparison.OrdinalIgnoreCase) && (object)combatCtx != null && combatCtx.IsAttacking && (object)combatCtx != null && combatCtx.IsMelee)
+				Atk = atkBonus,
+				Ac = acBonus,
+				Hp = hpBonus,
+				Skill = skillBonus,
+				ExtraWounds = extraWounds
+			};
+			PassiveContext lateCtx = new PassiveContext
 			{
-				extraWounds++;
-			}
-			if (definition.Name.Equals("TFK Brigand", StringComparison.OrdinalIgnoreCase) && (object)combatCtx != null && combatCtx.IsDefending)
-			{
-				extraWounds++;
-			}
-			if (definition.Name.Equals("Grimfey Prowler", StringComparison.OrdinalIgnoreCase) && (object)combatCtx != null && combatCtx.IsAttacking && (object)combatCtx != null && combatCtx.IsMelee && (object)combatCtx != null && combatCtx.OpponentCard?.ReadyState == ReadyState.Spent)
-			{
-				atkBonus += character.CurrentSkill + skillBonus;
-			}
+				State = state,
+				CardDb = cardDb,
+				Character = character,
+				Definition = definition,
+				Combat = combatCtx,
+				CharLevel = charLevel,
+				IsWounded = isWounded,
+				PlayerIndex = position?.Item1 ?? character.OwnerPlayerIndex,
+				Rank = position?.Item2 ?? character.Rank ?? 1,
+				SlotIndex = position?.Item3 ?? 0,
+				Acc = lateAcc
+			};
+			CardScriptRegistry.ApplyLatePassive(lateCtx);
+			atkBonus = lateAcc.Atk;
+			acBonus = lateAcc.Ac;
+			hpBonus = lateAcc.Hp;
+			skillBonus = lateAcc.Skill;
+			extraWounds = lateAcc.ExtraWounds;
 		}
 		if (state.TurnState.ActiveTurnBuffs.TryGetValue(character.InstanceId, out var activeBuffs))
 		{
@@ -778,7 +606,7 @@ public sealed partial class GameEngine
 	{
 		if (cardDb == null)
 		{
-			cardDb = _lastActiveCardDb ?? GetActiveCardDb();
+			cardDb = GetActiveCardDb(state);
 		}
 		CardDefinition definition = cardDb.GetDefinition(character.DefinitionId);
 		int baseAtk = (((object)definition != null && definition.Attack?.Strikes.Count > 0) ? definition.Attack.Strikes[0].Modifier : 0);
@@ -800,7 +628,7 @@ public sealed partial class GameEngine
 	{
 		if (cardDb == null)
 		{
-			cardDb = _lastActiveCardDb ?? GetActiveCardDb();
+			cardDb = GetActiveCardDb(state);
 		}
 		PassiveBonuses continuousPassiveBonuses = GetContinuousPassiveBonuses(state, character, combatCtx, cardDb);
 		return character.CurrentArmorClass + continuousPassiveBonuses.Ac;
@@ -810,7 +638,7 @@ public sealed partial class GameEngine
 	{
 		if (cardDb == null)
 		{
-			cardDb = _lastActiveCardDb ?? GetActiveCardDb();
+			cardDb = GetActiveCardDb(state);
 		}
 		PassiveBonuses continuousPassiveBonuses = GetContinuousPassiveBonuses(state, character, null, cardDb);
 		return character.CurrentHitPoints + continuousPassiveBonuses.Hp;
@@ -820,7 +648,7 @@ public sealed partial class GameEngine
 	{
 		if (cardDb == null)
 		{
-			cardDb = _lastActiveCardDb ?? GetActiveCardDb();
+			cardDb = GetActiveCardDb(state);
 		}
 		int baseHp = (cardDb?.GetDefinition(character.DefinitionId))?.BaseHitPoints ?? character.CurrentHitPoints;
 		int itemHp = 0;
@@ -841,7 +669,7 @@ public sealed partial class GameEngine
 	{
 		if (cardDb == null)
 		{
-			cardDb = _lastActiveCardDb ?? GetActiveCardDb();
+			cardDb = GetActiveCardDb(state);
 		}
 		PassiveBonuses continuousPassiveBonuses = GetContinuousPassiveBonuses(state, character, null, cardDb);
 		return character.CurrentSkill + continuousPassiveBonuses.Skill;
@@ -851,7 +679,7 @@ public sealed partial class GameEngine
 	{
 		if (cardDb == null)
 		{
-			cardDb = _lastActiveCardDb ?? GetActiveCardDb();
+			cardDb = GetActiveCardDb(state);
 		}
 		return (cardDb.GetDefinition(character.DefinitionId)?.Level ?? 0) + character.BonusLevel + (character.SkillRatings.TryGetValue("BonusLevel", out var bonusLevel) ? bonusLevel : 0);
 	}
@@ -860,7 +688,7 @@ public sealed partial class GameEngine
 	{
 		if (cardDb == null)
 		{
-			cardDb = _lastActiveCardDb ?? GetActiveCardDb();
+			cardDb = GetActiveCardDb(state);
 		}
 		CardDefinition definition = cardDb.GetDefinition(character.DefinitionId);
 		List<StrikeDescriptor> list = new List<StrikeDescriptor>();

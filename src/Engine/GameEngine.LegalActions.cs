@@ -629,8 +629,8 @@ public sealed partial class GameEngine
 		}
 		CardInstance? sourceCardInstance = CardLocator.FindCard(state, sourceInstanceId);
 		CardDefinition? sourceCardDef = sourceCardInstance.HasValue ? _cardDb.GetDefinition(sourceCardInstance.Value.DefinitionId) : null;
-		bool isHodsLegacy = sourceCardDef != null && sourceCardDef.Name.Equals("Hod's Legacy", StringComparison.OrdinalIgnoreCase);
-		bool isHuntingStaff = sourceCardDef != null && sourceCardDef.Name.Equals("Hunting Staff", StringComparison.OrdinalIgnoreCase);
+		bool isHodsLegacy = CardScriptRegistry.UsesLowerLevelFactionTargeting(sourceCardDef);
+		bool isHuntingStaff = CardScriptRegistry.UsesAdjacentMoveForwardTargeting(sourceCardDef);
 
 		if (isHodsLegacy || (ability.Description?.Contains("Hod's Legacy", StringComparison.OrdinalIgnoreCase) ?? false) || ((ability.Description?.Contains("lower level", StringComparison.OrdinalIgnoreCase) ?? false) && (ability.Description?.Contains("same faction", StringComparison.OrdinalIgnoreCase) ?? false)))
 		{

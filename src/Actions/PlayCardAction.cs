@@ -522,9 +522,7 @@ public sealed record PlayCardAction : IPlayerAction
 								|| itemDef.Traits.Any((string t) => t.Equals("Dual Wield", StringComparison.OrdinalIgnoreCase))
 								|| itemDef.RulesText.Contains("Dual Wield", StringComparison.OrdinalIgnoreCase)
 								|| definition2.Traits.Any((string t) => t.Equals("Dual Wield", StringComparison.OrdinalIgnoreCase))
-								|| definition2.RulesText.Contains("Dual Wield", StringComparison.OrdinalIgnoreCase)
-								|| itemDef.Name.Equals("Revenger", StringComparison.OrdinalIgnoreCase)
-								|| definition2.Name.Equals("Revenger", StringComparison.OrdinalIgnoreCase);
+								|| definition2.RulesText.Contains("Dual Wield", StringComparison.OrdinalIgnoreCase);
 							if (hasDualWield)
 							{
 								int weaponCount = 0;

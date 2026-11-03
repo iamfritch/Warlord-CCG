@@ -12,9 +12,7 @@ namespace WarlordEngine.Engine;
 
 public sealed partial class GameEngine
 {
-	private static CardDatabase? _masterCardDb;
-
-	private static CardDatabase? _lastActiveCardDb;
+	private static readonly Lazy<CardDatabase?> _fallbackCardDb = new(() => File.Exists(DataPaths.CardsJsonPath) ? DatabaseLoader.LoadFromFile(DataPaths.CardsJsonPath) : null);
 
 	private readonly GameState _state;
 
@@ -64,27 +62,11 @@ public sealed partial class GameEngine
 
 	public Func<StrikeTargetPrompt, int?>? SelectStrikeTarget { get; set; }
 
-	public static CardDatabase GetActiveCardDb()
+	/// <summary>Resolves the card database: explicit argument, then state.CardDb, then the immutable cards.json fallback.</summary>
+	public static CardDatabase GetActiveCardDb(GameState? state = null, CardDatabase? cardDb = null)
 	{
-		if (_masterCardDb != null)
-		{
-			return _masterCardDb;
-		}
-		string text3 = DataPaths.CardsJsonPath;
-		if (File.Exists(text3))
-		{
-			_masterCardDb = DatabaseLoader.LoadFromFile(text3);
-			return _masterCardDb;
-		}
-		if (_lastActiveCardDb != null)
-		{
-			return _lastActiveCardDb;
-		}
-		throw new InvalidOperationException("CardDatabase not initialized and Data/cards.json could not be found.");
+		return cardDb ?? state?.CardDb ?? _fallbackCardDb.Value ?? throw new InvalidOperationException("CardDatabase not initialized and Data/cards.json could not be found.");
 	}
-
-	public static CardDatabase GetLastActiveCardDb() => _lastActiveCardDb ?? GetActiveCardDb();
-
 	public void SetDiceRoller(DiceRoller roller)
 	{
 		ArgumentNullException.ThrowIfNull(roller, "roller");
@@ -111,7 +93,7 @@ public sealed partial class GameEngine
 		ArgumentNullException.ThrowIfNull(cardDb, "cardDb");
 		_state = state;
 		_cardDb = cardDb;
-		_lastActiveCardDb = cardDb;
+		_state.BindCardDb(cardDb);
 		_diceRoller = diceRoller ?? DefaultDiceRoller;
 		_resolver = new EventResolver();
 		if (_state.PendingEvents.Count > 0)
@@ -612,7 +594,7 @@ public sealed partial class GameEngine
 				foreach (CardInstance item in value)
 				{
 					CardDefinition definition = _cardDb.GetDefinition(item.DefinitionId);
-					if (definition != null && definition.Name.Equals("Ac'Vuk", StringComparison.OrdinalIgnoreCase) && !HasTurnBuff(_state, item.InstanceId, "WOUNDED_OPPONENT_THIS_TURN"))
+					if (definition != null && CardScriptRegistry.RequiresEndOfTurnSurvivalCheck(definition) && !HasTurnBuff(_state, item.InstanceId, "WOUNDED_OPPONENT_THIS_TURN"))
 					{
 						list.Add((player.PlayerIndex, item.InstanceId));
 					}

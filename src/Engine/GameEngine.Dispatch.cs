@@ -274,7 +274,7 @@ public sealed partial class GameEngine
 												c.ReadyState = ReadyState.Stunned;
 											});
 										}
-										if (!definition.Name.Equals("Hod's Legacy", StringComparison.OrdinalIgnoreCase) && !definition.Name.Equals("Hunting Staff", StringComparison.OrdinalIgnoreCase) && (abilityDefinition.DestroysSource || Regex.IsMatch(abilityDefinition.Description ?? "", "\\b(?:Destroy|Discard|Sacrifice)\\s+(?:this\\s+item|this\\s+card)\\b", RegexOptions.IgnoreCase) || (definition != null && definition.Type == CardType.Item && (Regex.IsMatch(definition.RulesText, "\\b(?:Destroy|Discard)\\s+(?:this\\s+item|Order:)\\b", RegexOptions.IgnoreCase) || definition.Name.Equals("Strongarm Stout", StringComparison.OrdinalIgnoreCase)))))
+										if (!CardScriptRegistry.PreservesSourceOnUse(definition) && (abilityDefinition.DestroysSource || Regex.IsMatch(abilityDefinition.Description ?? "", "\\b(?:Destroy|Discard|Sacrifice)\\s+(?:this\\s+item|this\\s+card)\\b", RegexOptions.IgnoreCase) || (definition != null && definition.Type == CardType.Item && (Regex.IsMatch(definition.RulesText, "\\b(?:Destroy|Discard)\\s+(?:this\\s+item|Order:)\\b", RegexOptions.IgnoreCase) || CardScriptRegistry.DestroysSourceOnUse(definition)))))
 										{
 											foreach (PlayerState player2 in _state.Players)
 											{
@@ -316,50 +316,16 @@ public sealed partial class GameEngine
 										PayActionCosts(action, abilityDefinition);
 										if (definition != null)
 										{
-											if (definition.Name.Equals("Ciane", StringComparison.OrdinalIgnoreCase))
+											CardScriptContext abilityCtx = new CardScriptContext
 											{
-												AddTurnBuff(_state, useAbilityAction.SourceInstanceId, "CIANE_SELF_WOUND", 1);
-											}
-											else if (definition.Name.Equals("Shannon the Daring", StringComparison.OrdinalIgnoreCase))
-											{
-												(int, int, int)? tuple2 = FindCharacterPosition(_state, performerId);
-												if (tuple2.HasValue)
-												{
-													int item2 = tuple2.Value.Item1;
-													if (_state.Players[item2].Ranks.TryGetValue(1, out List<CardInstance> firstRankCards))
-													{
-														foreach (CardInstance item8 in firstRankCards)
-														{
-															CardDefinition? definition2 = _cardDb.GetDefinition(item8.DefinitionId);
-															int effectiveLevel = GetEffectiveLevel(_state, item8, _cardDb);
-															if (IsFreeKingdoms(definition2) && effectiveLevel <= 2)
-															{
-																AddTurnBuff(_state, item8.InstanceId, "ATK", 2);
-																AddTurnBuff(_state, item8.InstanceId, "AC", 2);
-															}
-														}
-													}
-												}
-											}
-
-											else if (definition.Name.Equals("Albrecht Novice", StringComparison.OrdinalIgnoreCase))
-											{
-												(int, int, int)? tuple4 = FindCharacterPosition(_state, performerId);
-												if (tuple4.HasValue)
-												{
-													List<CardInstance> list3 = _state.Players[tuple4.Value.Item1].Ranks[tuple4.Value.Item2];
-													if (tuple4.Value.Item3 > 0)
-													{
-														AddTurnBuff(_state, list3[tuple4.Value.Item3 - 1].InstanceId, "ATK", 2);
-														AddTurnBuff(_state, list3[tuple4.Value.Item3 - 1].InstanceId, "AC", 2);
-													}
-													if (tuple4.Value.Item3 + 1 < list3.Count)
-													{
-														AddTurnBuff(_state, list3[tuple4.Value.Item3 + 1].InstanceId, "ATK", 2);
-														AddTurnBuff(_state, list3[tuple4.Value.Item3 + 1].InstanceId, "AC", 2);
-													}
-												}
-											}
+												State = _state,
+												CardDb = _cardDb,
+												Card = cardInstance.Value,
+												Definition = definition,
+												PerformerId = performerId,
+												PlayerIndex = action.PlayerIndex
+											};
+											CardScriptRegistry.OnAbilityUsed(abilityCtx);
 										}
 										_resolver.Push(new AbilityActivatedEvent
 										{
@@ -480,94 +446,19 @@ public sealed partial class GameEngine
 			}
 			if (cardDef != null)
 			{
-				if (cardDef.Name.Equals("Assassin's Strike", StringComparison.OrdinalIgnoreCase))
+				CardScriptContext actionCtx = new CardScriptContext
 				{
-					AddTurnBuff(_state, performerId, "ADVANTAGE", 1);
-					AddTurnBuff(_state, performerId, "WOUND_BONUS", 1);
-				}
-				else if (cardDef.Name.Equals("Cunning Shot", StringComparison.OrdinalIgnoreCase))
-				{
-					AddTurnBuff(_state, performerId, "CUNNING_SHOT_PULL", 1);
-				}
-				else if (cardDef.Name.Equals("Dupe", StringComparison.OrdinalIgnoreCase))
-				{
-
-					(int, int, int)? tuple5 = FindCharacterPosition(_state, performerId);
-					if (tuple5.HasValue)
-					{
-						List<CardInstance> list4 = _state.Players[tuple5.Value.Item1].Ranks[tuple5.Value.Item2];
-						if (list4.Count > 1)
-						{
-							int oldIdx = tuple5.Value.Item3;
-							int newIdx = (oldIdx + 1) % list4.Count;
-							CardInstance item4 = list4[oldIdx];
-							list4.RemoveAt(oldIdx);
-							list4.Insert(newIdx, item4);
-							AddTurnBuff(_state, performerId, "DUPE_ACTIVE", 1);
-						}
-					}
-				}
-				else if (cardDef.Name.Equals("Gift From Above", StringComparison.OrdinalIgnoreCase))
-				{
-					int instanceId = playCardAction.TargetCharacterId ?? performerId;
-					AddTurnBuff(_state, instanceId, "ATK", performerLevel);
-					AddTurnBuff(_state, instanceId, "AC", performerLevel);
-				}
-				else if (cardDef.Name.Equals("Quick Strength", StringComparison.OrdinalIgnoreCase))
-				{
-					int instanceId2 = playCardAction.TargetCharacterId ?? performerId;
-					AddTurnBuff(_state, instanceId2, "ATK", performerLevel);
-				}
-				else if (cardDef.Name.Equals("Quick Shielding", StringComparison.OrdinalIgnoreCase))
-				{
-					int instanceId3 = playCardAction.TargetCharacterId ?? performerId;
-					AddTurnBuff(_state, instanceId3, "AC", performerLevel);
-				}
-				else if (cardDef.Name.Equals("Even the Odds", StringComparison.OrdinalIgnoreCase))
-				{
-					int nearbyEnemiesCount = 0;
-					(int, int, int)? tuple6 = FindCharacterPosition(_state, performerId);
-					if (tuple6.HasValue)
-					{
-						int item5 = tuple6.Value.Item2;
-						for (int oppIndex = 0; oppIndex < _state.Players.Count; oppIndex++)
-						{
-							if (oppIndex == playCardAction.PlayerIndex)
-							{
-								continue;
-							}
-							foreach (var (oppRank, oppRankCards) in _state.Players[oppIndex].Ranks)
-							{
-								if (BoardGeometry.GetCrossBoardDistance(item5, oppRank) <= 1)
-								{
-									nearbyEnemiesCount += oppRankCards.Count;
-								}
-							}
-						}
-					}
-					AddTurnBuff(_state, performerId, "ATK", nearbyEnemiesCount);
-					AddTurnBuff(_state, performerId, "AC", nearbyEnemiesCount);
-					if (nearbyEnemiesCount >= 5)
-					{
-						AddTurnBuff(_state, performerId, "WARD", 1);
-					}
-				}
-				else if (cardDef.Name.Equals("Steady Grip", StringComparison.OrdinalIgnoreCase))
-				{
-					AddTurnBuff(_state, performerId, "TRUE_STRIKE", 1);
-				}
-				else if (cardDef.Name.Equals("Spiritual Weapon", StringComparison.OrdinalIgnoreCase))
-				{
-					AddTurnBuff(_state, performerId, "REACH", 1);
-				}
-				else if (cardDef.Name.Equals("Leveled!", StringComparison.OrdinalIgnoreCase))
-				{
-					actingPlayer.DiscardPile.RemoveAll((CardInstance c) => c.InstanceId == card.InstanceId);
-					actingPlayer.BanishPile.Add(card with
-					{
-						Zone = CardZone.Banished
-					});
-				}
+					State = _state,
+					CardDb = _cardDb,
+					Card = card,
+					Definition = cardDef,
+					PerformerId = performerId,
+					PlayerIndex = playCardAction.PlayerIndex,
+					TargetInstanceId = playCardAction.TargetCharacterId,
+					PerformerLevel = performerLevel,
+					ActingPlayer = actingPlayer
+				};
+				CardScriptRegistry.OnActionPlayed(actionCtx);
 			}
 			_resolver.Push(new AbilityActivatedEvent
 			{
