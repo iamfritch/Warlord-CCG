@@ -562,7 +562,7 @@ public sealed partial class GameEngine
 
 	private void UnspendAndUnstunCards()
 	{
-		_state.TurnState.UsedLimitedAbilityKeysThisTurn.Clear();
+		_state.TurnState.ResetForNewTurn();
 		foreach (PlayerState player in _state.Players)
 		{
 			foreach (List<CardInstance> value in player.Ranks.Values)

@@ -13,7 +13,7 @@ public sealed record GrantAdditionalStrikeEffect(int NumberOfStrikes = 1) : IEff
 			? context.GetPerformerCharacterId()
 			: context.GetPerformerCharacterId(targetId);
 
-		GameEngine.AddTurnBuff(context.State, instanceId, "ADDITIONAL_STRIKES", NumberOfStrikes);
+		GameEngine.AddTurnBuff(context.State, instanceId, TurnBuffType.ExtraStrikes, NumberOfStrikes);
 		yield break;
 	}
 }

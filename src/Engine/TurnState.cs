@@ -15,6 +15,8 @@ public sealed class TurnState
 
 	public HashSet<string> UsedLimitedAbilityKeysThisTurn { get; set; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
+	public Dictionary<int, List<TurnBuff>> ActiveTurnBuffs { get; init; } = new();
+
 	public void RecordPass()
 	{
 		Priority.ConsecutivePasses++;
@@ -37,15 +39,30 @@ public sealed class TurnState
 		}
 	}
 
+	public void ResetForNewTurn()
+	{
+		ActiveTurnBuffs.Clear();
+		UsedLimitedAbilityKeysThisTurn.Clear();
+	}
+
+	public TurnState Clone() => DeepClone();
+
 	public TurnState DeepClone()
 	{
+		var clonedBuffs = new Dictionary<int, List<TurnBuff>>(ActiveTurnBuffs.Count);
+		foreach (var (key, list) in ActiveTurnBuffs)
+		{
+			clonedBuffs[key] = new List<TurnBuff>(list);
+		}
+
 		return new TurnState
 		{
 			ActivePlayerIndex = ActivePlayerIndex,
 			CurrentPhase = CurrentPhase,
 			TurnNumber = TurnNumber,
 			Priority = Priority.DeepClone(),
-			UsedLimitedAbilityKeysThisTurn = new HashSet<string>(UsedLimitedAbilityKeysThisTurn, StringComparer.OrdinalIgnoreCase)
+			UsedLimitedAbilityKeysThisTurn = new HashSet<string>(UsedLimitedAbilityKeysThisTurn, StringComparer.OrdinalIgnoreCase),
+			ActiveTurnBuffs = clonedBuffs
 		};
 	}
 }

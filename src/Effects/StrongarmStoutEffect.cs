@@ -29,12 +29,8 @@ public sealed record StrongarmStoutEffect : IEffect
 
 		if (cardsDrawn > 0)
 		{
-			GameEngine.AddTurnBuff(context.State, characterId, "ATK", 2 * cardsDrawn);
-			GameEngine.AddTurnBuff(context.State, characterId, "HP", cardsDrawn);
-			CardLocator.FindAndMutate(context.State, characterId, delegate(ref CardInstance c)
-			{
-				c.CurrentHitPoints += cardsDrawn;
-			});
+			GameEngine.AddTurnBuff(context.State, characterId, TurnBuffType.Attack, 2 * cardsDrawn);
+			GameEngine.AddTurnBuff(context.State, characterId, TurnBuffType.HitPoints, cardsDrawn);
 		}
 		yield break;
 	}

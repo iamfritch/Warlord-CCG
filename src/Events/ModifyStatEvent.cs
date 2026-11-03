@@ -26,17 +26,14 @@ public sealed record ModifyStatEvent : GameEvent
 				card.Wounds = Math.Max(0, card.Wounds - amount);
 				break;
 			case "CurrentArmorClass":
-				card.CurrentArmorClass += amount;
-				GameEngine.AddTurnBuff(state, TargetInstanceId, "AC", amount);
+			case "AC":
+				GameEngine.AddTurnBuff(state, TargetInstanceId, TurnBuffType.ArmorClass, amount);
 				break;
 			case "CurrentSkill":
 				card.CurrentSkill += amount;
 				break;
 			case "ATK":
-				GameEngine.AddTurnBuff(state, TargetInstanceId, "ATK", amount);
-				break;
-			case "AC":
-				GameEngine.AddTurnBuff(state, TargetInstanceId, "AC", amount);
+				GameEngine.AddTurnBuff(state, TargetInstanceId, TurnBuffType.Attack, amount);
 				break;
 			}
 		});

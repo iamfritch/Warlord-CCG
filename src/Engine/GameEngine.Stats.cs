@@ -74,29 +74,104 @@ public sealed partial class GameEngine
 		return (Atk: atk, Ac: ac, Hp: hp);
 	}
 
+	public static TurnBuffType ParseBuffType(string buffType)
+	{
+		return buffType.ToUpperInvariant() switch
+		{
+			"ATK" or "ATTACK" => TurnBuffType.Attack,
+			"RANGED_ATK" or "RANGED_ATTACK" or "RANGEDATTACK" => TurnBuffType.RangedAttack,
+			"AC" or "ARMORCLASS" or "ARMOR_CLASS" => TurnBuffType.ArmorClass,
+			"HP" or "HITPOINTS" or "HIT_POINTS" => TurnBuffType.HitPoints,
+			"SKILL" => TurnBuffType.Skill,
+			"INITIATIVE" => TurnBuffType.Initiative,
+			"EXTRA_STRIKE" or "ADDITIONAL_STRIKES" or "EXTRA_STRIKES" => TurnBuffType.ExtraStrikes,
+			"WOUND_BONUS" => TurnBuffType.WoundBonus,
+			"MELEE_WOUND_BONUS" => TurnBuffType.MeleeWoundBonus,
+			"TRUE_STRIKE" => TurnBuffType.TrueStrike,
+			"REACH" => TurnBuffType.Reach,
+			"STEALTH" => TurnBuffType.Stealth,
+			"RIPOSTE" => TurnBuffType.Riposte,
+			"MAGIC_RESISTANCE" or "MAGICRESISTANCE" => TurnBuffType.MagicResistance,
+			"FIRE_RESISTANCE" or "FIRERESISTANCE" => TurnBuffType.FireResistance,
+			"NO_MELEE_STRIKES" => TurnBuffType.NoMeleeStrikes,
+			"ADVANTAGE" => TurnBuffType.Advantage,
+			"DISADVANTAGE" => TurnBuffType.Disadvantage,
+			"REDIRECT_TO_ME" => TurnBuffType.RedirectToMe,
+			"DUPE_ACTIVE" => TurnBuffType.DupeActive,
+			"WARD" => TurnBuffType.Ward,
+			"SURVEYED" => TurnBuffType.Surveyed,
+			"BANISH_ON_DEATH" => TurnBuffType.BanishOnDeath,
+			"WOUNDED_OPPONENT_THIS_TURN" => TurnBuffType.WoundedOpponentThisTurn,
+			"STIRGES_BONUS_STRIKE" => TurnBuffType.StirgesBonusStrike,
+			"CIANE_SELF_WOUND" => TurnBuffType.CianeSelfWound,
+			"CLEAVE_HIGHER_LEVEL_WOUND" => TurnBuffType.CleaveHigherLevelWound,
+			"CUNNING_SHOT_PULL" => TurnBuffType.CunningShotPull,
+			"CRUSH_DESTROY_ITEM" => TurnBuffType.CrushDestroyItem,
+			"POUNCE_MISS_WOUND" => TurnBuffType.PounceMissWound,
+			"SHIELD_OF_SPURNING_PUSH" => TurnBuffType.ShieldOfSpurningPush,
+			"PIERCE_ARMOR" => TurnBuffType.PierceArmor,
+			"DEALS_MAGIC_DAMAGE" => TurnBuffType.DealsMagicDamage,
+			"NEGATE_POWERATTACK" => TurnBuffType.NegatePowerattack,
+			"IMMUNE_TO_ATTACK_ACTIONS" => TurnBuffType.ImmuneToAttackActions,
+			"FORCE_RANGED_HIT" => TurnBuffType.ForceRangedHit,
+			_ => Enum.TryParse<TurnBuffType>(buffType.Replace("_", ""), true, out var parsed) ? parsed : TurnBuffType.Other
+		};
+	}
+
+	public static void AddTurnBuff(GameState state, int instanceId, TurnBuffType buffType, int value = 1, int? sourceInstanceId = null)
+	{
+		if (!state.TurnState.ActiveTurnBuffs.TryGetValue(instanceId, out var buffs))
+		{
+			buffs = new List<TurnBuff>();
+			state.TurnState.ActiveTurnBuffs[instanceId] = buffs;
+		}
+		buffs.Add(new TurnBuff(buffType, value, sourceInstanceId));
+	}
+
 	public static void AddTurnBuff(GameState state, int instanceId, string buffType, int value = 0)
 	{
-		state.TurnState.UsedLimitedAbilityKeysThisTurn.Add($"BUFF:{instanceId}:{buffType.ToUpperInvariant()}:{value}");
+		AddTurnBuff(state, instanceId, ParseBuffType(buffType), value);
+	}
+
+	public static bool HasTurnBuff(GameState state, int instanceId, TurnBuffType buffType)
+	{
+		if (state.TurnState.ActiveTurnBuffs.TryGetValue(instanceId, out var buffs))
+		{
+			for (int i = 0; i < buffs.Count; i++)
+			{
+				if (buffs[i].Type == buffType)
+				{
+					return true;
+				}
+			}
+		}
+		return false;
 	}
 
 	public static bool HasTurnBuff(GameState state, int instanceId, string buffType)
 	{
-		string prefix = $"BUFF:{instanceId}:{buffType.ToUpperInvariant()}:";
-		return state.TurnState.UsedLimitedAbilityKeysThisTurn.Any((string k) => k.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
+		return HasTurnBuff(state, instanceId, ParseBuffType(buffType));
+	}
+
+	public static int GetTurnBuffValue(GameState state, int instanceId, TurnBuffType buffType)
+	{
+		int totalBuff = 0;
+		if (state.TurnState.ActiveTurnBuffs.TryGetValue(instanceId, out var buffs))
+		{
+			for (int i = 0; i < buffs.Count; i++)
+			{
+				if (buffs[i].Type == buffType)
+				{
+					totalBuff += buffs[i].Value;
+				}
+			}
+		}
+		return totalBuff;
 	}
 
 	public static int GetTurnBuffValue(GameState state, int instanceId, string buffType)
 	{
-		string text = $"BUFF:{instanceId}:{buffType.ToUpperInvariant()}:";
-		int totalBuff = 0;
-		foreach (string item in state.TurnState.UsedLimitedAbilityKeysThisTurn)
-		{
-			if (item.StartsWith(text, StringComparison.OrdinalIgnoreCase) && int.TryParse(item.Substring(text.Length), out var result))
-			{
-				totalBuff += result;
-			}
-		}
-		return totalBuff;
+		return GetTurnBuffValue(state, instanceId, ParseBuffType(buffType));
 	}
 
 	public static bool IsDeverenian(CardDefinition? def)
@@ -638,54 +713,48 @@ public sealed partial class GameEngine
 				atkBonus += character.CurrentSkill + skillBonus;
 			}
 		}
-		string text = $"BUFF:{character.InstanceId}:";
-		foreach (string item5 in state.TurnState.UsedLimitedAbilityKeysThisTurn)
+		if (state.TurnState.ActiveTurnBuffs.TryGetValue(character.InstanceId, out var activeBuffs))
 		{
-			if (!item5.StartsWith(text, StringComparison.OrdinalIgnoreCase))
+			for (int i = 0; i < activeBuffs.Count; i++)
 			{
-				continue;
-			}
-			string[] array2 = item5.Substring(text.Length).Split(':');
-			if (array2.Length < 2 || !int.TryParse(array2[1], out var result2))
-			{
-				continue;
-			}
-			switch (array2[0].ToUpperInvariant())
-			{
-			case "ATK":
-				atkBonus += result2;
-				break;
-			case "AC":
-				acBonus += result2;
-				break;
-			case "SKILL":
-				skillBonus += result2;
-				break;
-			case "HP":
-				hpBonus += result2;
-				break;
-			case "TRUE_STRIKE":
-				trueStrike = true;
-				break;
-			case "REACH":
-				hasReach = true;
-				break;
-			case "EXTRA_STRIKE":
-				list.Add(new StrikeDescriptor
+				TurnBuff buff = activeBuffs[i];
+				switch (buff.Type)
 				{
-					Modifier = result2,
-					IsRanged = false
-				});
-				break;
-			case "MELEE_WOUND_BONUS":
-				if ((object)combatCtx != null && combatCtx.IsMelee)
-				{
-					extraWounds += result2;
+				case TurnBuffType.Attack:
+					atkBonus += buff.Value;
+					break;
+				case TurnBuffType.ArmorClass:
+					acBonus += buff.Value;
+					break;
+				case TurnBuffType.Skill:
+					skillBonus += buff.Value;
+					break;
+				case TurnBuffType.HitPoints:
+					hpBonus += buff.Value;
+					break;
+				case TurnBuffType.TrueStrike:
+					trueStrike = true;
+					break;
+				case TurnBuffType.Reach:
+					hasReach = true;
+					break;
+				case TurnBuffType.ExtraStrikes:
+					list.Add(new StrikeDescriptor
+					{
+						Modifier = buff.Value,
+						IsRanged = false
+					});
+					break;
+				case TurnBuffType.MeleeWoundBonus:
+					if (combatCtx != null && combatCtx.IsMelee)
+					{
+						extraWounds += buff.Value;
+					}
+					break;
+				case TurnBuffType.WoundBonus:
+					extraWounds += buff.Value;
+					break;
 				}
-				break;
-			case "WOUND_BONUS":
-				extraWounds += result2;
-				break;
 			}
 		}
 		if (character.SkillRatings.TryGetValue("BonusAtk", out var bonusAtkRating))
